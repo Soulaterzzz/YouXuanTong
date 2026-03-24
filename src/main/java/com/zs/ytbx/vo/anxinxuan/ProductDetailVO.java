@@ -1,0 +1,20 @@
+package com.zs.ytbx.vo.anxinxuan;
+
+import lombok.Builder;
+import lombok.Data;
+import java.math.BigDecimal;
+
+@Data
+@Builder
+public class ProductDetailVO {
+    private Long id;
+    private String productCode;
+    private String name;
+    private String description;
+    private String features;
+    private BigDecimal price;
+    private Integer stock;
+    private boolean isNew;
+    private String categoryCode;
+    private String companyName;
+}
