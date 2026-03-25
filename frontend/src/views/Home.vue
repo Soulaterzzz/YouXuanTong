@@ -284,17 +284,7 @@
                         <el-icon><Switch /></el-icon>
                         {{ product.saleStatus === 'ON_SALE' ? '下架' : '上架' }}
                       </el-button>
-                      <el-button type="primary" plain size="small" @click="previewImage(product)">
-                        <el-icon><Picture /></el-icon>
-                        图片
-                      </el-button>
-                      <el-button
-                        type="success"
-                        plain
-                        size="small"
-                        v-if="product.templateFileName"
-                        @click="downloadProductTemplate(product)"
-                      >
+                      <el-button type="primary" plain size="small" @click="downloadProductTemplate(product)">
                         <el-icon><Download /></el-icon>
                         模板
                       </el-button>
@@ -567,10 +557,7 @@
 
           <!-- 操作按钮 -->
           <div class="table-actions" v-if="isAdmin">
-            <el-select v-model="rechargeTargetUser" placeholder="选择用户" clearable style="width: 150px;">
-              <el-option v-for="user in allUsers" :key="user.id" :label="user.username" :value="user.id" />
-            </el-select>
-            <el-button type="primary" @click="openRechargeDialog" :disabled="!rechargeTargetUser">
+            <el-button type="primary" @click="openRechargeDialog">
               <el-icon><Coin /></el-icon>
               账户充值
             </el-button>
@@ -902,6 +889,11 @@
     <!-- 充值弹窗 -->
     <el-dialog v-model="rechargeDialogVisible" title="账户充值" width="400px">
       <el-form :model="rechargeForm" :rules="rechargeFormRules" ref="rechargeFormRef" label-width="80px">
+        <el-form-item label="用户" prop="userId">
+          <el-select v-model="rechargeForm.userId" placeholder="请选择用户" filterable style="width: 100%;">
+            <el-option v-for="user in allUsers" :key="user.id" :label="user.username" :value="user.id" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="充值金额" prop="amount">
           <el-input-number v-model="rechargeForm.amount" :min="1" :max="100000" :step="100" style="width: 100%;"></el-input-number>
         </el-form-item>
@@ -1101,6 +1093,7 @@ export default {
         remark: ''
       },
       rechargeFormRules: {
+        userId: [{ required: true, message: '请选择用户', trigger: 'change' }],
         amount: [{ required: true, message: '请输入充值金额', trigger: 'blur' }]
       },
       // 图片预览相关
@@ -1698,7 +1691,7 @@ export default {
 
     openRechargeDialog() {
       this.rechargeForm = {
-        userId: this.rechargeTargetUser,
+        userId: null,
         amount: 1000,
         method: 'alipay',
         remark: ''
@@ -1784,8 +1777,8 @@ export default {
     // 下载产品模板
     downloadProductTemplate(product) {
       const link = document.createElement('a')
-      link.href = `/api/images/product/${product.id}/template`
-      link.download = product.templateFileName || 'template'
+      link.href = `/api/images/template/${product.id}`
+      link.download = product.templateFileName || 'template.xlsx'
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
@@ -2725,6 +2718,24 @@ body {
     width: 100%;
     position: static;
     padding: 12px;
+  }
+
+  .sidebar-section {
+    display: block;
+  }
+
+  .sidebar-section .el-menu {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .sidebar-section .el-menu-item {
+    height: 36px;
+    line-height: 36px;
+    font-size: 13px;
+    margin-bottom: 0;
+    padding: 0 12px !important;
   }
 
   .sidebar-title {

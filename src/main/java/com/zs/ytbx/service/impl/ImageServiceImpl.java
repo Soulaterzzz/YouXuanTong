@@ -6,6 +6,7 @@ import com.zs.ytbx.common.exception.BusinessException;
 import com.zs.ytbx.common.enums.ResultCode;
 import com.zs.ytbx.mapper.AxxProductMapper;
 import com.zs.ytbx.service.ImageService;
+import com.zs.ytbx.vo.TemplateFileVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -172,12 +173,29 @@ public class ImageServiceImpl implements ImageService {
     }
 
     @Override
-    public byte[] getProductTemplate(Long productId) {
+    public TemplateFileVO getProductTemplate(Long productId) {
         AxxProductEntity product = productMapper.selectById(productId);
         if (product == null) {
             throw new BusinessException(ResultCode.NOT_FOUND, "产品不存在");
         }
-        return new byte[0];
+
+        String templatePath = product.getTemplateFilePath();
+        if (templatePath == null || templatePath.isEmpty()) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "没有文件");
+        }
+
+        try {
+            Path filePath = Paths.get(templatePath);
+            if (!Files.exists(filePath)) {
+                throw new BusinessException(ResultCode.NOT_FOUND, "文件不存在");
+            }
+            byte[] data = Files.readAllBytes(filePath);
+            String fileName = product.getTemplateFileName();
+            return new TemplateFileVO(data, fileName);
+        } catch (IOException e) {
+            log.error("读取模板文件失败: productId={}, path={}", productId, templatePath, e);
+            throw new BusinessException(ResultCode.SYSTEM_ERROR, "读取文件失败");
+        }
     }
 
     @Override
@@ -206,6 +224,10 @@ public class ImageServiceImpl implements ImageService {
 
             Path filePath = uploadPath.resolve(newFilename);
             Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+            product.setTemplateFileName(originalFilename);
+            product.setTemplateFilePath(filePath.toString());
+            productMapper.updateById(product);
 
             String templateUrl = "/api/images/template/" + productId;
 

@@ -351,6 +351,7 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
                 .saleStatus(entity.getSaleStatus())
                 .sortNo(entity.getSortNo())
                 .imageUrl(entity.getImageUrl())
+                .templateFileName(entity.getTemplateFileName())
                 .build();
     }
 

@@ -105,6 +105,7 @@
 /Users/zhao/IdeaProjects/ytbx/src/main/java/com/zs/ytbx/service/impl/SupportServiceImpl.java
 /Users/zhao/IdeaProjects/ytbx/src/main/java/com/zs/ytbx/service/impl/UserDashboardDbServiceImpl.java
 /Users/zhao/IdeaProjects/ytbx/src/main/java/com/zs/ytbx/service/impl/UserDashboardServiceImpl.java
+/Users/zhao/IdeaProjects/ytbx/src/main/java/com/zs/ytbx/vo/TemplateFileVO.java
 /Users/zhao/IdeaProjects/ytbx/src/main/java/com/zs/ytbx/vo/advisor/AdvisorDetailVO.java
 /Users/zhao/IdeaProjects/ytbx/src/main/java/com/zs/ytbx/vo/anxinxuan/AdminStatsVO.java
 /Users/zhao/IdeaProjects/ytbx/src/main/java/com/zs/ytbx/vo/anxinxuan/ExpenseVO.java

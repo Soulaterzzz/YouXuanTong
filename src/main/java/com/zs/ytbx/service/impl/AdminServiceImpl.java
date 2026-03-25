@@ -416,6 +416,7 @@ public class AdminServiceImpl implements AdminService {
                 .saleStatus(entity.getSaleStatus())
                 .sortNo(entity.getSortNo())
                 .imageUrl(entity.getImageUrl())
+                .templateFileName(entity.getTemplateFileName())
                 .build();
     }
 

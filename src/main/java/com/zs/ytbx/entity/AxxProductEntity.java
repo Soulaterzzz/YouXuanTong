@@ -42,4 +42,8 @@ public class AxxProductEntity extends BaseEntity {
     private String imageContentType;
 
     private Long imageSize;
+
+    private String templateFileName;
+
+    private String templateFilePath;
 }

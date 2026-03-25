@@ -6,6 +6,7 @@ com/zs/ytbx/service/impl/AuthServiceImpl.class
 com/zs/ytbx/vo/product/ProductCompareResultVO$ComparedPlan.class
 com/zs/ytbx/mapper/AccountBalanceMapper.class
 com/zs/ytbx/common/api/ApiResponse$ApiResponseBuilder.class
+com/zs/ytbx/vo/TemplateFileVO.class
 com/zs/ytbx/dto/UpdateUserRequest.class
 com/zs/ytbx/service/impl/PortalServiceImpl.class
 com/zs/ytbx/vo/product/ProductDetailVO$GuaranteeItem$GuaranteeItemBuilder.class

@@ -1,7 +1,9 @@
 package com.zs.ytbx.controller;
 
 import com.zs.ytbx.common.api.ApiResponse;
+import com.zs.ytbx.common.exception.BusinessException;
 import com.zs.ytbx.service.ImageService;
+import com.zs.ytbx.vo.TemplateFileVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -39,6 +41,32 @@ public class ImageController {
     public ApiResponse<Map<String, String>> getProductImageUrl(@PathVariable Long productId) {
         String imageUrl = imageService.getProductImageUrl(productId);
         return ApiResponse.success(Map.of("url", imageUrl));
+    }
+
+    @GetMapping("/template/{productId}")
+    public ResponseEntity<byte[]> downloadProductTemplate(@PathVariable Long productId) {
+        try {
+            TemplateFileVO templateFile = imageService.getProductTemplate(productId);
+
+            if (templateFile == null || templateFile.getData() == null || templateFile.getData().length == 0) {
+                return ResponseEntity.notFound().build();
+            }
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+            headers.setContentDispositionFormData("attachment", templateFile.getFileName());
+            headers.setContentLength(templateFile.getData().length);
+
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(templateFile.getData());
+        } catch (BusinessException e) {
+            byte[] errorBytes = e.getBusinessMessage().getBytes();
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.TEXT_PLAIN);
+            headers.setContentLength(errorBytes.length);
+            return ResponseEntity.status(404).headers(headers).body(errorBytes);
+        }
     }
 
     @PostMapping("/product/{productId}/upload")

@@ -1,5 +1,6 @@
 package com.zs.ytbx.service;
 
+import com.zs.ytbx.vo.TemplateFileVO;
 import org.springframework.web.multipart.MultipartFile;
 
 public interface ImageService {
@@ -8,7 +9,7 @@ public interface ImageService {
     void uploadProductImage(Long productId, MultipartFile file);
     void deleteProductImage(Long productId);
 
-    byte[] getProductTemplate(Long productId);
+    TemplateFileVO getProductTemplate(Long productId);
     String uploadProductTemplate(Long productId, MultipartFile file);
     void deleteProductTemplate(Long productId);
 }
