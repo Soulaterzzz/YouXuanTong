@@ -1,4 +1,4 @@
-# 优通选保险服务平台
+# 优选通保险服务平台
 
 <div align="center">
 
@@ -213,6 +213,23 @@ cd frontend && npm run build && cd ..
 # 4. 使用 java -jar 启动后端
 ```
 
+### ⚠️ 重要配置变量
+
+部署前请务必检查并修改以下配置：
+
+| 配置项 | 说明 | 默认值 |
+|--------|------|--------|
+| `FILE_STORAGE_PATH` | 文件存储根目录 | `/Users/zhao/IdeaProjects/ytbx/uploads` |
+| `TEMPLATE_FILE_PATH` | 模板文件存储路径 | `/Users/zhao/IdeaProjects/ytbx/uploads/templates` |
+| `MYSQL_URL` | 数据库连接地址 | `jdbc:mysql://127.0.0.1:3306/ytbx` |
+| `MYSQL_PASSWORD` | 数据库密码 | - |
+
+可通过环境变量或 `application.properties` 修改：
+```bash
+export FILE_STORAGE_PATH=/your/path/uploads
+export TEMPLATE_FILE_PATH=/your/path/uploads/templates
+```
+
 ---
 
 ## 许可证
@@ -225,6 +242,6 @@ cd frontend && npm run build && cd ..
 
 **如果这个项目对您有帮助，请给我们一个 ⭐️**
 
-Made with ❤️ by 优通选团队
+Design with ❤️ by 优选通团队
 
 </div>

@@ -35,11 +35,15 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
     public PageResponse<ProductVO> listProducts(ProductQuery query) {
         LambdaQueryWrapper<AxxProductEntity> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(AxxProductEntity::getSaleStatus, "ON_SALE");
-        
+
         if (query.getCategory() != null && !query.getCategory().isEmpty() && !"all".equals(query.getCategory())) {
             wrapper.eq(AxxProductEntity::getCategoryCode, query.getCategory());
         }
-        
+
+        if (query.getCompany() != null && !query.getCompany().isEmpty() && !"all".equals(query.getCompany())) {
+            wrapper.like(AxxProductEntity::getCompanyName, query.getCompany());
+        }
+
         wrapper.orderByAsc(AxxProductEntity::getSortNo);
         
         IPage<AxxProductEntity> page = axxProductMapper.selectPage(

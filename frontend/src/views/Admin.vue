@@ -2,7 +2,7 @@
   <div class="admin-container">
     <aside class="sidebar" :class="{ 'sidebar-open': sidebarOpen }">
       <div class="sidebar-header">
-        <h2>优通选</h2>
+        <h2>优选通</h2>
         <p>管理后台</p>
       </div>
       <nav class="sidebar-menu">

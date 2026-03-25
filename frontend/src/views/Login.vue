@@ -2,7 +2,7 @@
   <div class="login-page">
     <header class="login-header">
       <div class="logo">
-        <span class="logo-text">优通选</span>
+        <span class="logo-text">优选通</span>
         <span class="logo-sub">保险服务平台</span>
       </div>
     </header>
@@ -116,7 +116,12 @@ const handleLogin = async () => {
       loginError.value = response.data.message || '登录失败'
     }
   } catch (error) {
-    loginError.value = error.response?.data?.message || '网络错误，请稍后重试'
+    const errorData = error.response?.data
+    if (errorData?.code === 'A0400' && errorData?.data) {
+      loginError.value = errorData.data
+    } else {
+      loginError.value = errorData?.message || '网络错误，请稍后重试'
+    }
   } finally {
     loginLoading.value = false
   }
@@ -154,7 +159,12 @@ const handleRegister = async () => {
       registerError.value = response.data.message || '注册失败'
     }
   } catch (error) {
-    registerError.value = error.response?.data?.message || '网络错误，请稍后重试'
+    const errorData = error.response?.data
+    if (errorData?.code === 'A0400' && errorData?.data) {
+      registerError.value = errorData.data
+    } else {
+      registerError.value = errorData?.message || '网络错误，请稍后重试'
+    }
   } finally {
     registerLoading.value = false
   }

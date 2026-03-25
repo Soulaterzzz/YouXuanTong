@@ -21,6 +21,10 @@ public class ProductQuery {
 
     private String sortBy;
 
+    private String category;
+
+    private String company;
+
     @Min(value = 1, message = "页码必须大于等于1")
     private Integer pageNo = 1;
 

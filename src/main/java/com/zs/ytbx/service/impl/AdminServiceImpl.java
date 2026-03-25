@@ -173,11 +173,15 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public PageResponse<ProductVO> listProducts(ProductQuery query) {
         LambdaQueryWrapper<AxxProductEntity> wrapper = new LambdaQueryWrapper<>();
-        
+
         if (query.getCategory() != null && !query.getCategory().isEmpty() && !"all".equals(query.getCategory())) {
             wrapper.eq(AxxProductEntity::getCategoryCode, query.getCategory());
         }
-        
+
+        if (query.getCompany() != null && !query.getCompany().isEmpty() && !"all".equals(query.getCompany())) {
+            wrapper.like(AxxProductEntity::getCompanyName, query.getCompany());
+        }
+
         wrapper.orderByAsc(AxxProductEntity::getSortNo);
         
         IPage<AxxProductEntity> page = axxProductMapper.selectPage(

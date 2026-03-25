@@ -1,5 +1,5 @@
 -- ================================================
--- 安心选数据库初始化脚本
+-- 优选通数据库初始化脚本
 -- 版本: 1.0.0
 -- 说明: 包含完整表结构和测试数据
 -- ================================================
@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS axx_user (
     UNIQUE KEY uk_username (username),
     KEY idx_mobile (mobile),
     KEY idx_user_type (user_type)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='安心选用户表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='优选通用户表';
 
 -- 2. 账户余额表
 CREATE TABLE IF NOT EXISTS axx_account_balance (
@@ -120,7 +120,7 @@ CREATE TABLE IF NOT EXISTS axx_insurance_record (
     KEY idx_create_time (create_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='保险清单表';
 
--- 6. 产品表（安心选专用）
+-- 6. 产品表（优选通专用）
 CREATE TABLE IF NOT EXISTS axx_product (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键',
     product_code VARCHAR(64) NOT NULL COMMENT '产品编码',
@@ -147,7 +147,7 @@ CREATE TABLE IF NOT EXISTS axx_product (
     UNIQUE KEY uk_product_code (product_code),
     KEY idx_category (category_code),
     KEY idx_sale_status (sale_status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='安心选产品表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='优选通产品表';
 
 -- 为已存在的表添加图片字段（如果不存在）
 ALTER TABLE axx_product

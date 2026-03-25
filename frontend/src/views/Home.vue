@@ -3,7 +3,7 @@
     <!-- 顶部导航栏 -->
     <header class="header">
       <div class="logo">
-        <span class="logo-text">优通选</span>
+        <span class="logo-text">优选通</span>
         <span class="logo-sub">保险服务平台</span>
       </div>
       <nav class="nav">
@@ -119,7 +119,7 @@
             <div class="welcome-icon">
               <el-icon :size="60"><CircleCheck /></el-icon>
             </div>
-            <h1>欢迎使用优通选保险服务平台</h1>
+            <h1>欢迎使用优选通保险服务平台</h1>
             <p>为您的家庭保驾护航，提供专业、稳健、有温度的风险保障方案</p>
             <div class="quick-actions">
               <el-button type="primary" size="large" @click="activeMenu = 'product'">
@@ -265,7 +265,7 @@
                       <span class="price-value">¥{{ product.price }}</span>
                     </div>
                     <div class="stock-info">
-                      <span class="stock-label">资源值：</span>
+                      <span class="stock-label">库存：</span>
                       <span class="stock-value" :class="{ 'low-stock': product.stock < 10 }">
                         {{ product.stock > 0 ? product.stock : '充足' }}
                       </span>
@@ -1248,10 +1248,18 @@ export default {
     async loadProducts() {
       this.productLoading = true
       try {
+        const companyMap = {
+          'guoshou': '国寿财险',
+          'pingan': '平安财险',
+          'zhonghua': '中华联合',
+          'taiping': '太平财险',
+          'renbao': '人保财险'
+        }
         const params = {
           page: this.productCurrentPage,
           size: this.productPageSize,
-          company: this.companyFilter === 'all' ? '' : this.companyFilter
+          category: this.activeCategory === 'all' ? '' : this.activeCategory,
+          company: this.companyFilter === 'all' ? '' : (companyMap[this.companyFilter] || this.companyFilter)
         }
         const endpoint = this.isAdmin ? '/api/admin/products' : '/api/anxinxuan/products'
         const res = await this.$axios.get(endpoint, { params })
@@ -2777,8 +2785,37 @@ body {
 }
 
 @media screen and (max-width: 768px) {
-  .header {
-    padding: 0 12px;
+  .product-card {
+    flex-direction: column;
+  }
+
+  .product-image-wrapper {
+    width: 100%;
+    height: 180px;
+  }
+
+  .product-footer {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .price-info, .stock-info {
+    flex: 1;
+    min-width: calc(50% - 6px);
+  }
+
+  .product-actions {
+    width: 100%;
+    margin-left: 0;
+    margin-top: 8px;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .product-actions .el-button {
+    flex: 1;
+    min-width: 80px;
   }
 
   .logo-text {
@@ -2848,6 +2885,10 @@ body {
     gap: 8px;
   }
 
+  .filter-row .el-radio-button {
+    margin-bottom: 4px;
+  }
+
   .product-stats {
     padding: 12px 16px;
     font-size: 13px;
@@ -2886,6 +2927,24 @@ body {
 
   .main-content {
     padding: 12px;
+  }
+
+  .product-image-wrapper {
+    height: 140px;
+  }
+
+  .product-footer {
+    gap: 8px;
+  }
+
+  .price-info, .stock-info {
+    min-width: 100%;
+  }
+
+  .product-actions .el-button {
+    min-width: 70px;
+    padding: 4px 8px;
+    font-size: 12px;
   }
 
   .stat-card {
