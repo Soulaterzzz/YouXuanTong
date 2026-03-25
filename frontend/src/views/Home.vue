@@ -780,13 +780,14 @@
           <div class="template-upload-container">
             <el-upload
               class="template-uploader"
-              :action="`/api/images/product/${productForm.id}/template/upload`"
+              :action="`/api/images/product/${productForm.id}/template`"
               :show-file-list="false"
               :on-success="handleTemplateUploadSuccess"
               :on-error="handleTemplateUploadError"
               :before-upload="beforeTemplateUpload"
               accept=".pdf,.doc,.docx,.xls,.xlsx,.txt"
               :with-credentials="true"
+              method="post"
             >
               <el-button type="primary" size="small">
                 <el-icon><Upload /></el-icon>

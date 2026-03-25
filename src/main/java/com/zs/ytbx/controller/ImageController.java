@@ -55,4 +55,18 @@ public class ImageController {
         imageService.deleteProductImage(productId);
         return ApiResponse.success(Map.of("message", "图片删除成功"));
     }
+
+    @PostMapping("/product/{productId}/template")
+    public ApiResponse<Map<String, String>> uploadProductTemplate(
+            @PathVariable Long productId,
+            @RequestParam("file") MultipartFile file) {
+        String templateUrl = imageService.uploadProductTemplate(productId, file);
+        return ApiResponse.success(Map.of("url", templateUrl, "message", "模板上传成功"));
+    }
+
+    @DeleteMapping("/product/{productId}/template")
+    public ApiResponse<Map<String, String>> deleteProductTemplate(@PathVariable Long productId) {
+        imageService.deleteProductTemplate(productId);
+        return ApiResponse.success(Map.of("message", "模板删除成功"));
+    }
 }

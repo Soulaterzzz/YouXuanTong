@@ -135,6 +135,10 @@ CREATE TABLE IF NOT EXISTS axx_product (
     is_hot TINYINT NOT NULL DEFAULT 0 COMMENT '是否热门',
     sale_status VARCHAR(32) NOT NULL DEFAULT 'ON_SALE' COMMENT '销售状态',
     sort_no INT NOT NULL DEFAULT 0 COMMENT '排序',
+    image_url VARCHAR(500) DEFAULT NULL COMMENT '图片URL',
+    image_path VARCHAR(500) DEFAULT NULL COMMENT '图片路径',
+    image_content_type VARCHAR(100) DEFAULT NULL COMMENT '图片类型',
+    image_size BIGINT DEFAULT NULL COMMENT '图片大小',
     deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除',
     create_by BIGINT DEFAULT NULL COMMENT '创建人',
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -144,6 +148,13 @@ CREATE TABLE IF NOT EXISTS axx_product (
     KEY idx_category (category_code),
     KEY idx_sale_status (sale_status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='安心选产品表';
+
+-- 为已存在的表添加图片字段（如果不存在）
+ALTER TABLE axx_product
+ADD COLUMN IF NOT EXISTS image_url VARCHAR(500) DEFAULT NULL COMMENT '图片URL',
+ADD COLUMN IF NOT EXISTS image_path VARCHAR(500) DEFAULT NULL COMMENT '图片路径',
+ADD COLUMN IF NOT EXISTS image_content_type VARCHAR(100) DEFAULT NULL COMMENT '图片类型',
+ADD COLUMN IF NOT EXISTS image_size BIGINT DEFAULT NULL COMMENT '图片大小';
 
 -- ================================================
 -- 测试数据

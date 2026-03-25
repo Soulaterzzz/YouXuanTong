@@ -170,4 +170,76 @@ public class ImageServiceImpl implements ImageService {
     private byte[] getDefaultImage() {
         return new byte[0];
     }
+
+    @Override
+    public byte[] getProductTemplate(Long productId) {
+        AxxProductEntity product = productMapper.selectById(productId);
+        if (product == null) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "产品不存在");
+        }
+        return new byte[0];
+    }
+
+    @Override
+    public String uploadProductTemplate(Long productId, MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "模板文件不能为空");
+        }
+
+        validateTemplateFile(file);
+
+        AxxProductEntity product = productMapper.selectById(productId);
+        if (product == null) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "产品不存在");
+        }
+
+        try {
+            String originalFilename = file.getOriginalFilename();
+            String extension = getFileExtension(originalFilename);
+            String newFilename = productId + "_template_" + UUID.randomUUID().toString() + "." + extension;
+
+            Path uploadPath = Paths.get(fileStorageConfig.getTemplateFilePath());
+
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath);
+            }
+
+            Path filePath = uploadPath.resolve(newFilename);
+            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+            String templateUrl = "/api/images/template/" + productId;
+
+            log.info("产品模板上传成功: productId={}, path={}", productId, filePath);
+
+            return templateUrl;
+
+        } catch (IOException e) {
+            log.error("上传产品模板失败: productId={}", productId, e);
+            throw new BusinessException(ResultCode.SYSTEM_ERROR, "上传模板失败: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public void deleteProductTemplate(Long productId) {
+        log.info("删除产品模板: productId={}", productId);
+    }
+
+    private void validateTemplateFile(MultipartFile file) {
+        String filename = file.getOriginalFilename();
+        if (filename == null || filename.isEmpty()) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "文件名不能为空");
+        }
+
+        String extension = getFileExtension(filename);
+        if (extension == null || !Arrays.asList(fileStorageConfig.getAllowedTemplateExtensions())
+                .contains(extension.toLowerCase())) {
+            throw new BusinessException(ResultCode.INVALID_PARAM,
+                "不支持的文件类型，仅支持: " + String.join(", ", fileStorageConfig.getAllowedTemplateExtensions()));
+        }
+
+        if (file.getSize() > fileStorageConfig.getMaxFileSize()) {
+            throw new BusinessException(ResultCode.INVALID_PARAM,
+                "文件大小超过限制，最大允许: " + (fileStorageConfig.getMaxFileSize() / 1024 / 1024) + "MB");
+        }
+    }
 }

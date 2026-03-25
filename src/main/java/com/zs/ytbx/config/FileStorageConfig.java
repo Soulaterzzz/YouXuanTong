@@ -8,9 +8,9 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @ConfigurationProperties(prefix = "file.storage")
 public class FileStorageConfig {
-    private String uploadPath = "/Users/zhao/IdeaProjects/ytbx/src/main/resources/images";
-    private String productImagePath = "";
-    private String templateFilePath = "/Users/zhao/IdeaProjects/ytbx/src/main/resources/file";
+    private String uploadPath = "/Users/zhao/IdeaProjects/ytbx/uploads";
+    private String productImagePath = "products";
+    private String templateFilePath = "/Users/zhao/IdeaProjects/ytbx/uploads/templates";
     private long maxFileSize = 10 * 1024 * 1024;
     private String[] allowedExtensions = {"jpg", "jpeg", "png", "gif", "webp"};
     private String[] allowedTemplateExtensions = {"pdf", "doc", "docx", "xls", "xlsx", "txt"};
