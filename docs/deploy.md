@@ -115,6 +115,35 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.yml ps
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml logs -f ytbx-app
 ```
 
+### 5.6 一键服务器脚本
+
+如果服务器是 `Ubuntu 22.04/24.04`，可直接在项目根目录执行：
+
+```bash
+sudo bash deploy/server-bootstrap-ubuntu.sh
+```
+
+脚本启动后会交互式询问端口、上传目录、数据库账号密码、Nginx 域名等变量；直接回车可使用默认值。
+
+常用可选参数：
+
+```bash
+sudo SERVER_NAME=example.com APP_PORT=8080 HOST_UPLOAD_DIR=/data/ytbx/uploads \
+MYSQL_PASSWORD=your_app_password MYSQL_ROOT_PASSWORD=your_root_password \
+FORCE_WRITE_ENV=1 bash deploy/server-bootstrap-ubuntu.sh
+```
+
+如果希望静默执行，也可以继续通过环境变量预先传值；脚本在无交互终端时会自动回退到环境变量或默认值。
+
+脚本会自动完成以下动作：
+
+- 安装 `Docker`、`Docker Compose Plugin`、`Git`、`Nginx`、`OpenSSL`
+- 创建上传目录和 `deploy/.env`
+- 写入 Nginx 反向代理配置
+- 执行 `docker compose up -d --build` 启动项目
+
+如果 `deploy/.env` 已存在，默认不会覆盖；如需重写，设置 `FORCE_WRITE_ENV=1`。
+
 ## 6. Nginx 反向代理
 
 示例配置见 `deploy/nginx/ytbx.conf.example`。
