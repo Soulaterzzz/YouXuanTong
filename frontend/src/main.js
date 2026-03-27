@@ -5,7 +5,7 @@ import 'element-plus/dist/index.css'
 import axios from 'axios'
 import router from './router'
 
-axios.defaults.baseURL = 'http://localhost:8080'
+axios.defaults.baseURL = import.meta.env.VITE_API_BASE_URL || ''
 
 axios.interceptors.request.use(config => {
   const authToken = sessionStorage.getItem('authToken')

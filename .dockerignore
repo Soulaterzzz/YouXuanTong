@@ -1,0 +1,15 @@
+.git
+.github
+.idea
+.vscode
+node_modules
+frontend/node_modules
+frontend/dist
+target
+uploads
+logs
+*.log
+*.tmp
+*.bak
+.DS_Store
+deploy/.env

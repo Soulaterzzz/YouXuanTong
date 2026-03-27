@@ -1,0 +1,74 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ytbx-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    environment: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Write deployment env file
+        run: |
+          APP_PORT_VALUE="${{ vars.YTBX_APP_PORT }}"
+          HOST_UPLOAD_DIR_VALUE="${{ vars.YTBX_HOST_UPLOAD_DIR }}"
+          MYSQL_DATABASE_VALUE="${{ vars.YTBX_MYSQL_DATABASE }}"
+          MYSQL_USER_VALUE="${{ vars.YTBX_MYSQL_USER }}"
+          MYSQL_PASSWORD_VALUE="${{ secrets.YTBX_MYSQL_PASSWORD }}"
+          MYSQL_ROOT_PASSWORD_VALUE="${{ secrets.YTBX_MYSQL_ROOT_PASSWORD }}"
+          PRODUCT_IMAGE_PATH_VALUE="${{ vars.YTBX_PRODUCT_IMAGE_PATH }}"
+          MAX_FILE_SIZE_VALUE="${{ vars.YTBX_MAX_FILE_SIZE }}"
+          ALLOWED_EXTENSIONS_VALUE="${{ vars.YTBX_ALLOWED_EXTENSIONS }}"
+          SQL_INIT_MODE_VALUE="${{ vars.YTBX_SQL_INIT_MODE }}"
+
+          APP_PORT_VALUE="${APP_PORT_VALUE:-8080}"
+          HOST_UPLOAD_DIR_VALUE="${HOST_UPLOAD_DIR_VALUE:-/data/ytbx/uploads}"
+          MYSQL_DATABASE_VALUE="${MYSQL_DATABASE_VALUE:-ytbx}"
+          MYSQL_USER_VALUE="${MYSQL_USER_VALUE:-ytbx}"
+          PRODUCT_IMAGE_PATH_VALUE="${PRODUCT_IMAGE_PATH_VALUE:-products}"
+          MAX_FILE_SIZE_VALUE="${MAX_FILE_SIZE_VALUE:-10485760}"
+          ALLOWED_EXTENSIONS_VALUE="${ALLOWED_EXTENSIONS_VALUE:-jpg,jpeg,png,gif,webp}"
+          SQL_INIT_MODE_VALUE="${SQL_INIT_MODE_VALUE:-never}"
+
+          if [ -z "$MYSQL_PASSWORD_VALUE" ] || [ -z "$MYSQL_ROOT_PASSWORD_VALUE" ]; then
+            echo "缺少必需的 GitHub Secrets：YTBX_MYSQL_PASSWORD / YTBX_MYSQL_ROOT_PASSWORD" >&2
+            exit 1
+          fi
+
+          cat > deploy/.env <<EOF_ENV
+          APP_PORT=${APP_PORT_VALUE}
+          HOST_UPLOAD_DIR=${HOST_UPLOAD_DIR_VALUE}
+          MYSQL_DATABASE=${MYSQL_DATABASE_VALUE}
+          MYSQL_USER=${MYSQL_USER_VALUE}
+          MYSQL_PASSWORD=${MYSQL_PASSWORD_VALUE}
+          MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD_VALUE}
+          PRODUCT_IMAGE_PATH=${PRODUCT_IMAGE_PATH_VALUE}
+          MAX_FILE_SIZE=${MAX_FILE_SIZE_VALUE}
+          ALLOWED_EXTENSIONS=${ALLOWED_EXTENSIONS_VALUE}
+          YTBX_SQL_INIT_MODE=${SQL_INIT_MODE_VALUE}
+          EOF_ENV
+
+      - name: Prepare upload directory
+        run: |
+          HOST_UPLOAD_DIR_VALUE="${{ vars.YTBX_HOST_UPLOAD_DIR }}"
+          HOST_UPLOAD_DIR_VALUE="${HOST_UPLOAD_DIR_VALUE:-/data/ytbx/uploads}"
+          mkdir -p "$HOST_UPLOAD_DIR_VALUE/templates"
+
+      - name: Deploy application
+        run: |
+          docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --build --remove-orphans
+          docker image prune -f
