@@ -15,6 +15,8 @@ public class SessionUser implements Serializable {
 
     private String username;
 
+    private String userType;
+
     private String customerName;
 
     private String memberLevel;

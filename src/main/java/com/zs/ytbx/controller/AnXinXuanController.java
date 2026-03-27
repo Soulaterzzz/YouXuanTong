@@ -2,14 +2,11 @@ package com.zs.ytbx.controller;
 
 import com.zs.ytbx.common.api.ApiResponse;
 import com.zs.ytbx.common.api.PageResponse;
-import com.zs.ytbx.common.auth.SessionConstants;
-import com.zs.ytbx.common.enums.ResultCode;
-import com.zs.ytbx.common.exception.BusinessException;
+import com.zs.ytbx.common.auth.AuthContext;
 import com.zs.ytbx.dto.*;
 import com.zs.ytbx.service.AnXinXuanService;
 import com.zs.ytbx.service.impl.AnXinXuanServiceImpl;
 import com.zs.ytbx.vo.anxinxuan.*;
-import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
@@ -27,18 +24,15 @@ public class AnXinXuanController {
 
     private final AnXinXuanService anxinXuanService;
     private final AnXinXuanServiceImpl anXinXuanServiceImpl;
+    private final AuthContext authContext;
 
-    private Long getCurrentUserId(HttpSession session) {
-        Long userId = (Long) session.getAttribute(SessionConstants.SESSION_USER_ID);
-        if (userId == null) {
-            throw new BusinessException(ResultCode.UNAUTHORIZED);
-        }
-        return userId;
+    private Long getCurrentUserId() {
+        return authContext.requireCurrentUser().getUserId();
     }
 
     @GetMapping("/stats")
-    public ApiResponse<Map<String, Object>> getStats(HttpSession session) {
-        Long userId = getCurrentUserId(session);
+    public ApiResponse<Map<String, Object>> getStats() {
+        Long userId = getCurrentUserId();
         Map<String, Object> stats = new HashMap<>();
         stats.put("totalProducts", anXinXuanServiceImpl.getTotalProducts());
         stats.put("totalPolicies", anXinXuanServiceImpl.getTotalPolicies(userId));
@@ -48,8 +42,8 @@ public class AnXinXuanController {
     }
 
     @GetMapping("/balance")
-    public ApiResponse<BigDecimal> getBalance(HttpSession session) {
-        Long userId = getCurrentUserId(session);
+    public ApiResponse<BigDecimal> getBalance() {
+        Long userId = getCurrentUserId();
         return ApiResponse.success(anXinXuanServiceImpl.getBalance(userId));
     }
 
@@ -59,26 +53,40 @@ public class AnXinXuanController {
     }
 
     @GetMapping("/products/{productId}")
-    public ApiResponse<ProductDetailVO> getProductDetail(@PathVariable Long productId) {
+    public ApiResponse<ProductDetailVO> getProductDetail(@PathVariable("productId") Long productId) {
         return ApiResponse.success(anxinXuanService.getProductDetail(productId));
     }
 
     @PostMapping("/products/activate")
-    public ApiResponse<Void> activateProduct(@Valid @RequestBody ActivateRequest request, HttpSession session) {
-        Long userId = getCurrentUserId(session);
+    public ApiResponse<Void> activateProduct(@Valid @RequestBody ActivateRequest request) {
+        Long userId = getCurrentUserId();
         anxinXuanService.activateProduct(request, userId);
         return ApiResponse.success(null);
     }
 
+    @PostMapping("/products/save-draft")
+    public ApiResponse<Void> saveDraft(@Valid @RequestBody ActivateRequest request) {
+        Long userId = getCurrentUserId();
+        anxinXuanService.saveDraft(request, userId);
+        return ApiResponse.success(null);
+    }
+
+    @PutMapping("/insurances/{insuranceId}/submit")
+    public ApiResponse<Void> submitDraft(@PathVariable("insuranceId") Long insuranceId) {
+        Long userId = getCurrentUserId();
+        anxinXuanService.submitDraft(insuranceId, userId);
+        return ApiResponse.success(null);
+    }
+
     @GetMapping("/expenses")
-    public ApiResponse<PageResponse<ExpenseVO>> listExpenses(@Valid @ModelAttribute ExpenseQuery query, HttpSession session) {
-        Long userId = getCurrentUserId(session);
+    public ApiResponse<PageResponse<ExpenseVO>> listExpenses(@Valid @ModelAttribute ExpenseQuery query) {
+        Long userId = getCurrentUserId();
         return ApiResponse.success(anxinXuanService.listExpenses(query, userId));
     }
 
     @GetMapping("/insurances")
-    public ApiResponse<PageResponse<InsuranceVO>> listInsurances(@Valid @ModelAttribute InsuranceQuery query, HttpSession session) {
-        Long userId = getCurrentUserId(session);
+    public ApiResponse<PageResponse<InsuranceVO>> listInsurances(@Valid @ModelAttribute InsuranceQuery query) {
+        Long userId = getCurrentUserId();
         return ApiResponse.success(anxinXuanService.listInsurances(query, userId));
     }
 
@@ -89,14 +97,14 @@ public class AnXinXuanController {
     }
 
     @GetMapping("/recharges")
-    public ApiResponse<PageResponse<RechargeVO>> listRecharges(@Valid @ModelAttribute RechargeQuery query, HttpSession session) {
-        Long userId = getCurrentUserId(session);
+    public ApiResponse<PageResponse<RechargeVO>> listRecharges(@Valid @ModelAttribute RechargeQuery query) {
+        Long userId = getCurrentUserId();
         return ApiResponse.success(anxinXuanService.listRecharges(query, userId));
     }
 
     @PostMapping("/recharges")
-    public ApiResponse<Void> createRecharge(@Valid @RequestBody CreateRechargeRequest request, HttpSession session) {
-        Long userId = getCurrentUserId(session);
+    public ApiResponse<Void> createRecharge(@Valid @RequestBody CreateRechargeRequest request) {
+        Long userId = getCurrentUserId();
         anxinXuanService.createRecharge(request, userId);
         return ApiResponse.success(null);
     }

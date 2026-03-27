@@ -1,1 +1,7 @@
 /Users/zhao/IdeaProjects/ytbx/src/test/java/com/zs/ytbx/YtbxApplicationTests.java
+/Users/zhao/IdeaProjects/ytbx/src/test/java/com/zs/ytbx/common/auth/AuthTokenServiceTest.java
+/Users/zhao/IdeaProjects/ytbx/src/test/java/com/zs/ytbx/controller/AdminControllerTest.java
+/Users/zhao/IdeaProjects/ytbx/src/test/java/com/zs/ytbx/controller/AnXinXuanControllerTest.java
+/Users/zhao/IdeaProjects/ytbx/src/test/java/com/zs/ytbx/controller/AuthControllerTest.java
+/Users/zhao/IdeaProjects/ytbx/src/test/java/com/zs/ytbx/controller/NoticeControllerTest.java
+/Users/zhao/IdeaProjects/ytbx/src/test/java/com/zs/ytbx/support/ControllerTestSupport.java

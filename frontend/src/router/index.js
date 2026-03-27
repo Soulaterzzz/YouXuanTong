@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { resolveNavigationTarget } from './guard'
 
 const routes = [
   {
@@ -25,18 +26,18 @@ const router = createRouter({
 })
 
 router.beforeEach((to, from, next) => {
-  const isLoggedIn = sessionStorage.getItem('isLoggedIn')
-  const userType = sessionStorage.getItem('userType')
+  const redirectTarget = resolveNavigationTarget(
+    to,
+    sessionStorage.getItem('authToken'),
+    sessionStorage.getItem('userType')
+  )
 
-  if (to.meta.requiresAuth && !isLoggedIn) {
-    next('/login')
-  } else if (to.path === '/login' && isLoggedIn) {
-    next('/')
-  } else if (to.meta.requiresAdmin && userType !== 'ADMIN') {
-    next('/')
-  } else {
-    next()
+  if (redirectTarget) {
+    next(redirectTarget)
+    return
   }
+
+  next()
 })
 
 export default router

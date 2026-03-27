@@ -39,6 +39,22 @@ public class InsuranceRecordEntity extends BaseEntity {
 
     private String insuranceStatus;
 
+    private String reviewComment;
+
+    private Long reviewerId;
+
+    private String reviewerName;
+
+    private LocalDateTime reviewTime;
+
+    private String rejectReason;
+
+    private LocalDateTime submitTime;
+
+    private LocalDateTime underwritingTime;
+
+    private LocalDateTime activateTime;
+
     private String policyNo;
 
     private BigDecimal premiumAmount;

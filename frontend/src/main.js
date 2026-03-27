@@ -6,13 +6,35 @@ import axios from 'axios'
 import router from './router'
 
 axios.defaults.baseURL = 'http://localhost:8080'
-axios.defaults.withCredentials = true
+
+axios.interceptors.request.use(config => {
+  const authToken = sessionStorage.getItem('authToken')
+  if (authToken) {
+    config.headers = config.headers || {}
+    config.headers.Authorization = `Bearer ${authToken}`
+  }
+  return config
+})
 
 axios.interceptors.response.use(
-  response => response,
+  response => {
+    if (response?.data?.code === 'A0401') {
+      sessionStorage.removeItem('authToken')
+      sessionStorage.removeItem('isLoggedIn')
+      sessionStorage.removeItem('userId')
+      sessionStorage.removeItem('userType')
+      sessionStorage.removeItem('username')
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login'
+      }
+    }
+    return response
+  },
   error => {
     if (error.response && error.response.status === 401) {
+      sessionStorage.removeItem('authToken')
       sessionStorage.removeItem('isLoggedIn')
+      sessionStorage.removeItem('userId')
       sessionStorage.removeItem('userType')
       sessionStorage.removeItem('username')
       window.location.href = '/login'

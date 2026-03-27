@@ -240,7 +240,13 @@
         <div v-if="activeMenu === 'insurances'">
           <h1 class="page-title">保险清单</h1>
           <div class="table-card">
-            <el-table :data="insurances" style="width: 100%" v-loading="insuranceLoading">
+            <div class="table-actions">
+              <el-button type="warning" :disabled="!selectedInsuranceRows.some(item => item.status === '待生效')" @click="openInsuranceBatchDialog">
+                批量更新状态
+              </el-button>
+            </div>
+            <el-table :data="insurances" style="width: 100%" v-loading="insuranceLoading" @selection-change="handleInsuranceSelectionChange">
+              <el-table-column type="selection" width="55" />
               <el-table-column prop="policyNo" label="保单号" width="150" />
               <el-table-column prop="product" label="产品名称" min-width="150" />
               <el-table-column prop="insuredName" label="被保险人" width="100" />
@@ -327,6 +333,38 @@
         <el-button type="primary" @click="saveProduct" :loading="productDialogLoading">确定</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="insuranceBatchDialogVisible" title="批量更新保险状态" width="900px">
+      <div class="insurance-batch-tip">仅支持将“待生效”保单批量更新为“已生效”，并同步写入保单号、起保日期、到期日期。</div>
+      <el-table :data="insuranceBatchItems" border>
+        <el-table-column prop="product" label="产品名称" min-width="160" />
+        <el-table-column prop="beneficiaryName" label="受益人" width="120" />
+        <el-table-column label="更新后状态" width="120">
+          <template #default>
+            <el-tag type="success">已生效</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="保单号" min-width="200">
+          <template #default="scope">
+            <el-input v-model="scope.row.policyNo" placeholder="请输入保单号" />
+          </template>
+        </el-table-column>
+        <el-table-column label="起保日期" width="170">
+          <template #default="scope">
+            <el-date-picker v-model="scope.row.startDate" type="date" value-format="YYYY-MM-DD" placeholder="起保日期" style="width: 100%" />
+          </template>
+        </el-table-column>
+        <el-table-column label="到期日期" width="170">
+          <template #default="scope">
+            <el-date-picker v-model="scope.row.endDate" type="date" value-format="YYYY-MM-DD" placeholder="到期日期" style="width: 100%" />
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="insuranceBatchDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitInsuranceBatchUpdate" :loading="insuranceBatchSubmitting">确认更新</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -335,6 +373,7 @@ import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import axios from 'axios'
+import { buildInsuranceBatchPayload, getStatusType as mapStatusType, validateInsuranceBatchItems } from './admin-utils'
 
 export default {
   name: 'Admin',
@@ -359,9 +398,9 @@ export default {
     const menuTitle = computed(() => menuTitles[activeMenu.value])
 
     const checkAuth = () => {
-      const isLoggedIn = sessionStorage.getItem('isLoggedIn')
+      const authToken = sessionStorage.getItem('authToken')
       const userType = sessionStorage.getItem('userType')
-      if (!isLoggedIn || userType !== 'ADMIN') {
+      if (!authToken || userType !== 'ADMIN') {
         router.push('/login')
       }
     }
@@ -371,10 +410,10 @@ export default {
     const loadStats = async () => {
       try {
         const [usersRes, productsRes, expensesRes, insurancesRes] = await Promise.all([
-          axios.get('/admin/users?page=1&size=1'),
-          axios.get('/admin/products?page=1&size=1'),
-          axios.get('/admin/expenses?page=1&size=1'),
-          axios.get('/admin/insurances?page=1&size=1')
+          axios.get('/api/admin/users?page=1&size=1'),
+          axios.get('/api/admin/products?page=1&size=1'),
+          axios.get('/api/admin/expenses?page=1&size=1'),
+          axios.get('/api/admin/insurances?page=1&size=1')
         ])
         if (usersRes.data.code === '00000') stats.totalUsers = usersRes.data.data.total
         if (productsRes.data.code === '00000') stats.totalProducts = productsRes.data.data.total
@@ -398,7 +437,7 @@ export default {
     const loadUsers = async () => {
       userLoading.value = true
       try {
-        const res = await axios.get('/admin/users', { params: { page: userCurrentPage.value, size: 10, ...userQuery } })
+        const res = await axios.get('/api/admin/users', { params: { page: userCurrentPage.value, size: 10, ...userQuery } })
         if (res.data.code === '00000') {
           users.value = res.data.data.records
           userTotal.value = res.data.data.total
@@ -437,7 +476,7 @@ export default {
       userDialogLoading.value = true
       try {
         if (userForm.id) {
-          await axios.put('/admin/users', userForm)
+          await axios.put('/api/admin/users', userForm)
           ElMessage.success('更新成功')
         } else {
           if (!userForm.password) {
@@ -445,7 +484,7 @@ export default {
             userDialogLoading.value = false
             return
           }
-          await axios.post('/admin/users', userForm)
+          await axios.post('/api/admin/users', userForm)
           ElMessage.success('创建成功')
         }
         userDialogVisible.value = false
@@ -460,10 +499,10 @@ export default {
     const toggleUserStatus = async (row) => {
       try {
         if (row.status === 'ACTIVE') {
-          await axios.put(`/admin/users/${row.id}/disable`)
+          await axios.put(`/api/admin/users/${row.id}/disable`)
           ElMessage.success('禁用成功')
         } else {
-          await axios.put(`/admin/users/${row.id}/enable`)
+          await axios.put(`/api/admin/users/${row.id}/enable`)
           ElMessage.success('启用成功')
         }
         loadUsers()
@@ -475,7 +514,7 @@ export default {
     const deleteUser = async (row) => {
       try {
         await ElMessageBox.confirm('确定要删除该用户吗？', '提示', { type: 'warning' })
-        await axios.delete(`/admin/users/${row.id}`)
+        await axios.delete(`/api/admin/users/${row.id}`)
         ElMessage.success('删除成功')
         loadUsers()
       } catch (error) {
@@ -496,7 +535,7 @@ export default {
     const loadProducts = async () => {
       productLoading.value = true
       try {
-        const res = await axios.get('/admin/products', { params: { page: productCurrentPage.value, size: 10, category: productQuery.category } })
+        const res = await axios.get('/api/admin/products', { params: { page: productCurrentPage.value, size: 10, category: productQuery.category } })
         if (res.data.code === '00000') {
           products.value = res.data.data.records
           productTotal.value = res.data.data.total
@@ -533,10 +572,10 @@ export default {
       productDialogLoading.value = true
       try {
         if (productForm.id) {
-          await axios.put('/admin/products', productForm)
+          await axios.put('/api/admin/products', productForm)
           ElMessage.success('更新成功')
         } else {
-          await axios.post('/admin/products', productForm)
+          await axios.post('/api/admin/products', productForm)
           ElMessage.success('创建成功')
         }
         productDialogVisible.value = false
@@ -551,10 +590,10 @@ export default {
     const toggleProductStatus = async (row) => {
       try {
         if (row.saleStatus !== 'ON_SALE') {
-          await axios.put(`/admin/products/${row.id}/on-sale`)
+          await axios.put(`/api/admin/products/${row.id}/on-sale`)
           ElMessage.success('上架成功')
         } else {
-          await axios.put(`/admin/products/${row.id}/off-sale`)
+          await axios.put(`/api/admin/products/${row.id}/off-sale`)
           ElMessage.success('下架成功')
         }
         loadProducts()
@@ -566,7 +605,7 @@ export default {
     const deleteProduct = async (row) => {
       try {
         await ElMessageBox.confirm('确定要删除该产品吗？', '提示', { type: 'warning' })
-        await axios.delete(`/admin/products/${row.id}`)
+        await axios.delete(`/api/admin/products/${row.id}`)
         ElMessage.success('删除成功')
         loadProducts()
       } catch (error) {
@@ -582,7 +621,7 @@ export default {
     const loadExpenses = async () => {
       expenseLoading.value = true
       try {
-        const res = await axios.get('/admin/expenses', { params: { page: expenseCurrentPage.value, size: 10 } })
+        const res = await axios.get('/api/admin/expenses', { params: { page: expenseCurrentPage.value, size: 10 } })
         if (res.data.code === '00000') {
           expenses.value = res.data.data.records
           expenseTotal.value = res.data.data.total
@@ -603,11 +642,15 @@ export default {
     const insuranceLoading = ref(false)
     const insuranceTotal = ref(0)
     const insuranceCurrentPage = ref(1)
+    const selectedInsuranceRows = ref([])
+    const insuranceBatchDialogVisible = ref(false)
+    const insuranceBatchSubmitting = ref(false)
+    const insuranceBatchItems = ref([])
 
     const loadInsurances = async () => {
       insuranceLoading.value = true
       try {
-        const res = await axios.get('/admin/insurances', { params: { page: insuranceCurrentPage.value, size: 10 } })
+        const res = await axios.get('/api/admin/insurances', { params: { page: insuranceCurrentPage.value, size: 10 } })
         if (res.data.code === '00000') {
           insurances.value = res.data.data.records
           insuranceTotal.value = res.data.data.total
@@ -624,13 +667,64 @@ export default {
       loadInsurances()
     }
 
-    const getStatusType = (status) => {
-      const map = { '已完成': 'success', '有效': 'success', '待处理': 'warning', '待生效': 'warning', '已取消': 'danger', '已过期': 'danger' }
-      return map[status] || ''
+    const handleInsuranceSelectionChange = (selection) => {
+      selectedInsuranceRows.value = selection
     }
 
+    const openInsuranceBatchDialog = () => {
+      const pendingRows = selectedInsuranceRows.value.filter(item => item.status === '待生效')
+      if (!pendingRows.length) {
+        ElMessage.warning('请先勾选待生效的保单')
+        return
+      }
+
+      insuranceBatchItems.value = pendingRows.map(item => ({
+        insuranceId: item.id,
+        product: item.product,
+        beneficiaryName: item.beneficiaryName,
+        policyNo: item.policyNo || '',
+        startDate: item.startDate || '',
+        endDate: item.endDate || ''
+      }))
+      insuranceBatchDialogVisible.value = true
+    }
+
+    const submitInsuranceBatchUpdate = async () => {
+      const validationMessage = validateInsuranceBatchItems(insuranceBatchItems.value)
+      if (validationMessage) {
+        ElMessage.warning(validationMessage)
+        return
+      }
+
+      insuranceBatchSubmitting.value = true
+      try {
+        const res = await axios.post('/api/admin/insurances/activate-batch', buildInsuranceBatchPayload(insuranceBatchItems.value))
+        if (res.data.code === '00000') {
+          ElMessage.success(`已批量更新 ${insuranceBatchItems.value.length} 条保单状态`)
+          insuranceBatchDialogVisible.value = false
+          selectedInsuranceRows.value = []
+          insuranceBatchItems.value = []
+          loadInsurances()
+          loadExpenses()
+          loadStats()
+        } else {
+          ElMessage.error(res.data.message || '批量更新失败')
+        }
+      } catch (error) {
+        ElMessage.error(error.response?.data?.message || '批量更新失败')
+      } finally {
+        insuranceBatchSubmitting.value = false
+      }
+    }
+
+    const getStatusType = (status) => mapStatusType(status)
+
     const logout = () => {
-      sessionStorage.clear()
+      sessionStorage.removeItem('authToken')
+      sessionStorage.removeItem('isLoggedIn')
+      sessionStorage.removeItem('userId')
+      sessionStorage.removeItem('userType')
+      sessionStorage.removeItem('username')
       router.push('/login')
     }
 
@@ -648,14 +742,14 @@ export default {
     })
 
     return {
-      activeMenu, username, menuTitle, stats,
+      activeMenu, sidebarOpen, handleMenuClick, username, menuTitle, stats,
       users, userLoading, userTotal, userCurrentPage, userQuery, userDialogVisible, userDialogTitle, userDialogLoading, userForm,
       products, productLoading, productTotal, productCurrentPage, productQuery, productDialogVisible, productDialogTitle, productDialogLoading, productForm,
       expenses, expenseLoading, expenseTotal, expenseCurrentPage,
-      insurances, insuranceLoading, insuranceTotal, insuranceCurrentPage,
+      insurances, insuranceLoading, insuranceTotal, insuranceCurrentPage, selectedInsuranceRows, insuranceBatchDialogVisible, insuranceBatchSubmitting, insuranceBatchItems,
       loadStats, loadUsers, resetUserQuery, handleUserPageChange, openUserDialog, saveUser, toggleUserStatus, deleteUser,
       loadProducts, resetProductQuery, handleProductPageChange, openProductDialog, saveProduct, toggleProductStatus, deleteProduct,
-      loadExpenses, handleExpensePageChange, loadInsurances, handleInsurancePageChange,
+      loadExpenses, handleExpensePageChange, loadInsurances, handleInsurancePageChange, handleInsuranceSelectionChange, openInsuranceBatchDialog, submitInsuranceBatchUpdate,
       getStatusType, logout
     }
   }
@@ -711,6 +805,7 @@ export default {
 .filter-item label { font-size: 14px; color: #666; }
 
 .table-card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.05); overflow-x: auto; }
+.insurance-batch-tip { margin-bottom: 16px; padding: 12px 14px; background: #fff7e6; border: 1px solid #ffe7ba; border-radius: 8px; font-size: 13px; line-height: 1.6; color: #8c6218; }
 
 .pagination { margin-top: 20px; display: flex; justify-content: flex-end; }
 

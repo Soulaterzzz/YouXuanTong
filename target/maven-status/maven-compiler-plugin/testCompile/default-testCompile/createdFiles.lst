@@ -1,1 +1,7 @@
+com/zs/ytbx/support/ControllerTestSupport.class
+com/zs/ytbx/controller/AnXinXuanControllerTest.class
+com/zs/ytbx/common/auth/AuthTokenServiceTest.class
+com/zs/ytbx/controller/AdminControllerTest.class
 com/zs/ytbx/YtbxApplicationTests.class
+com/zs/ytbx/controller/NoticeControllerTest.class
+com/zs/ytbx/controller/AuthControllerTest.class

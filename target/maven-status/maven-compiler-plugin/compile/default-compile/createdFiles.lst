@@ -17,6 +17,7 @@ com/zs/ytbx/vo/anxinxuan/RechargeVO$RechargeVOBuilder.class
 com/zs/ytbx/vo/policy/PolicyDetailVO$PolicyDetailVOBuilder.class
 com/zs/ytbx/dto/CreateClaimRequest.class
 com/zs/ytbx/controller/SupportController.class
+com/zs/ytbx/vo/anxinxuan/ProductSalesAnalysisVO$ProductSalesAnalysisVOBuilder.class
 com/zs/ytbx/config/AuthInterceptor.class
 com/zs/ytbx/entity/PolicyEventEntity.class
 com/zs/ytbx/service/impl/SupportDbServiceImpl.class
@@ -30,6 +31,7 @@ com/zs/ytbx/controller/FileController.class
 com/zs/ytbx/vo/user/UserDashboardVO.class
 com/zs/ytbx/mapper/PolicyBeneficiaryMapper.class
 com/zs/ytbx/vo/product/ProductCompareResultVO.class
+com/zs/ytbx/vo/anxinxuan/OrderTrendAnalysisVO$OrderTrendAnalysisVOBuilder.class
 com/zs/ytbx/controller/PolicyController.class
 com/zs/ytbx/mapper/TransactionRecordMapper.class
 com/zs/ytbx/controller/ImageController.class
@@ -48,6 +50,7 @@ com/zs/ytbx/controller/AnXinXuanController.class
 com/zs/ytbx/mapper/InsuranceProductMapper.class
 com/zs/ytbx/entity/TransactionRecordEntity.class
 com/zs/ytbx/common/enums/ResultCode.class
+com/zs/ytbx/service/impl/AdminServiceImpl$ProductSalesAccumulator.class
 com/zs/ytbx/vo/policy/PolicyDetailVO$BeneficiaryInfo$BeneficiaryInfoBuilder.class
 com/zs/ytbx/vo/user/UserDashboardVO$QuickService$QuickServiceBuilder.class
 com/zs/ytbx/vo/policy/PolicyDetailVO$GuaranteeInfo$GuaranteeInfoBuilder.class
@@ -62,6 +65,7 @@ com/zs/ytbx/dto/ExpenseQuery.class
 com/zs/ytbx/vo/portal/PortalHomeVO$Hero$HeroBuilder.class
 com/zs/ytbx/vo/policy/PolicyDetailVO$PartyInfo$PartyInfoBuilder.class
 com/zs/ytbx/common/api/PageResponse$PageResponseBuilder.class
+com/zs/ytbx/vo/anxinxuan/ProductStatusAnalysisVO.class
 com/zs/ytbx/mapper/PolicyEventMapper.class
 com/zs/ytbx/vo/anxinxuan/ExpenseVO.class
 com/zs/ytbx/entity/InsuranceRecordEntity.class
@@ -107,6 +111,7 @@ com/zs/ytbx/service/impl/ImageServiceImpl.class
 com/zs/ytbx/vo/policy/PolicyListItemVO$PolicyListItemVOBuilder.class
 com/zs/ytbx/entity/InsuranceProductEntity.class
 com/zs/ytbx/service/impl/PolicyServiceImpl.class
+com/zs/ytbx/vo/anxinxuan/ProductStatusAnalysisVO$ProductStatusAnalysisVOBuilder.class
 com/zs/ytbx/dto/UserVO.class
 com/zs/ytbx/mapper/ProductGuaranteeItemMapper.class
 com/zs/ytbx/vo/portal/PortalHomeVO.class
@@ -121,6 +126,7 @@ com/zs/ytbx/vo/portal/PortalHomeVO$ClaimStep$ClaimStepBuilder.class
 com/zs/ytbx/vo/anxinxuan/ProductDetailVO.class
 com/zs/ytbx/mapper/SysUserMapper.class
 com/zs/ytbx/vo/portal/PortalHomeVO$ClaimStep.class
+com/zs/ytbx/vo/anxinxuan/ProductSalesAnalysisVO.class
 com/zs/ytbx/vo/portal/PortalHomeVO$CategoryCard$CategoryCardBuilder.class
 com/zs/ytbx/mapper/ProductCategoryMapper.class
 com/zs/ytbx/mapper/AxxProductMapper.class
@@ -161,6 +167,7 @@ com/zs/ytbx/vo/policy/PolicyEventVO.class
 com/zs/ytbx/vo/user/UserDashboardVO$Profile$ProfileBuilder.class
 com/zs/ytbx/mapper/PolicyMapper.class
 com/zs/ytbx/dto/CompareProductsRequest.class
+com/zs/ytbx/vo/anxinxuan/OrderTrendAnalysisVO.class
 com/zs/ytbx/common/auth/SessionConstants.class
 com/zs/ytbx/common/util/PasswordUtils.class
 com/zs/ytbx/service/impl/UserDashboardDbServiceImpl.class
@@ -185,5 +192,6 @@ com/zs/ytbx/mapper/InsuranceRecordMapper.class
 com/zs/ytbx/vo/portal/PortalHomeVO$CategoryCard.class
 com/zs/ytbx/entity/AccountBalanceEntity.class
 com/zs/ytbx/mapper/AdvisorMapper.class
+com/zs/ytbx/dto/AdminStatsQuery.class
 com/zs/ytbx/YtbxApplication.class
 com/zs/ytbx/vo/user/UserDashboardVO$PolicyUpdate$PolicyUpdateBuilder.class

@@ -4,6 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zs.ytbx.common.api.PageResponse;
+import com.zs.ytbx.common.enums.InsuranceStatus;
+import com.zs.ytbx.common.enums.ResultCode;
+import com.zs.ytbx.common.exception.BusinessException;
 import com.zs.ytbx.dto.*;
 import com.zs.ytbx.entity.*;
 import com.zs.ytbx.mapper.*;
@@ -17,8 +20,14 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAdjusters;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -212,6 +221,13 @@ public class AdminServiceImpl implements AdminService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void createProduct(ProductRequest request) {
+        long exists = axxProductMapper.selectCount(new LambdaQueryWrapper<AxxProductEntity>()
+                .eq(AxxProductEntity::getProductCode, request.getProductCode()));
+
+        if (exists > 0) {
+            throw new BusinessException(ResultCode.CONFLICT, "产品编码已存在");
+        }
+
         AxxProductEntity product = new AxxProductEntity();
         product.setProductCode(request.getProductCode());
         product.setProductName(request.getProductName());
@@ -225,9 +241,13 @@ public class AdminServiceImpl implements AdminService {
         product.setIsHot(request.getIsHot() != null ? request.getIsHot() : 0);
         product.setSaleStatus(request.getSaleStatus() != null ? request.getSaleStatus() : "ON_SALE");
         product.setSortNo(request.getSortNo() != null ? request.getSortNo() : 0);
+        product.setDeleted(0);
         product.setCreateTime(LocalDateTime.now());
         product.setUpdateTime(LocalDateTime.now());
-        axxProductMapper.insert(product);
+
+        if (axxProductMapper.insert(product) != 1) {
+            throw new BusinessException(ResultCode.SYSTEM_ERROR, "新增产品失败");
+        }
     }
 
     @Override
@@ -235,7 +255,15 @@ public class AdminServiceImpl implements AdminService {
     public void updateProduct(ProductRequest request) {
         AxxProductEntity product = axxProductMapper.selectById(request.getId());
         if (product == null) {
-            throw new RuntimeException("产品不存在");
+            throw new BusinessException(ResultCode.NOT_FOUND, "产品不存在");
+        }
+
+        if (request.getProductCode() != null && !request.getProductCode().equals(product.getProductCode())) {
+            long exists = axxProductMapper.selectCount(new LambdaQueryWrapper<AxxProductEntity>()
+                    .eq(AxxProductEntity::getProductCode, request.getProductCode()));
+            if (exists > 0) {
+                throw new BusinessException(ResultCode.CONFLICT, "产品编码已存在");
+            }
         }
         
         if (request.getProductCode() != null) {
@@ -276,7 +304,9 @@ public class AdminServiceImpl implements AdminService {
         }
         
         product.setUpdateTime(LocalDateTime.now());
-        axxProductMapper.updateById(product);
+        if (axxProductMapper.updateById(product) != 1) {
+            throw new BusinessException(ResultCode.SYSTEM_ERROR, "更新产品失败");
+        }
     }
 
     @Override
@@ -284,11 +314,12 @@ public class AdminServiceImpl implements AdminService {
     public void deleteProduct(Long productId) {
         AxxProductEntity product = axxProductMapper.selectById(productId);
         if (product == null) {
-            throw new RuntimeException("产品不存在");
+            throw new BusinessException(ResultCode.NOT_FOUND, "产品不存在");
         }
-        product.setDeleted(1);
-        product.setUpdateTime(LocalDateTime.now());
-        axxProductMapper.updateById(product);
+
+        if (axxProductMapper.deleteById(productId) != 1) {
+            throw new BusinessException(ResultCode.SYSTEM_ERROR, "删除产品失败");
+        }
     }
 
     @Override
@@ -318,9 +349,10 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public PageResponse<ExpenseVO> listAllExpenses(ExpenseQuery query) {
         LambdaQueryWrapper<ExpenseRecordEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.ne(ExpenseRecordEntity::getExpenseStatus, InsuranceStatus.DRAFT.getCode());
         
         if (query.getStatus() != null && !query.getStatus().isEmpty() && !"all".equals(query.getStatus())) {
-            wrapper.eq(ExpenseRecordEntity::getExpenseStatus, query.getStatus().toUpperCase());
+            applyExpenseStatusFilter(wrapper, query.getStatus());
         }
         
         if (query.getSerialNo() != null && !query.getSerialNo().isEmpty()) {
@@ -348,9 +380,12 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public PageResponse<InsuranceVO> listAllInsurances(InsuranceQuery query) {
         LambdaQueryWrapper<InsuranceRecordEntity> wrapper = new LambdaQueryWrapper<>();
+        if (query.getStatus() == null || query.getStatus().isEmpty() || "all".equals(query.getStatus())) {
+            wrapper.ne(InsuranceRecordEntity::getInsuranceStatus, InsuranceStatus.DRAFT.getCode());
+        }
         
         if (query.getStatus() != null && !query.getStatus().isEmpty() && !"all".equals(query.getStatus())) {
-            wrapper.eq(InsuranceRecordEntity::getInsuranceStatus, query.getStatus().toUpperCase());
+            applyInsuranceStatusFilter(wrapper, query.getStatus());
         }
         
         if (query.getSerialNo() != null && !query.getSerialNo().isEmpty()) {
@@ -381,6 +416,203 @@ public class AdminServiceImpl implements AdminService {
                 .total(page.getTotal())
                 .totalPages(page.getPages())
                 .build();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void approveInsurance(Long insuranceId, InsuranceApproveRequest request, Long reviewerId, String reviewerName) {
+        InsuranceRecordEntity insurance = requireInsurance(insuranceId);
+        ensureTransition(insurance, InsuranceStatus.PENDING_REVIEW, InsuranceStatus.APPROVED);
+
+        insurance.setInsuranceStatus(InsuranceStatus.APPROVED.getCode());
+        insurance.setReviewComment(request.getReviewComment().trim());
+        insurance.setReviewerId(reviewerId);
+        insurance.setReviewerName(reviewerName);
+        insurance.setReviewTime(LocalDateTime.now());
+        insurance.setRejectReason(null);
+        insurance.setUnderwritingTime(null);
+        insurance.setActivateTime(null);
+        insurance.setUpdateTime(LocalDateTime.now());
+        insuranceRecordMapper.updateById(insurance);
+
+        syncExpenseStatus(insurance.getExpenseId(), InsuranceStatus.APPROVED, insurance.getPolicyNo(), insurance.getEffectiveDate(), insurance.getExpiryDate());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void rejectInsurance(Long insuranceId, InsuranceRejectRequest request, Long reviewerId, String reviewerName) {
+        InsuranceRecordEntity insurance = requireInsurance(insuranceId);
+        ensureTransition(insurance, InsuranceStatus.PENDING_REVIEW, InsuranceStatus.REVIEW_REJECTED);
+
+        insurance.setInsuranceStatus(InsuranceStatus.REVIEW_REJECTED.getCode());
+        insurance.setReviewComment(request.getReviewComment().trim());
+        insurance.setReviewerId(reviewerId);
+        insurance.setReviewerName(reviewerName);
+        insurance.setReviewTime(LocalDateTime.now());
+        insurance.setRejectReason(request.getRejectReason().trim());
+        insurance.setUnderwritingTime(null);
+        insurance.setActivateTime(null);
+        insurance.setPolicyNo(null);
+        insurance.setEffectiveDate(null);
+        insurance.setExpiryDate(null);
+        insurance.setUpdateTime(LocalDateTime.now());
+        insuranceRecordMapper.updateById(insurance);
+
+        syncExpenseStatus(insurance.getExpenseId(), InsuranceStatus.REVIEW_REJECTED, null, null, null);
+        refundRejectedInsurance(insurance);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void startUnderwriting(Long insuranceId) {
+        InsuranceRecordEntity insurance = requireInsurance(insuranceId);
+        ensureTransition(insurance, InsuranceStatus.APPROVED, InsuranceStatus.UNDERWRITING);
+
+        insurance.setInsuranceStatus(InsuranceStatus.UNDERWRITING.getCode());
+        insurance.setUnderwritingTime(LocalDateTime.now());
+        insurance.setActivateTime(null);
+        insurance.setUpdateTime(LocalDateTime.now());
+        insuranceRecordMapper.updateById(insurance);
+
+        syncExpenseStatus(insurance.getExpenseId(), InsuranceStatus.UNDERWRITING, insurance.getPolicyNo(), insurance.getEffectiveDate(), insurance.getExpiryDate());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void activateInsurance(Long insuranceId, ActivateInsuranceRequest request) {
+        activateInsuranceInternal(insuranceId, request.getPolicyNo(), request.getEffectiveDate(), request.getExpiryDate());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void activateInsurances(List<BatchActivateInsuranceRequest.Item> items) {
+        if (items == null || items.isEmpty()) {
+            throw new RuntimeException("保单列表不能为空");
+        }
+
+        for (BatchActivateInsuranceRequest.Item item : items) {
+            activateInsuranceInternal(item.getInsuranceId(), item.getPolicyNo(), item.getEffectiveDate(), item.getExpiryDate());
+        }
+    }
+
+    private void activateInsuranceInternal(Long insuranceId, String policyNo, LocalDate effectiveDate, LocalDate expiryDate) {
+        InsuranceRecordEntity insurance = requireInsurance(insuranceId);
+        ensureTransition(insurance, InsuranceStatus.UNDERWRITING, InsuranceStatus.ACTIVE);
+
+        if (policyNo == null || policyNo.trim().isEmpty()) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "保单号不能为空");
+        }
+
+        if (effectiveDate == null || expiryDate == null) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "起保日期和结束日期不能为空");
+        }
+
+        if (expiryDate.isBefore(effectiveDate)) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "结束日期不能早于起保日期");
+        }
+
+        insurance.setInsuranceStatus(InsuranceStatus.ACTIVE.getCode());
+        insurance.setPolicyNo(policyNo.trim());
+        insurance.setEffectiveDate(effectiveDate);
+        insurance.setExpiryDate(expiryDate);
+        insurance.setActivateTime(LocalDateTime.now());
+        insurance.setUpdateTime(LocalDateTime.now());
+        insuranceRecordMapper.updateById(insurance);
+
+        syncExpenseStatus(insurance.getExpenseId(), InsuranceStatus.ACTIVE, policyNo.trim(), effectiveDate, expiryDate);
+    }
+
+    private InsuranceRecordEntity requireInsurance(Long insuranceId) {
+        InsuranceRecordEntity insurance = insuranceRecordMapper.selectById(insuranceId);
+        if (insurance == null) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "保险记录不存在");
+        }
+        return insurance;
+    }
+
+    private void ensureTransition(InsuranceRecordEntity insurance, InsuranceStatus expectedStatus, InsuranceStatus targetStatus) {
+        InsuranceStatus currentStatus = InsuranceStatus.fromCode(insurance.getInsuranceStatus());
+        if (currentStatus != expectedStatus) {
+            throw new BusinessException(ResultCode.INVALID_PARAM,
+                    "当前状态为“" + currentStatus.getLabel() + "”，不能执行“" + targetStatus.getLabel() + "”操作");
+        }
+        if (!currentStatus.canTransitionTo(targetStatus)) {
+            throw new BusinessException(ResultCode.INVALID_PARAM,
+                    "状态“" + currentStatus.getLabel() + "”不能流转到“" + targetStatus.getLabel() + "”");
+        }
+    }
+
+    private void syncExpenseStatus(Long expenseId,
+                                   InsuranceStatus status,
+                                   String policyNo,
+                                   LocalDate effectiveDate,
+                                   LocalDate expiryDate) {
+        if (expenseId == null) {
+            return;
+        }
+
+        ExpenseRecordEntity expense = expenseRecordMapper.selectById(expenseId);
+        if (expense == null) {
+            return;
+        }
+
+        expense.setExpenseStatus(status.getCode());
+        expense.setPolicyNo(policyNo);
+        expense.setEffectiveDate(effectiveDate);
+        expense.setExpiryDate(expiryDate);
+        expense.setUpdateTime(LocalDateTime.now());
+        expenseRecordMapper.updateById(expense);
+    }
+
+    private void refundRejectedInsurance(InsuranceRecordEntity insurance) {
+        if (insurance.getExpenseId() == null) {
+            return;
+        }
+
+        ExpenseRecordEntity expense = expenseRecordMapper.selectById(insurance.getExpenseId());
+        if (expense == null || expense.getTotalAmount() == null) {
+            return;
+        }
+
+        AccountBalanceEntity balance = accountBalanceMapper.selectOne(
+                new LambdaQueryWrapper<AccountBalanceEntity>()
+                        .eq(AccountBalanceEntity::getUserId, insurance.getUserId()));
+        if (balance == null) {
+            balance = new AccountBalanceEntity();
+            balance.setUserId(insurance.getUserId());
+            balance.setBalance(BigDecimal.ZERO);
+            balance.setFrozenBalance(BigDecimal.ZERO);
+            balance.setCreateTime(LocalDateTime.now());
+            balance.setUpdateTime(LocalDateTime.now());
+            accountBalanceMapper.insert(balance);
+        }
+
+        BigDecimal balanceBefore = balance.getBalance();
+        BigDecimal refundAmount = expense.getTotalAmount();
+        balance.setBalance(balanceBefore.add(refundAmount));
+        balance.setUpdateTime(LocalDateTime.now());
+        accountBalanceMapper.updateById(balance);
+
+        TransactionRecordEntity transaction = new TransactionRecordEntity();
+        transaction.setSerialNo(generateSerialNo("RFD"));
+        transaction.setUserId(insurance.getUserId());
+        transaction.setTransType("RECHARGE");
+        transaction.setAmount(refundAmount);
+        transaction.setBalanceBefore(balanceBefore);
+        transaction.setBalanceAfter(balance.getBalance());
+        transaction.setDescription("投保审核驳回退款：" + insurance.getProductName());
+        transaction.setRefType("EXPENSE");
+        transaction.setRefId(expense.getId());
+        transaction.setPaymentMethod("BALANCE");
+        transaction.setPaymentStatus("SUCCESS");
+        transaction.setCreateTime(LocalDateTime.now());
+        transaction.setUpdateTime(LocalDateTime.now());
+        transactionRecordMapper.insert(transaction);
+    }
+
+    private String generateSerialNo(String prefix) {
+        return prefix + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
+                + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
 
     private UserVO convertToUserVO(AxxUserEntity entity) {
@@ -454,8 +686,10 @@ public class AdminServiceImpl implements AdminService {
     }
 
     private InsuranceVO convertToInsuranceVO(InsuranceRecordEntity entity) {
+        String statusCode = InsuranceStatus.normalizeCode(entity.getInsuranceStatus());
         return InsuranceVO.builder()
                 .id(entity.getId())
+                .statusCode(statusCode)
                 .product(entity.getProductName())
                 .insuredName(entity.getInsuredName())
                 .insuredId(entity.getInsuredIdNo())
@@ -468,26 +702,55 @@ public class AdminServiceImpl implements AdminService {
                 .policyNo(entity.getPolicyNo())
                 .startDate(entity.getEffectiveDate() != null ? entity.getEffectiveDate().toString() : "")
                 .endDate(entity.getExpiryDate() != null ? entity.getExpiryDate().toString() : "")
+                .reviewerName(entity.getReviewerName())
+                .reviewTime(entity.getReviewTime() != null ? entity.getReviewTime().toString() : "")
+                .reviewComment(entity.getReviewComment())
+                .rejectReason(entity.getRejectReason())
+                .submitTime(entity.getSubmitTime() != null ? entity.getSubmitTime().toString() : "")
+                .underwritingTime(entity.getUnderwritingTime() != null ? entity.getUnderwritingTime().toString() : "")
+                .activateTime(entity.getActivateTime() != null ? entity.getActivateTime().toString() : "")
                 .count(entity.getQuantity())
                 .premiumAmount(entity.getPremiumAmount())
                 .build();
     }
 
+    private void applyExpenseStatusFilter(LambdaQueryWrapper<ExpenseRecordEntity> wrapper, String status) {
+        String normalizedStatus = InsuranceStatus.normalizeCode(status);
+        if (InsuranceStatus.ACTIVE.getCode().equals(normalizedStatus)) {
+            wrapper.in(ExpenseRecordEntity::getExpenseStatus, InsuranceStatus.ACTIVE.getCode(), "COMPLETED");
+            return;
+        }
+        if ("PENDING".equalsIgnoreCase(status)) {
+            wrapper.in(ExpenseRecordEntity::getExpenseStatus,
+                    InsuranceStatus.PENDING_REVIEW.getCode(),
+                    InsuranceStatus.APPROVED.getCode(),
+                    InsuranceStatus.UNDERWRITING.getCode());
+            return;
+        }
+        wrapper.eq(ExpenseRecordEntity::getExpenseStatus, normalizedStatus);
+    }
+
+    private void applyInsuranceStatusFilter(LambdaQueryWrapper<InsuranceRecordEntity> wrapper, String status) {
+        String normalizedStatus = InsuranceStatus.normalizeCode(status);
+        if ("PENDING".equalsIgnoreCase(status)) {
+            wrapper.in(InsuranceRecordEntity::getInsuranceStatus,
+                    InsuranceStatus.PENDING_REVIEW.getCode(),
+                    InsuranceStatus.APPROVED.getCode(),
+                    InsuranceStatus.UNDERWRITING.getCode(),
+                    "PENDING");
+            return;
+        }
+        wrapper.eq(InsuranceRecordEntity::getInsuranceStatus, normalizedStatus);
+    }
+
     private String mapStatus(String status) {
-        if (status == null) return "";
-        switch (status.toUpperCase()) {
-            case "COMPLETED":
-            case "ACTIVE":
-                return "已完成";
-            case "PENDING":
-                return "待处理";
-            case "PROCESSING":
-                return "处理中";
-            case "CANCELLED":
-            case "EXPIRED":
-                return "已取消";
-            default:
-                return status;
+        if (status == null || status.isBlank()) {
+            return "";
+        }
+        try {
+            return InsuranceStatus.fromCode(status).getLabel();
+        } catch (IllegalArgumentException ex) {
+            return status;
         }
     }
 
@@ -526,6 +789,7 @@ public class AdminServiceImpl implements AdminService {
         LocalDateTime todayStart = LocalDateTime.of(LocalDate.now(), LocalTime.MIN);
         return expenseRecordMapper.selectCount(
             new LambdaQueryWrapper<ExpenseRecordEntity>()
+                .ne(ExpenseRecordEntity::getExpenseStatus, InsuranceStatus.DRAFT.getCode())
                 .ge(ExpenseRecordEntity::getCreateTime, todayStart)
         );
     }
@@ -534,7 +798,10 @@ public class AdminServiceImpl implements AdminService {
     public Long getPendingOrders() {
         return expenseRecordMapper.selectCount(
             new LambdaQueryWrapper<ExpenseRecordEntity>()
-                .eq(ExpenseRecordEntity::getExpenseStatus, "PENDING")
+                .in(ExpenseRecordEntity::getExpenseStatus,
+                        InsuranceStatus.PENDING_REVIEW.getCode(),
+                        InsuranceStatus.APPROVED.getCode(),
+                        InsuranceStatus.UNDERWRITING.getCode())
         );
     }
 
@@ -544,8 +811,210 @@ public class AdminServiceImpl implements AdminService {
         LocalDateTime monthStart = LocalDateTime.of(now.with(TemporalAdjusters.firstDayOfMonth()), LocalTime.MIN);
         return expenseRecordMapper.selectCount(
             new LambdaQueryWrapper<ExpenseRecordEntity>()
+                .ne(ExpenseRecordEntity::getExpenseStatus, InsuranceStatus.DRAFT.getCode())
                 .ge(ExpenseRecordEntity::getCreateTime, monthStart)
         );
+    }
+
+    @Override
+    public List<ProductSalesAnalysisVO> getProductSalesRanking(LocalDate startDate, LocalDate endDate) {
+        LocalDate[] range = resolveStatsDateRange(startDate, endDate);
+        LocalDateTime startDateTime = range[0].atStartOfDay();
+        LocalDateTime endDateTime = LocalDateTime.of(range[1], LocalTime.MAX);
+
+        List<ExpenseRecordEntity> expenses = expenseRecordMapper.selectList(new LambdaQueryWrapper<ExpenseRecordEntity>()
+                .notIn(ExpenseRecordEntity::getExpenseStatus,
+                        InsuranceStatus.DRAFT.getCode(),
+                        InsuranceStatus.REVIEW_REJECTED.getCode(),
+                        InsuranceStatus.CANCELLED.getCode())
+                .ge(ExpenseRecordEntity::getCreateTime, startDateTime)
+                .le(ExpenseRecordEntity::getCreateTime, endDateTime));
+
+        Map<String, ProductSalesAccumulator> accumulatorMap = new HashMap<>();
+        for (ExpenseRecordEntity expense : expenses) {
+            String productName = expense.getProductName() == null || expense.getProductName().isBlank() ? "未命名产品" : expense.getProductName();
+            ProductSalesAccumulator accumulator = accumulatorMap.computeIfAbsent(productName, key -> new ProductSalesAccumulator());
+            accumulator.orderCount++;
+            accumulator.salesQuantity += expense.getQuantity() == null ? 0 : expense.getQuantity();
+            accumulator.salesAmount = accumulator.salesAmount.add(expense.getTotalAmount() == null ? BigDecimal.ZERO : expense.getTotalAmount());
+        }
+
+        Map<String, Long> activePolicyMap = insuranceRecordMapper.selectList(new LambdaQueryWrapper<InsuranceRecordEntity>()
+                        .eq(InsuranceRecordEntity::getInsuranceStatus, InsuranceStatus.ACTIVE.getCode())
+                        .ge(InsuranceRecordEntity::getCreateTime, startDateTime)
+                        .le(InsuranceRecordEntity::getCreateTime, endDateTime))
+                .stream()
+                .collect(Collectors.groupingBy(item -> item.getProductName() == null || item.getProductName().isBlank() ? "未命名产品" : item.getProductName(), Collectors.counting()));
+
+        List<Map.Entry<String, ProductSalesAccumulator>> sortedEntries = new ArrayList<>(accumulatorMap.entrySet());
+        sortedEntries.sort(Comparator
+                .comparing((Map.Entry<String, ProductSalesAccumulator> item) -> item.getValue().salesAmount).reversed()
+                .thenComparing(item -> item.getValue().salesQuantity, Comparator.reverseOrder())
+                .thenComparing(Map.Entry::getKey));
+
+        List<ProductSalesAnalysisVO> result = new ArrayList<>();
+        for (int index = 0; index < Math.min(sortedEntries.size(), 10); index++) {
+            Map.Entry<String, ProductSalesAccumulator> entry = sortedEntries.get(index);
+            ProductSalesAccumulator value = entry.getValue();
+            result.add(ProductSalesAnalysisVO.builder()
+                    .rankNo(index + 1)
+                    .productName(entry.getKey())
+                    .orderCount(value.orderCount)
+                    .salesQuantity(value.salesQuantity)
+                    .salesAmount(value.salesAmount)
+                    .activePolicyCount(activePolicyMap.getOrDefault(entry.getKey(), 0L))
+                    .build());
+        }
+        return result;
+    }
+
+    @Override
+    public List<OrderTrendAnalysisVO> getOrderTrendAnalysis(LocalDate startDate, LocalDate endDate, String periodType) {
+        LocalDate[] range = resolveStatsDateRange(startDate, endDate);
+        LocalDateTime startDateTime = range[0].atStartOfDay();
+        LocalDateTime endDateTime = LocalDateTime.of(range[1], LocalTime.MAX);
+
+        Map<LocalDate, Long> orderCountMap = expenseRecordMapper.selectList(new LambdaQueryWrapper<ExpenseRecordEntity>()
+                        .ne(ExpenseRecordEntity::getExpenseStatus, InsuranceStatus.DRAFT.getCode())
+                        .ge(ExpenseRecordEntity::getCreateTime, startDateTime)
+                        .le(ExpenseRecordEntity::getCreateTime, endDateTime))
+                .stream()
+                .collect(Collectors.groupingBy(item -> item.getCreateTime().toLocalDate(), Collectors.counting()));
+
+        return switch (normalizePeriodType(periodType)) {
+            case "YEAR" -> buildMonthlyTrend(range[0], range[1], orderCountMap);
+            case "QUARTER" -> buildSemiMonthlyTrend(range[0], range[1], orderCountMap);
+            case "MONTH" -> buildWeeklyTrend(range[0], range[1], orderCountMap);
+            default -> buildDailyTrend(range[0], range[1], orderCountMap);
+        };
+    }
+
+    private static class ProductSalesAccumulator {
+        private long orderCount;
+        private int salesQuantity;
+        private BigDecimal salesAmount = BigDecimal.ZERO;
+    }
+
+    private LocalDate[] resolveStatsDateRange(LocalDate startDate, LocalDate endDate) {
+        LocalDate resolvedEnd = endDate == null ? LocalDate.now() : endDate;
+        LocalDate resolvedStart = startDate == null ? resolvedEnd.minusDays(29) : startDate;
+        if (resolvedStart.isAfter(resolvedEnd)) {
+            LocalDate temp = resolvedStart;
+            resolvedStart = resolvedEnd;
+            resolvedEnd = temp;
+        }
+        return new LocalDate[]{resolvedStart, resolvedEnd};
+    }
+
+    private String normalizePeriodType(String periodType) {
+        if (periodType == null || periodType.isBlank()) {
+            return "MONTH";
+        }
+        return periodType.trim().toUpperCase();
+    }
+
+    private List<OrderTrendAnalysisVO> buildDailyTrend(LocalDate startDate,
+                                                       LocalDate endDate,
+                                                       Map<LocalDate, Long> orderCountMap) {
+        List<OrderTrendAnalysisVO> result = new ArrayList<>();
+        LocalDate cursor = startDate;
+        while (!cursor.isAfter(endDate)) {
+            result.add(OrderTrendAnalysisVO.builder()
+                    .dateLabel(cursor.format(DateTimeFormatter.ofPattern("MM-dd")))
+                    .orderCount(orderCountMap.getOrDefault(cursor, 0L))
+                    .build());
+            cursor = cursor.plusDays(1);
+        }
+        return result;
+    }
+
+    private List<OrderTrendAnalysisVO> buildWeeklyTrend(LocalDate startDate,
+                                                        LocalDate endDate,
+                                                        Map<LocalDate, Long> orderCountMap) {
+        List<OrderTrendAnalysisVO> result = new ArrayList<>();
+        LocalDate bucketStart = startDate;
+        int weekIndex = 1;
+        while (!bucketStart.isAfter(endDate)) {
+            LocalDate bucketEnd = bucketStart.plusDays(6);
+            if (bucketEnd.isAfter(endDate)) {
+                bucketEnd = endDate;
+            }
+            result.add(OrderTrendAnalysisVO.builder()
+                    .dateLabel(String.format("第%d周 %s~%s", weekIndex,
+                            bucketStart.format(DateTimeFormatter.ofPattern("MM-dd")),
+                            bucketEnd.format(DateTimeFormatter.ofPattern("MM-dd"))))
+                    .orderCount(sumOrderCount(orderCountMap, bucketStart, bucketEnd))
+                    .build());
+            bucketStart = bucketEnd.plusDays(1);
+            weekIndex++;
+        }
+        return result;
+    }
+
+    private List<OrderTrendAnalysisVO> buildSemiMonthlyTrend(LocalDate startDate,
+                                                             LocalDate endDate,
+                                                             Map<LocalDate, Long> orderCountMap) {
+        List<OrderTrendAnalysisVO> result = new ArrayList<>();
+        LocalDate cursor = LocalDate.of(startDate.getYear(), startDate.getMonth(), 1);
+        while (!cursor.isAfter(endDate)) {
+            LocalDate firstHalfStart = cursor;
+            LocalDate firstHalfEnd = LocalDate.of(cursor.getYear(), cursor.getMonth(), Math.min(15, cursor.lengthOfMonth()));
+            appendHalfMonthBucket(result, orderCountMap, startDate, endDate, firstHalfStart, firstHalfEnd, cursor.format(DateTimeFormatter.ofPattern("MM上")));
+
+            LocalDate secondHalfStart = firstHalfEnd.plusDays(1);
+            LocalDate secondHalfEnd = LocalDate.of(cursor.getYear(), cursor.getMonth(), cursor.lengthOfMonth());
+            appendHalfMonthBucket(result, orderCountMap, startDate, endDate, secondHalfStart, secondHalfEnd, cursor.format(DateTimeFormatter.ofPattern("MM下")));
+
+            cursor = cursor.plusMonths(1);
+        }
+        return result;
+    }
+
+    private void appendHalfMonthBucket(List<OrderTrendAnalysisVO> result,
+                                       Map<LocalDate, Long> orderCountMap,
+                                       LocalDate rangeStart,
+                                       LocalDate rangeEnd,
+                                       LocalDate bucketStart,
+                                       LocalDate bucketEnd,
+                                       String label) {
+        if (bucketStart.isAfter(rangeEnd) || bucketEnd.isBefore(rangeStart)) {
+            return;
+        }
+        LocalDate actualStart = bucketStart.isBefore(rangeStart) ? rangeStart : bucketStart;
+        LocalDate actualEnd = bucketEnd.isAfter(rangeEnd) ? rangeEnd : bucketEnd;
+        result.add(OrderTrendAnalysisVO.builder()
+                .dateLabel(label)
+                .orderCount(sumOrderCount(orderCountMap, actualStart, actualEnd))
+                .build());
+    }
+
+    private List<OrderTrendAnalysisVO> buildMonthlyTrend(LocalDate startDate,
+                                                         LocalDate endDate,
+                                                         Map<LocalDate, Long> orderCountMap) {
+        List<OrderTrendAnalysisVO> result = new ArrayList<>();
+        LocalDate cursor = LocalDate.of(startDate.getYear(), startDate.getMonth(), 1);
+        while (!cursor.isAfter(endDate)) {
+            LocalDate monthStart = cursor;
+            LocalDate monthEnd = cursor.withDayOfMonth(cursor.lengthOfMonth());
+            LocalDate actualStart = monthStart.isBefore(startDate) ? startDate : monthStart;
+            LocalDate actualEnd = monthEnd.isAfter(endDate) ? endDate : monthEnd;
+            result.add(OrderTrendAnalysisVO.builder()
+                    .dateLabel(cursor.format(DateTimeFormatter.ofPattern("yyyy-MM")))
+                    .orderCount(sumOrderCount(orderCountMap, actualStart, actualEnd))
+                    .build());
+            cursor = cursor.plusMonths(1);
+        }
+        return result;
+    }
+
+    private Long sumOrderCount(Map<LocalDate, Long> orderCountMap, LocalDate startDate, LocalDate endDate) {
+        long total = 0L;
+        LocalDate cursor = startDate;
+        while (!cursor.isAfter(endDate)) {
+            total += orderCountMap.getOrDefault(cursor, 0L);
+            cursor = cursor.plusDays(1);
+        }
+        return total;
     }
 
     private RechargeVO convertToRechargeVO(TransactionRecordEntity entity) {

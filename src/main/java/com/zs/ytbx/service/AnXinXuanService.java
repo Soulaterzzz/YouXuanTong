@@ -9,6 +9,8 @@ public interface AnXinXuanService {
     PageResponse<ProductVO> listProducts(ProductQuery query);
     ProductDetailVO getProductDetail(Long productId);
     void activateProduct(ActivateRequest request, Long userId);
+    void saveDraft(ActivateRequest request, Long userId);
+    void submitDraft(Long insuranceId, Long userId);
 
     PageResponse<ExpenseVO> listExpenses(ExpenseQuery query, Long userId);
 

@@ -191,6 +191,90 @@
               </div>
             </div>
           </div>
+
+          <div v-if="isAdmin" class="admin-analysis-toolbar">
+            <div class="admin-analysis-filter">
+              <div class="admin-analysis-filter-meta">
+                <h3>经营分析</h3>
+                <p>可按时间范围查看销量排行与订单总量走势</p>
+              </div>
+              <div class="admin-analysis-filter-actions">
+                <el-button :type="adminAnalysisPeriodType === 'WEEK' ? 'primary' : 'default'" @click="applyAdminAnalysisPreset('WEEK')">本周</el-button>
+                <el-button :type="adminAnalysisPeriodType === 'MONTH' ? 'primary' : 'default'" @click="applyAdminAnalysisPreset('MONTH')">本月</el-button>
+                <el-button :type="adminAnalysisPeriodType === 'QUARTER' ? 'primary' : 'default'" @click="applyAdminAnalysisPreset('QUARTER')">季度</el-button>
+                <el-button :type="adminAnalysisPeriodType === 'YEAR' ? 'primary' : 'default'" @click="applyAdminAnalysisPreset('YEAR')">全年</el-button>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="isAdmin" class="admin-analysis-grid admin-analysis-stack">
+            <div class="admin-analysis-card">
+              <div class="admin-analysis-header">
+                <div>
+                  <h3>产品销量排行</h3>
+                  <p>{{ adminAnalysisRangeText }}</p>
+                </div>
+                <el-tag type="success" effect="plain">TOP 10</el-tag>
+              </div>
+              <el-table v-if="adminSalesRanking.length" :data="adminSalesRanking" size="small" stripe>
+                <el-table-column prop="rankNo" label="排名" width="70" align="center" />
+                <el-table-column prop="productName" label="产品名称" min-width="220" show-overflow-tooltip />
+                <el-table-column prop="orderCount" label="订单数" width="90" align="center" />
+                <el-table-column prop="salesQuantity" label="销量份数" width="100" align="center" />
+                <el-table-column label="销售金额" width="120" align="right">
+                  <template #default="scope">¥{{ Number(scope.row.salesAmount || 0).toFixed(2) }}</template>
+                </el-table-column>
+                <el-table-column prop="activePolicyCount" label="生效保单" width="100" align="center" />
+              </el-table>
+              <el-empty v-else description="当前时间范围暂无销量数据" :image-size="88">
+                <el-button type="primary" @click="applyAdminAnalysisPreset('MONTH')">查看本月</el-button>
+              </el-empty>
+            </div>
+
+            <div class="admin-analysis-card">
+              <div class="admin-analysis-header">
+                <div>
+                  <h3>总订单量表</h3>
+                  <p>{{ adminOrderTrendRangeText }}</p>
+                </div>
+                <el-tag type="warning" effect="plain">{{ adminOrderTrendModeLabel }}</el-tag>
+              </div>
+              <el-table v-if="adminOrderTrend.length" :data="adminOrderTrend" size="small" stripe>
+                <el-table-column prop="dateLabel" label="时间段" min-width="180" align="center" />
+                <el-table-column prop="orderCount" label="订单量" min-width="120" align="center" />
+              </el-table>
+              <el-empty v-else description="当前时间范围暂无订单趋势数据" :image-size="88">
+                <el-button type="primary" @click="applyAdminAnalysisPreset('MONTH')">查看本月</el-button>
+              </el-empty>
+            </div>
+          </div>
+
+          <div class="notice-board-card">
+            <div class="notice-board-header">
+              <div class="notice-board-meta">
+                <h3>通知公告</h3>
+                <p>管理员首页和用户首页展示同一份通知列表。</p>
+              </div>
+              <div class="notice-board-actions">
+                <el-tag type="info" effect="plain">{{ publishedNoticeTimeText }}</el-tag>
+                <el-button v-if="isAdmin" type="primary" @click="openNoticePublishDialog">
+                  <el-icon><Plus /></el-icon>
+                  发布通知
+                </el-button>
+              </div>
+            </div>
+
+            <div v-if="publishedNoticeList.length" class="notice-list notice-published-list">
+              <div v-for="(item, index) in publishedNoticeList" :key="item.id || index" class="notice-list-item notice-published-item">
+                <div class="notice-list-order">{{ index + 1 }}</div>
+                <div class="notice-list-content">
+                  <h4>{{ item.title }}</h4>
+                  <p>{{ item.content }}</p>
+                </div>
+              </div>
+            </div>
+            <el-empty v-else description="暂无通知公告" :image-size="90" />
+          </div>
         </div>
 
         <!-- 产品中心 -->
@@ -199,14 +283,20 @@
           <div class="product-filter">
             <div class="filter-header">
               <h3><el-icon><Filter /></el-icon> 产品筛选</h3>
-              <el-button text @click="resetProductFilter" v-if="companyFilter !== 'all'">
-                <el-icon><Refresh /></el-icon>
-                重置筛选
-              </el-button>
+              <div class="filter-header-actions">
+                <el-button text @click="resetProductFilter" v-if="companyFilter !== 'all' || activeCategory !== 'all'">
+                  <el-icon><Refresh /></el-icon>
+                  重置筛选
+                </el-button>
+                <el-button v-if="isAdmin" type="primary" @click="openProductDialog()">
+                  <el-icon><Plus /></el-icon>
+                  添加产品
+                </el-button>
+              </div>
             </div>
             <div class="filter-row">
               <span class="filter-label">承保公司：</span>
-              <el-radio-group v-model="companyFilter" @change="handleCompanyChange" size="default">
+              <el-radio-group v-model="companyFilter" @change="handleCompanyChange" size="default" class="product-company-group">
                 <el-radio-button label="all">全部</el-radio-button>
                 <el-radio-button label="guoshou">国寿财险</el-radio-button>
                 <el-radio-button label="pingan">平安财险</el-radio-button>
@@ -284,6 +374,10 @@
                         <el-icon><Switch /></el-icon>
                         {{ product.saleStatus === 'ON_SALE' ? '下架' : '上架' }}
                       </el-button>
+                      <el-button v-if="isAdmin" type="danger" plain size="small" @click="deleteProduct(product)">
+                        <el-icon><Delete /></el-icon>
+                        删除
+                      </el-button>
                       <el-button type="primary" plain size="small" @click="downloadProductTemplate(product)">
                         <el-icon><Download /></el-icon>
                         模板
@@ -343,8 +437,11 @@
               <el-form-item label="状态">
                 <el-select v-model="expenseFilter.status" placeholder="请选择" clearable style="width: 150px;">
                   <el-option label="全部" value="all"></el-option>
-                  <el-option label="待处理" value="pending"></el-option>
-                  <el-option label="已完成" value="completed"></el-option>
+                  <el-option label="待审核" value="PENDING_REVIEW"></el-option>
+                  <el-option label="审核通过" value="APPROVED"></el-option>
+                  <el-option label="审核驳回" value="REVIEW_REJECTED"></el-option>
+                  <el-option label="承保中" value="UNDERWRITING"></el-option>
+                  <el-option label="已生效" value="ACTIVE"></el-option>
                   <el-option label="已取消" value="cancelled"></el-option>
                 </el-select>
               </el-form-item>
@@ -363,37 +460,22 @@
             </el-form>
           </div>
 
-          <!-- 操作按钮 -->
-          <div class="table-actions">
-            <el-button type="success" plain>
-              <el-icon><Download /></el-icon>
-              {{ isAdmin ? '导出全部费用清单' : '导出费用清单' }}
-            </el-button>
-          </div>
-
           <!-- 费用清单表格 -->
           <el-table :data="expenseList" style="width: 100%" v-loading="expenseLoading" stripe>
-            <el-table-column prop="serial" label="序列号" width="150"></el-table-column>
-            <el-table-column prop="contact" label="联系人" width="100"></el-table-column>
-            <el-table-column prop="product" label="产品名称" min-width="150"></el-table-column>
-            <el-table-column prop="createTime" label="创建时间" width="160"></el-table-column>
-            <el-table-column prop="exportTime" label="导出时间" width="160"></el-table-column>
-            <el-table-column prop="status" label="状态" width="100">
+            <el-table-column prop="serial" label="序列号" width="180"></el-table-column>
+            <el-table-column prop="product" label="产品名称" min-width="220"></el-table-column>
+            <el-table-column prop="contact" label="联系人" width="120"></el-table-column>
+            <el-table-column prop="createTime" label="创建时间" width="170"></el-table-column>
+            <el-table-column prop="status" label="状态" width="110">
               <template #default="scope">
                 <el-tag :type="getStatusType(scope.row.status)">{{ scope.row.status }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="policyNo" label="电子保单号" width="180"></el-table-column>
-            <el-table-column prop="startDate" label="起保日期" width="120"></el-table-column>
-            <el-table-column prop="endDate" label="结束日期" width="120"></el-table-column>
-            <el-table-column prop="count" label="份数" width="80" align="center"></el-table-column>
-            <el-table-column prop="price" label="价格" width="100" align="right">
-              <template #default="scope">¥{{ scope.row.price }}</template>
-            </el-table-column>
-            <el-table-column prop="total" label="小计" width="100" align="right">
+            <el-table-column prop="count" label="份数" width="90" align="center"></el-table-column>
+            <el-table-column prop="total" label="金额" width="120" align="right">
               <template #default="scope">¥{{ scope.row.total }}</template>
             </el-table-column>
-            <el-table-column label="操作" width="100" fixed="right">
+            <el-table-column label="操作" width="110" fixed="right">
               <template #default="scope">
                 <el-button link type="primary" @click="viewExpenseDetail(scope.row)">详情</el-button>
               </template>
@@ -432,9 +514,13 @@
               <el-form-item label="状态">
                 <el-select v-model="insuranceFilter.status" placeholder="请选择" clearable style="width: 150px;">
                   <el-option label="全部" value="all"></el-option>
-                  <el-option label="有效" value="active"></el-option>
-                  <el-option label="待生效" value="pending"></el-option>
-                  <el-option label="已过期" value="expired"></el-option>
+                  <el-option v-if="!isAdmin" label="待提交" value="DRAFT"></el-option>
+                  <el-option label="待审核" value="PENDING_REVIEW"></el-option>
+                  <el-option label="审核通过" value="APPROVED"></el-option>
+                  <el-option label="审核驳回" value="REVIEW_REJECTED"></el-option>
+                  <el-option label="承保中" value="UNDERWRITING"></el-option>
+                  <el-option label="已生效" value="ACTIVE"></el-option>
+                  <el-option label="已过期" value="EXPIRED"></el-option>
                 </el-select>
               </el-form-item>
               <el-form-item label="序列号">
@@ -460,49 +546,76 @@
           </div>
 
           <!-- 操作按钮 -->
-          <div class="table-actions">
-            <el-button type="primary" @click="queryInsurances">
-              <el-icon><Search /></el-icon>
-              查询
-            </el-button>
-            <el-button type="success">
-              <el-icon><Download /></el-icon>
-              数据导出(最多5000条)
-            </el-button>
-            <el-button type="info">
-              <el-icon><Clock /></el-icon>
-              到期查询(1个月)
-            </el-button>
-            <el-button type="warning">
-              <el-icon><Document /></el-icon>
-              批量导出凭证(前20条)
+          <div v-if="isAdmin" class="table-actions">
+            <el-button
+              type="warning"
+              :disabled="!selectedInsurances.some(item => item.statusCode === 'UNDERWRITING')"
+              @click="openInsuranceActivationDialog(selectedInsurances.filter(item => item.statusCode === 'UNDERWRITING'))"
+            >
+              <el-icon><Lightning /></el-icon>
+              批量生效
             </el-button>
           </div>
 
           <!-- 保险清单表格 -->
           <el-table :data="insuranceList" style="width: 100%" v-loading="insuranceLoading" stripe @selection-change="handleSelectionChange">
-            <el-table-column type="selection" width="55"></el-table-column>
-            <el-table-column prop="product" label="产品名称" min-width="150"></el-table-column>
-            <el-table-column prop="insuredName" label="投保人" width="100"></el-table-column>
-            <el-table-column prop="insuredId" label="投保人证件号" width="150"></el-table-column>
-            <el-table-column prop="beneficiaryName" label="被保人" width="100"></el-table-column>
-            <el-table-column prop="beneficiaryId" label="被保人证件号" width="150"></el-table-column>
-            <el-table-column prop="createTime" label="创建时间" width="160"></el-table-column>
-            <el-table-column prop="exportTime" label="导出时间" width="160"></el-table-column>
-            <el-table-column prop="status" label="状态" width="100">
+            <el-table-column v-if="isAdmin" type="selection" width="55"></el-table-column>
+            <el-table-column prop="product" label="产品名称" min-width="220"></el-table-column>
+            <el-table-column prop="insuredName" label="投保人" width="120"></el-table-column>
+            <el-table-column prop="beneficiaryName" label="被保人" width="120"></el-table-column>
+            <el-table-column prop="status" label="状态" width="110">
               <template #default="scope">
                 <el-tag :type="getStatusType(scope.row.status)">{{ scope.row.status }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="agent" label="业务员" width="100"></el-table-column>
-            <el-table-column prop="policyNo" label="电子保单号" width="180"></el-table-column>
+            <el-table-column prop="policyNo" label="保单号" min-width="200" show-overflow-tooltip></el-table-column>
             <el-table-column prop="startDate" label="起保日期" width="120"></el-table-column>
             <el-table-column prop="endDate" label="结束日期" width="120"></el-table-column>
-            <el-table-column prop="count" label="份数" width="80" align="center"></el-table-column>
-            <el-table-column label="操作" width="120" fixed="right">
+            <el-table-column v-if="isAdmin" prop="agent" label="业务员" width="110"></el-table-column>
+            <el-table-column label="操作" width="220" fixed="right">
               <template #default="scope">
                 <el-button link type="primary" @click="viewInsuranceDetail(scope.row)">详情</el-button>
                 <el-button link type="success" @click="downloadPolicy(scope.row)">下载</el-button>
+                <el-button
+                  v-if="!isAdmin && scope.row.statusCode === 'DRAFT'"
+                  link
+                  type="primary"
+                  @click="submitInsuranceDraft(scope.row)"
+                >
+                  提交审核
+                </el-button>
+                <el-button
+                  v-if="isAdmin && scope.row.statusCode === 'PENDING_REVIEW'"
+                  link
+                  type="success"
+                  @click="openInsuranceReviewDialog(scope.row, 'approve')"
+                >
+                  通过
+                </el-button>
+                <el-button
+                  v-if="isAdmin && scope.row.statusCode === 'PENDING_REVIEW'"
+                  link
+                  type="danger"
+                  @click="openInsuranceReviewDialog(scope.row, 'reject')"
+                >
+                  驳回
+                </el-button>
+                <el-button
+                  v-if="isAdmin && scope.row.statusCode === 'APPROVED'"
+                  link
+                  type="warning"
+                  @click="startInsuranceUnderwriting(scope.row)"
+                >
+                  承保
+                </el-button>
+                <el-button
+                  v-if="isAdmin && scope.row.statusCode === 'UNDERWRITING'"
+                  link
+                  type="warning"
+                  @click="openInsuranceActivationDialog([scope.row])"
+                >
+                  生效
+                </el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -605,10 +718,16 @@
           <div class="filter-form">
             <div class="filter-header">
               <h3>用户管理</h3>
-              <el-button text @click="resetUserQuery">
-                <el-icon><Refresh /></el-icon>
-                重置筛选
-              </el-button>
+              <div class="filter-header-actions">
+                <el-button text @click="resetUserQuery">
+                  <el-icon><Refresh /></el-icon>
+                  重置筛选
+                </el-button>
+                <el-button type="primary" @click="openUserDialog('create')">
+                  <el-icon><Plus /></el-icon>
+                  新增用户
+                </el-button>
+              </div>
             </div>
             <el-form :inline="true" :model="userQuery" class="demo-form-inline">
               <el-form-item label="用户名">
@@ -642,7 +761,7 @@
             <el-table :data="userList" v-loading="userLoading" stripe>
               <el-table-column prop="id" label="ID" width="80" />
               <el-table-column prop="username" label="用户名" width="120" />
-              <el-table-column prop="phone" label="手机号" width="130" />
+              <el-table-column prop="mobile" label="手机号" width="130" />
               <el-table-column prop="userType" label="类型" width="100">
                 <template #default="scope">
                   <el-tag :type="scope.row.userType === 'ADMIN' ? 'danger' : 'success'" size="small">
@@ -706,7 +825,7 @@
     </main>
 
     <!-- 激活弹窗 -->
-    <el-dialog v-model="productDialogVisible" title="编辑产品" width="620px" :close-on-click-modal="false">
+    <el-dialog v-model="productDialogVisible" :title="productDialogTitle" width="620px" :close-on-click-modal="false">
       <el-form :model="productForm" label-width="90px">
         <el-form-item label="产品编码">
           <el-input v-model="productForm.productCode" placeholder="请输入产品编码" />
@@ -746,6 +865,7 @@
           <el-upload
             class="product-image-uploader"
             :action="`/api/images/product/${productForm.id}/upload`"
+            :disabled="!productForm.id"
             :show-file-list="false"
             :on-success="handleImageUploadSuccess"
             :on-error="handleImageUploadError"
@@ -757,10 +877,10 @@
             <el-icon v-else class="product-image-uploader-icon"><Plus /></el-icon>
           </el-upload>
           <div class="image-upload-tip">
-            <el-button size="small" type="danger" @click="deleteProductImage" v-if="productForm.imageUrl">
+            <el-button size="small" type="danger" @click="deleteProductImage" v-if="productForm.id && productForm.imageUrl">
               删除图片
             </el-button>
-            <span class="tip-text">支持 jpg、png、gif、webp 格式，大小不超过 10MB</span>
+            <span class="tip-text">{{ productForm.id ? '支持 jpg、png、gif、webp 格式，大小不超过 10MB' : '请先保存产品后再上传图片' }}</span>
           </div>
         </el-form-item>
         <el-form-item label="模板文件">
@@ -768,6 +888,7 @@
             <el-upload
               class="template-uploader"
               :action="`/api/images/product/${productForm.id}/template`"
+              :disabled="!productForm.id"
               :show-file-list="false"
               :on-success="handleTemplateUploadSuccess"
               :on-error="handleTemplateUploadError"
@@ -788,7 +909,7 @@
               <el-button size="small" type="danger" link @click="deleteTemplate">删除</el-button>
             </div>
             <div class="template-upload-tip">
-              支持 PDF、Word、Excel、TXT 格式，大小不超过 10MB
+              {{ productForm.id ? '支持 PDF、Word、Excel、TXT 格式，大小不超过 10MB' : '请先保存产品后再上传模板文件' }}
             </div>
           </div>
         </el-form-item>
@@ -881,7 +1002,8 @@
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="activeDialogVisible = false">取消</el-button>
-          <el-button type="primary" :loading="activeSubmitting" :disabled="selectedProduct && balance < selectedProduct.price * activeForm.count" @click="submitActiveForm">提交数据</el-button>
+          <el-button :loading="draftSubmitting" @click="saveDraftForm">保存待提交</el-button>
+          <el-button type="primary" :loading="activeSubmitting" :disabled="selectedProduct && balance < selectedProduct.price * activeForm.count" @click="submitActiveForm">提交审核</el-button>
         </span>
       </template>
     </el-dialog>
@@ -916,18 +1038,216 @@
       </template>
     </el-dialog>
 
+    <el-dialog
+      v-model="insuranceActivationDialogVisible"
+      :title="insuranceActivationDialogTitle"
+      width="960px"
+      :close-on-click-modal="false"
+    >
+      <div class="insurance-activation-tip">
+        请填写保单号、起保日期和结束日期，提交后将同步更新费用清单状态和保单起止日期。
+      </div>
+      <el-table :data="insuranceActivationItems" border>
+        <el-table-column prop="product" label="产品名称" min-width="160" />
+        <el-table-column prop="beneficiaryName" label="被保人" width="120" />
+        <el-table-column label="保单号" min-width="200">
+          <template #default="scope">
+            <el-input v-model="scope.row.policyNo" placeholder="请输入保单号" />
+          </template>
+        </el-table-column>
+        <el-table-column label="起保日期" width="170">
+          <template #default="scope">
+            <el-date-picker
+              v-model="scope.row.startDate"
+              type="date"
+              value-format="YYYY-MM-DD"
+              placeholder="起保日期"
+              style="width: 100%"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="结束日期" width="170">
+          <template #default="scope">
+            <el-date-picker
+              v-model="scope.row.endDate"
+              type="date"
+              value-format="YYYY-MM-DD"
+              placeholder="结束日期"
+              style="width: 100%"
+            />
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="insuranceActivationDialogVisible = false">取消</el-button>
+          <el-button type="primary" :loading="insuranceActivationSubmitting" @click="submitInsuranceActivation">
+            确认生效
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="insuranceReviewDialogVisible"
+      :title="insuranceReviewDialogTitle"
+      width="520px"
+      :close-on-click-modal="false"
+    >
+      <el-form label-width="88px">
+        <el-form-item label="审核意见">
+          <el-input
+            v-model="insuranceReviewForm.reviewComment"
+            type="textarea"
+            :rows="4"
+            placeholder="请输入审核意见"
+          />
+        </el-form-item>
+        <el-form-item v-if="insuranceReviewAction === 'reject'" label="驳回原因">
+          <el-input
+            v-model="insuranceReviewForm.rejectReason"
+            type="textarea"
+            :rows="4"
+            placeholder="请输入驳回原因"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="insuranceReviewDialogVisible = false">取消</el-button>
+          <el-button type="primary" :loading="insuranceReviewSubmitting" @click="submitInsuranceReview">确认</el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="expenseDetailDialogVisible"
+      title="费用详情"
+      width="680px"
+      :close-on-click-modal="true"
+      destroy-on-close
+    >
+      <div v-if="expenseDetailRow" class="detail-dialog-body">
+        <div class="detail-dialog-hero">
+          <div>
+            <div class="detail-dialog-eyebrow">费用清单</div>
+            <h3 class="detail-dialog-title">{{ expenseDetailRow.product || '保险产品' }}</h3>
+            <p class="detail-dialog-subtitle">{{ expenseDetailRow.serial || '-' }}</p>
+          </div>
+          <el-tag :type="getStatusType(expenseDetailRow.status)" effect="dark">{{ expenseDetailRow.status }}</el-tag>
+        </div>
+
+        <div class="detail-summary-grid">
+          <div class="detail-summary-card">
+            <span class="label">联系人</span>
+            <strong>{{ expenseDetailRow.contact || '-' }}</strong>
+          </div>
+          <div class="detail-summary-card">
+            <span class="label">创建时间</span>
+            <strong>{{ formatPolicyTime(expenseDetailRow.createTime) }}</strong>
+          </div>
+          <div class="detail-summary-card">
+            <span class="label">投保份数</span>
+            <strong>{{ expenseDetailRow.count || 0 }} 份</strong>
+          </div>
+          <div class="detail-summary-card">
+            <span class="label">总金额</span>
+            <strong>¥{{ expenseDetailRow.total ?? '-' }}</strong>
+          </div>
+        </div>
+
+        <el-descriptions :column="2" border class="detail-meta-block">
+          <el-descriptions-item label="序列号">{{ expenseDetailRow.serial || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="保单号">{{ expenseDetailRow.policyNo || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="起保日期">{{ expenseDetailRow.startDate || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="结束日期">{{ expenseDetailRow.endDate || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="单价">¥{{ expenseDetailRow.price ?? '-' }}</el-descriptions-item>
+          <el-descriptions-item label="小计">¥{{ expenseDetailRow.total ?? '-' }}</el-descriptions-item>
+        </el-descriptions>
+      </div>
+    </el-dialog>
+
+    <el-dialog
+      v-model="insuranceDetailDialogVisible"
+      title="保单详情"
+      width="760px"
+      :close-on-click-modal="true"
+      destroy-on-close
+    >
+      <div v-if="insuranceDetailRow" class="detail-dialog-body">
+        <div class="detail-dialog-hero">
+          <div>
+            <div class="detail-dialog-eyebrow">保单生命周期</div>
+            <h3 class="detail-dialog-title">{{ insuranceDetailRow.product || '保险产品' }}</h3>
+            <p class="detail-dialog-subtitle">{{ insuranceDetailRow.policyNo || '正式保单号待下发' }}</p>
+          </div>
+          <el-tag :type="getStatusType(insuranceDetailRow.status)" effect="dark">{{ insuranceDetailRow.status }}</el-tag>
+        </div>
+
+        <div class="detail-summary-grid">
+          <div class="detail-summary-card">
+            <span class="label">投保人</span>
+            <strong>{{ insuranceDetailRow.insuredName || '-' }}</strong>
+          </div>
+          <div class="detail-summary-card">
+            <span class="label">被保人</span>
+            <strong>{{ insuranceDetailRow.beneficiaryName || '-' }}</strong>
+          </div>
+          <div class="detail-summary-card">
+            <span class="label">业务员</span>
+            <strong>{{ insuranceDetailRow.agent || '-' }}</strong>
+          </div>
+          <div class="detail-summary-card">
+            <span class="label">保障期限</span>
+            <strong>{{ insuranceDetailRow.startDate || '-' }} 至 {{ insuranceDetailRow.endDate || '-' }}</strong>
+          </div>
+        </div>
+
+        <el-descriptions :column="2" border class="detail-meta-block">
+          <el-descriptions-item label="审核人">{{ insuranceDetailRow.reviewerName || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="审核时间">{{ formatPolicyTime(insuranceDetailRow.reviewTime) }}</el-descriptions-item>
+          <el-descriptions-item label="审核意见" :span="2">{{ insuranceDetailRow.reviewComment || '-' }}</el-descriptions-item>
+          <el-descriptions-item v-if="insuranceDetailRow.rejectReason" label="驳回原因" :span="2">{{ insuranceDetailRow.rejectReason }}</el-descriptions-item>
+        </el-descriptions>
+
+        <div class="detail-section-block">
+          <div class="detail-section-header">
+            <h4>进度时间线</h4>
+            <span>按业务节点查看当前保单处理进度</span>
+          </div>
+          <el-timeline class="policy-timeline">
+            <el-timeline-item
+              v-for="item in insuranceTimeline"
+              :key="item.key"
+              :timestamp="formatPolicyTime(item.time)"
+              :type="item.type"
+              placement="top"
+            >
+              <div class="policy-timeline-card">
+                <div class="policy-timeline-title">{{ item.title }}</div>
+                <p class="policy-timeline-content">{{ item.content }}</p>
+              </div>
+            </el-timeline-item>
+          </el-timeline>
+        </div>
+      </div>
+    </el-dialog>
+
     <!-- 用户管理弹窗 -->
     <el-dialog v-model="userDialogVisible" :title="userDialogTitle" width="450px" :close-on-click-modal="false">
       <el-form :model="userForm" :rules="userFormRules" ref="userFormRef" label-width="80px">
         <el-form-item label="用户名" prop="username">
           <el-input v-model="userForm.username" placeholder="请输入用户名" :disabled="!!userForm.id" />
         </el-form-item>
-        <el-form-item label="手机号" prop="phone">
-          <el-input v-model="userForm.phone" placeholder="请输入手机号" />
+        <el-form-item label="手机号" prop="mobile">
+          <el-input v-model="userForm.mobile" placeholder="请输入手机号" />
         </el-form-item>
         <el-form-item label="密码" :prop="userForm.id ? '' : 'password'">
           <el-input v-model="userForm.password" type="password" placeholder="请输入密码" show-password />
           <span style="color: #999; font-size: 12px;" v-if="userForm.id">留空则不修改密码</span>
+        </el-form-item>
+        <el-form-item v-if="!userForm.id || userForm.password" label="确认密码">
+          <el-input v-model="userForm.confirmPassword" type="password" placeholder="请再次输入密码" show-password />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -944,6 +1264,77 @@
         <img :src="previewImageUrl" :alt="previewImageTitle" class="preview-image">
       </div>
     </el-dialog>
+
+    <el-dialog
+      v-model="noticePublishDialogVisible"
+      title="发布通知"
+      width="780px"
+      :close-on-click-modal="false"
+      class="notice-publish-dialog"
+    >
+      <div class="notice-admin-layout">
+        <div class="notice-editor-panel">
+          <el-form label-position="top">
+            <el-form-item label="通知标题">
+              <el-input
+                v-model="noticeDraft.title"
+                maxlength="30"
+                show-word-limit
+                placeholder="例如：系统升级提醒"
+              />
+            </el-form-item>
+            <el-form-item label="通知内容">
+              <el-input
+                v-model="noticeDraft.content"
+                type="textarea"
+                :rows="5"
+                maxlength="200"
+                show-word-limit
+                placeholder="请输入首页要展示的通知内容"
+              />
+            </el-form-item>
+          </el-form>
+          <div class="notice-editor-actions">
+            <el-button @click="resetNoticeDraft">重置输入</el-button>
+            <el-button type="primary" @click="saveNoticeDraftItem">
+              {{ editingNoticeIndex > -1 ? '更新通知' : '加入列表' }}
+            </el-button>
+          </div>
+        </div>
+
+        <div class="notice-list-panel">
+          <div class="notice-list-header">
+            <span>待发布通知（{{ noticeDraftList.length }}）</span>
+            <div class="notice-list-actions">
+              <el-button text @click="clearNoticeDraftList" :disabled="!noticeDraftList.length">
+                清空列表
+              </el-button>
+            </div>
+          </div>
+
+          <div v-if="noticeDraftList.length" class="notice-list">
+            <div v-for="(item, index) in noticeDraftList" :key="item.id || index" class="notice-list-item">
+              <div class="notice-list-order">{{ index + 1 }}</div>
+              <div class="notice-list-content">
+                <h4>{{ item.title }}</h4>
+                <p>{{ item.content }}</p>
+              </div>
+              <div class="notice-list-item-actions">
+                <el-button text type="primary" @click="editNoticeItem(index)">编辑</el-button>
+                <el-button text type="danger" @click="removeNoticeItem(index)">删除</el-button>
+              </div>
+            </div>
+          </div>
+          <el-empty v-else description="暂无待发布通知" :image-size="80" />
+        </div>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="noticePublishDialogVisible = false">取消</el-button>
+          <el-button type="success" @click="publishNotices" :disabled="!noticeDraftList.length">发布通知</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -953,7 +1344,7 @@ import {
   Grid, Menu, Sunny, Star, Present, OfficeBuilding,
   CircleCheck, Refresh, Search, Picture, Upload, Lightning, View, Download,
   Clock, Link, Edit, Switch, ZoomIn, Calendar, Timer, Notebook, Plus, Filter,
-  Delete, ArrowDown
+  ArrowDown, Delete
 } from '@element-plus/icons-vue'
 
 export default {
@@ -963,7 +1354,7 @@ export default {
     Grid, Menu, Sunny, Star, Present, OfficeBuilding,
     CircleCheck, Refresh, Search, Picture, Upload, Lightning, View, Download,
     Clock, Link, Edit, Switch, ZoomIn, Calendar, Timer, Notebook, Plus, Filter,
-    ArrowDown
+    ArrowDown, Delete
   },
   data() {
     return {
@@ -981,6 +1372,10 @@ export default {
         pendingOrders: 0,
         monthOrders: 0
       },
+      adminSalesRanking: [],
+      adminOrderTrend: [],
+      adminAnalysisRange: [],
+      adminAnalysisPeriodType: 'MONTH',
       productLoading: false,
       products: [],
       productTotal: 0,
@@ -990,6 +1385,7 @@ export default {
       categoryFilter: 'all',
       selectedCompanies: [],
       productDialogVisible: false,
+      productDialogTitle: '编辑产品',
       productSubmitting: false,
       productForm: {
         id: null,
@@ -1034,6 +1430,10 @@ export default {
         agent: ''
       },
       selectedInsurances: [],
+      insuranceActivationDialogVisible: false,
+      insuranceActivationDialogTitle: '保单生效',
+      insuranceActivationSubmitting: false,
+      insuranceActivationItems: [],
       rechargeLoading: false,
       rechargeList: [],
       rechargeTotal: 0,
@@ -1060,16 +1460,31 @@ export default {
       userForm: {
         id: null,
         username: '',
-        phone: '',
-        password: ''
+        mobile: '',
+        password: '',
+        confirmPassword: ''
       },
       userFormRules: {
         username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-        phone: [{ required: true, message: '请输入手机号', trigger: 'blur' }]
+        mobile: [
+          { required: true, message: '请输入手机号', trigger: 'blur' },
+          { pattern: /^1[3-9]\d{9}$/, message: '手机号格式不正确', trigger: 'blur' }
+        ]
       },
+      noticePublishDialogVisible: false,
+      noticePublishedAt: '',
+      publishedNoticeList: [],
+      noticeDraftList: [],
+      noticeDraft: {
+        id: null,
+        title: '',
+        content: ''
+      },
+      editingNoticeIndex: -1,
       selectedProduct: null,
       activeDialogVisible: false,
       activeSubmitting: false,
+      draftSubmitting: false,
       activeForm: {
         planName: '',
         beneficiaryName: '',
@@ -1085,6 +1500,20 @@ export default {
         beneficiaryId: [{ required: true, message: '请输入被保人证件号', trigger: 'blur' }],
         beneficiaryJob: [{ required: true, message: '请选择被保人职业', trigger: 'change' }]
       },
+      insuranceReviewDialogVisible: false,
+      insuranceReviewDialogTitle: '保单审核',
+      insuranceReviewSubmitting: false,
+      insuranceReviewAction: 'approve',
+      insuranceReviewForm: {
+        insuranceId: null,
+        reviewComment: '',
+        rejectReason: ''
+      },
+      expenseDetailDialogVisible: false,
+      expenseDetailRow: null,
+      insuranceDetailDialogVisible: false,
+      insuranceDetailRow: null,
+      insuranceTimeline: [],
       rechargeDialogVisible: false,
       rechargeSubmitting: false,
       rechargeForm: {
@@ -1102,18 +1531,242 @@ export default {
       previewImageTitle: ''
     }
   },
+  computed: {
+    publishedNoticeTimeText() {
+      if (!this.noticePublishedAt) {
+        return '最近发布：未发布'
+      }
+
+      return `最近发布：${new Date(this.noticePublishedAt).toLocaleString('zh-CN', { hour12: false })}`
+    },
+    adminAnalysisRangeText() {
+      if (!this.adminAnalysisRange || this.adminAnalysisRange.length !== 2) {
+        return '默认展示本月的数据表现'
+      }
+      return `${this.adminAnalysisRange[0]} 至 ${this.adminAnalysisRange[1]}`
+    },
+    adminOrderTrendRangeText() {
+      return `${this.adminAnalysisRangeText} · ${this.adminOrderTrendModeLabel}`
+    },
+    adminOrderTrendModeLabel() {
+      const labelMap = {
+        WEEK: '按日统计',
+        MONTH: '按周统计',
+        QUARTER: '按半月统计',
+        YEAR: '按月统计'
+      }
+      return `${labelMap[this.adminAnalysisPeriodType] || '按周统计'} · 共 ${this.adminOrderTrendTotal} 单`
+    },
+    adminOrderTrendTotal() {
+      return this.adminOrderTrend.reduce((sum, item) => sum + Number(item.orderCount || 0), 0)
+    },
+  },
   mounted() {
-    if (!sessionStorage.getItem('isLoggedIn')) {
+    if (!sessionStorage.getItem('authToken')) {
       this.$router.push('/login')
       return
+    }
+    if (this.isAdmin) {
+      this.adminAnalysisRange = this.buildAdminAnalysisRange('MONTH')
     }
     this.loadStats()
     this.loadProducts()
     this.loadBalance()
+    this.initializeNoticeCenter()
   },
   methods: {
     isSuccess(res) {
       return res && res.data && res.data.code === '00000'
+    },
+
+    getAdminStatsParams() {
+      if (!this.adminAnalysisRange || this.adminAnalysisRange.length !== 2) {
+        return { periodType: this.adminAnalysisPeriodType }
+      }
+      return {
+        periodType: this.adminAnalysisPeriodType,
+        startDate: this.adminAnalysisRange[0],
+        endDate: this.adminAnalysisRange[1]
+      }
+    },
+
+    buildAdminAnalysisRange(periodType) {
+      const current = new Date()
+      current.setHours(0, 0, 0, 0)
+      let start = new Date(current)
+
+      switch (periodType) {
+        case 'WEEK': {
+          const day = current.getDay() === 0 ? 7 : current.getDay()
+          start.setDate(current.getDate() - day + 1)
+          break
+        }
+        case 'QUARTER': {
+          const quarterStartMonth = Math.floor(current.getMonth() / 3) * 3
+          start = new Date(current.getFullYear(), quarterStartMonth, 1)
+          break
+        }
+        case 'YEAR':
+          start = new Date(current.getFullYear(), 0, 1)
+          break
+        case 'MONTH':
+        default:
+          start = new Date(current.getFullYear(), current.getMonth(), 1)
+          break
+      }
+
+      return [this.formatAdminDate(start), this.formatAdminDate(current)]
+    },
+
+    formatAdminDate(date) {
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    },
+
+    applyAdminAnalysisPreset(periodType) {
+      this.adminAnalysisPeriodType = periodType
+      this.adminAnalysisRange = this.buildAdminAnalysisRange(periodType)
+      this.loadStats()
+    },
+
+    createNoticeId() {
+      return `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`
+    },
+
+    normalizeNoticeItem(item) {
+      const title = String(item?.title || '').trim()
+      const content = String(item?.content || '').trim()
+
+      if (!title || !content) {
+        return null
+      }
+
+      return {
+        id: item?.id || this.createNoticeId(),
+        title,
+        content,
+        sortNo: item?.sortNo ?? 0,
+        publishedAt: item?.publishedAt || ''
+      }
+    },
+
+    cloneNoticeList(list = []) {
+      return list.map(item => ({ ...item }))
+    },
+
+    async refreshPublishedNotices() {
+      try {
+        const res = await this.$axios.get('/api/notices')
+        if (!this.isSuccess(res)) {
+          this.publishedNoticeList = []
+          this.noticePublishedAt = ''
+          return
+        }
+
+        const notices = Array.isArray(res.data.data)
+          ? res.data.data.map(item => this.normalizeNoticeItem(item)).filter(Boolean)
+          : []
+
+        this.publishedNoticeList = this.cloneNoticeList(notices)
+        this.noticePublishedAt = notices[0]?.publishedAt || ''
+      } catch (error) {
+        console.error('读取通知失败:', error)
+        this.publishedNoticeList = []
+        this.noticePublishedAt = ''
+      }
+    },
+
+    initializeNoticeCenter() {
+      this.refreshPublishedNotices()
+    },
+
+    async openNoticePublishDialog() {
+      await this.refreshPublishedNotices()
+      this.noticeDraftList = this.cloneNoticeList(this.publishedNoticeList)
+      this.resetNoticeDraft()
+      this.noticePublishDialogVisible = true
+    },
+
+    resetNoticeDraft() {
+      this.noticeDraft = {
+        id: null,
+        title: '',
+        content: ''
+      }
+      this.editingNoticeIndex = -1
+    },
+
+    saveNoticeDraftItem() {
+      const notice = this.normalizeNoticeItem(this.noticeDraft)
+      if (!notice) {
+        this.$message.warning('请先填写完整的通知标题和内容')
+        return
+      }
+
+      if (this.editingNoticeIndex > -1) {
+        this.noticeDraftList.splice(this.editingNoticeIndex, 1, notice)
+      } else {
+        this.noticeDraftList.push(notice)
+      }
+
+      this.$message.success(this.editingNoticeIndex > -1 ? '通知已更新' : '通知已加入待发布列表')
+      this.resetNoticeDraft()
+    },
+
+    editNoticeItem(index) {
+      const target = this.noticeDraftList[index]
+      if (!target) {
+        return
+      }
+
+      this.noticeDraft = { ...target }
+      this.editingNoticeIndex = index
+    },
+
+    removeNoticeItem(index) {
+      this.noticeDraftList.splice(index, 1)
+
+      if (this.editingNoticeIndex === index) {
+        this.resetNoticeDraft()
+      } else if (this.editingNoticeIndex > index) {
+        this.editingNoticeIndex -= 1
+      }
+    },
+
+    clearNoticeDraftList() {
+      this.noticeDraftList = []
+      this.resetNoticeDraft()
+    },
+
+    async publishNotices() {
+      if (!this.noticeDraftList.length) {
+        this.$message.warning('请先添加至少一条通知')
+        return
+      }
+
+      const notices = this.noticeDraftList
+        .map((item, index) => {
+          const normalized = this.normalizeNoticeItem(item)
+          return normalized ? { ...normalized, sortNo: index + 1 } : null
+        })
+        .filter(Boolean)
+
+      try {
+        const res = await this.$axios.post('/api/admin/notices/publish', { notices })
+        if (!this.isSuccess(res)) {
+          this.$message.error(res.data?.message || '通知发布失败')
+          return
+        }
+
+        await this.refreshPublishedNotices()
+        this.noticePublishDialogVisible = false
+        this.$message.success('通知已发布')
+      } catch (error) {
+        console.error('发布通知失败:', error)
+        this.$message.error(error.response?.data?.message || '通知发布失败')
+      }
     },
 
     async loadBalance() {
@@ -1134,7 +1787,7 @@ export default {
             this.$axios.get('/api/admin/products', { params: { page: 1, size: 1 } }),
             this.$axios.get('/api/admin/expenses', { params: { page: 1, size: 1 } }),
             this.$axios.get('/api/admin/insurances', { params: { page: 1, size: 1 } }),
-            this.$axios.get('/api/admin/stats')
+            this.$axios.get('/api/admin/stats', { params: this.getAdminStatsParams() })
           ])
           
           const adminStats = this.isSuccess(statsRes) ? statsRes.data.data || {} : {}
@@ -1148,9 +1801,13 @@ export default {
             pendingOrders: adminStats.pendingOrders || 0,
             monthOrders: adminStats.monthOrders || 0
           }
+          this.adminSalesRanking = adminStats.productSalesRanking || []
+          this.adminOrderTrend = adminStats.orderTrendAnalysis || []
           return
         }
 
+        this.adminSalesRanking = []
+        this.adminOrderTrend = []
         const res = await this.$axios.get('/api/anxinxuan/stats')
         if (this.isSuccess(res)) {
           const data = res.data.data || {}
@@ -1173,14 +1830,18 @@ export default {
           pendingOrders: 0,
           monthOrders: 0
         }
+        this.adminSalesRanking = []
+        this.adminOrderTrend = []
       }
     },
 
     handleMenuSelect(key) {
       this.activeMenu = key
+
       switch (key) {
         case 'home':
           this.loadStats()
+          this.refreshPublishedNotices()
           break
         case 'product':
           this.loadProducts()
@@ -1284,23 +1945,57 @@ export default {
       this.loadProducts()
     },
 
-    openProductDialog(product) {
-      this.productForm = {
-        id: product.id,
-        productCode: product.productCode || '',
-        productName: product.name || '',
-        categoryCode: product.categoryCode || '1-3',
-        companyName: product.companyName || '',
-        description: product.description || '',
-        features: product.features || '',
-        price: product.price || 0.01,
-        stock: product.stock || 0,
-        isNew: product.isNew ? 1 : 0,
-        isHot: product.isHot ? 1 : 0,
-        saleStatus: product.saleStatus || 'ON_SALE',
-        sortNo: product.sortNo || 0,
-        imageUrl: product.imageUrl || '',
-        templateFileName: product.templateFileName || ''
+    getDefaultProductForm() {
+      const companyMap = {
+        guoshou: '国寿财险',
+        pingan: '平安财险',
+        zhonghua: '中华联合',
+        taiping: '太平财险',
+        renbao: '人保财险'
+      }
+
+      return {
+        id: null,
+        productCode: '',
+        productName: '',
+        categoryCode: this.activeCategory !== 'all' ? this.activeCategory : '1-3',
+        companyName: this.companyFilter !== 'all' ? (companyMap[this.companyFilter] || this.companyFilter) : '',
+        description: '',
+        features: '',
+        price: 0.01,
+        stock: 0,
+        isNew: 0,
+        isHot: 0,
+        saleStatus: 'ON_SALE',
+        sortNo: 0,
+        imageUrl: '',
+        templateFileName: ''
+      }
+    },
+
+    openProductDialog(product = null) {
+      if (product) {
+        this.productDialogTitle = '编辑产品'
+        this.productForm = {
+          id: product.id,
+          productCode: product.productCode || '',
+          productName: product.name || '',
+          categoryCode: product.categoryCode || '1-3',
+          companyName: product.companyName || '',
+          description: product.description || '',
+          features: product.features || '',
+          price: product.price || 0.01,
+          stock: product.stock || 0,
+          isNew: product.isNew ? 1 : 0,
+          isHot: product.isHot ? 1 : 0,
+          saleStatus: product.saleStatus || 'ON_SALE',
+          sortNo: product.sortNo || 0,
+          imageUrl: product.imageUrl || '',
+          templateFileName: product.templateFileName || ''
+        }
+      } else {
+        this.productDialogTitle = '新增产品'
+        this.productForm = this.getDefaultProductForm()
       }
       this.productDialogVisible = true
     },
@@ -1310,16 +2005,39 @@ export default {
         this.$message.warning('请填写产品编码和产品名称')
         return
       }
+
+      const isEdit = !!this.productForm.id
+      const submitData = {
+        id: this.productForm.id,
+        productCode: this.productForm.productCode,
+        productName: this.productForm.productName,
+        categoryCode: this.productForm.categoryCode,
+        companyName: this.productForm.companyName,
+        description: this.productForm.description,
+        features: this.productForm.features,
+        price: this.productForm.price,
+        stock: this.productForm.stock,
+        isNew: this.productForm.isNew,
+        isHot: this.productForm.isHot,
+        saleStatus: this.productForm.saleStatus,
+        sortNo: this.productForm.sortNo
+      }
+
       this.productSubmitting = true
       try {
-        await this.$axios.put('/api/admin/products', this.productForm)
-        this.$message.success('产品更新成功')
+        if (isEdit) {
+          await this.$axios.put('/api/admin/products', submitData)
+        } else {
+          delete submitData.id
+          await this.$axios.post('/api/admin/products', submitData)
+        }
+        this.$message.success(isEdit ? '产品更新成功' : '产品新增成功')
         this.productDialogVisible = false
         this.loadProducts()
         this.loadStats()
       } catch (error) {
-        console.error('更新产品失败:', error)
-        this.$message.error(error.response?.data?.message || '更新产品失败')
+        console.error(isEdit ? '更新产品失败:' : '新增产品失败:', error)
+        this.$message.error(error.response?.data?.message || (isEdit ? '更新产品失败' : '新增产品失败'))
       } finally {
         this.productSubmitting = false
       }
@@ -1339,6 +2057,25 @@ export default {
       } catch (error) {
         console.error('切换产品状态失败:', error)
         this.$message.error(error.response?.data?.message || '切换产品状态失败')
+      }
+    },
+
+    async deleteProduct(product) {
+      try {
+        await this.$confirm(`确定删除产品“${product.name}”吗？此操作不可恢复。`, '删除确认', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        })
+        await this.$axios.delete(`/api/admin/products/${product.id}`)
+        this.$message.success('产品删除成功')
+        this.loadProducts()
+        this.loadStats()
+      } catch (error) {
+        if (error !== 'cancel') {
+          console.error('删除产品失败:', error)
+          this.$message.error(error.response?.data?.message || '删除产品失败')
+        }
       }
     },
 
@@ -1370,19 +2107,44 @@ export default {
         try {
           const res = await this.$axios.post('/api/anxinxuan/products/activate', this.activeForm)
           if (this.isSuccess(res)) {
-            this.$message.success('激活成功')
+            this.$message.success('提交审核成功')
             this.activeDialogVisible = false
             this.loadProducts()
             this.loadStats()
             this.loadBalance()
+            this.loadInsurances()
           } else {
-            this.$message.error(res.data.message || '激活失败')
+            this.$message.error(res.data.message || '提交审核失败')
           }
         } catch (error) {
-          console.error('激活失败:', error)
-          this.$message.error(error.response?.data?.message || '激活失败，请稍后重试')
+          console.error('提交审核失败:', error)
+          this.$message.error(error.response?.data?.message || '提交审核失败，请稍后重试')
         } finally {
           this.activeSubmitting = false
+        }
+      })
+    },
+
+    async saveDraftForm() {
+      this.$refs.activeFormRef.validate(async (valid) => {
+        if (!valid) {
+          return
+        }
+        this.draftSubmitting = true
+        try {
+          const res = await this.$axios.post('/api/anxinxuan/products/save-draft', this.activeForm)
+          if (this.isSuccess(res)) {
+            this.$message.success('已保存为待提交')
+            this.activeDialogVisible = false
+            this.loadInsurances()
+          } else {
+            this.$message.error(res.data.message || '保存草稿失败')
+          }
+        } catch (error) {
+          console.error('保存草稿失败:', error)
+          this.$message.error(error.response?.data?.message || '保存草稿失败，请稍后重试')
+        } finally {
+          this.draftSubmitting = false
         }
       })
     },
@@ -1437,7 +2199,8 @@ export default {
     },
 
     viewExpenseDetail(row) {
-      this.$message.info(`查看费用详情：${row.serial}`)
+      this.expenseDetailRow = { ...row }
+      this.expenseDetailDialogVisible = true
     },
 
     resetInsuranceFilter() {
@@ -1506,11 +2269,259 @@ export default {
     },
 
     viewInsuranceDetail(row) {
-      this.$message.info(`查看保险详情：${row.policyNo}`)
+      this.insuranceDetailRow = { ...row }
+      this.insuranceTimeline = this.buildInsuranceTimeline(row)
+      this.insuranceDetailDialogVisible = true
+    },
+
+    buildInsuranceTimeline(row) {
+      const entries = [
+        {
+          key: 'draft',
+          title: '投保资料创建',
+          time: row.createTime,
+          type: 'info',
+          content: row.statusCode === 'DRAFT'
+            ? '资料已暂存为待提交，用户仍可继续补充后再发起审核。'
+            : '投保资料已创建，并进入后续业务流。'
+        },
+        {
+          key: 'submit',
+          title: '提交审核',
+          time: row.submitTime || (row.statusCode !== 'DRAFT' ? row.createTime : ''),
+          type: 'primary',
+          content: '资料已提交给管理员审核，并进入内部处理队列。'
+        },
+        {
+          key: 'review',
+          title: row.statusCode === 'REVIEW_REJECTED' ? '审核驳回' : '审核完成',
+          time: row.reviewTime,
+          type: row.statusCode === 'REVIEW_REJECTED' ? 'danger' : 'success',
+          content: row.statusCode === 'REVIEW_REJECTED'
+            ? (row.rejectReason || row.reviewComment || '审核未通过，等待重新处理。')
+            : (row.reviewComment || '管理员已审核通过，等待进入承保。')
+        },
+        {
+          key: 'underwriting',
+          title: '进入承保',
+          time: row.underwritingTime,
+          type: 'warning',
+          content: '平台已推进到承保阶段，等待保险公司完成正式承保。'
+        },
+        {
+          key: 'active',
+          title: '保单生效',
+          time: row.activateTime || row.startDate,
+          type: 'success',
+          content: row.policyNo
+            ? `正式保单号已下发：${row.policyNo}`
+            : '保单已生效，正式保单号待同步。'
+        }
+      ]
+
+      return entries.filter(item => {
+        if (item.key === 'draft') return !!row.createTime
+        if (item.key === 'submit') return !!item.time && row.statusCode !== 'DRAFT'
+        if (item.key === 'review') return !!item.time && ['APPROVED', 'REVIEW_REJECTED', 'UNDERWRITING', 'ACTIVE', 'EXPIRED', 'CANCELLED'].includes(row.statusCode)
+        if (item.key === 'underwriting') return !!item.time && ['UNDERWRITING', 'ACTIVE', 'EXPIRED', 'CANCELLED'].includes(row.statusCode)
+        if (item.key === 'active') return !!item.time && ['ACTIVE', 'EXPIRED'].includes(row.statusCode)
+        return false
+      })
+    },
+
+    formatPolicyTime(value) {
+      if (!value) return '待更新'
+      const normalized = typeof value === 'string' ? value.replace('T', ' ') : value
+      const date = new Date(normalized)
+      if (Number.isNaN(date.getTime())) return normalized
+      return date.toLocaleString('zh-CN', { hour12: false })
+    },
+
+    openInsuranceActivationDialog(rows) {
+      const pendingRows = (rows || []).filter(item => item.statusCode === 'UNDERWRITING')
+      if (!pendingRows.length) {
+        this.$message.warning('请选择承保中的保单')
+        return
+      }
+
+      this.insuranceActivationDialogTitle = pendingRows.length > 1 ? `批量生效（${pendingRows.length} 条）` : '保单生效'
+      this.insuranceActivationItems = pendingRows.map(item => ({
+        id: item.id,
+        product: item.product,
+        beneficiaryName: item.beneficiaryName,
+        policyNo: item.policyNo || '',
+        startDate: item.startDate || '',
+        endDate: item.endDate || ''
+      }))
+      this.insuranceActivationDialogVisible = true
+    },
+
+    activateInsuranceRecord(row) {
+      this.openInsuranceActivationDialog([row])
+    },
+
+    batchActivateInsuranceRecords() {
+      this.openInsuranceActivationDialog(this.selectedInsurances)
+    },
+
+    async submitInsuranceActivation() {
+      if (!this.insuranceActivationItems.length) {
+        this.$message.warning('暂无承保中的保单')
+        return
+      }
+
+      for (const item of this.insuranceActivationItems) {
+        if (!item.policyNo || !item.startDate || !item.endDate) {
+          this.$message.warning('请完整填写保单号、起保日期和结束日期')
+          return
+        }
+        if (item.endDate < item.startDate) {
+          this.$message.warning('结束日期不能早于起保日期')
+          return
+        }
+      }
+
+      this.insuranceActivationSubmitting = true
+      try {
+        const items = this.insuranceActivationItems.map(item => ({
+          insuranceId: item.id,
+          policyNo: item.policyNo,
+          effectiveDate: item.startDate,
+          expiryDate: item.endDate
+        }))
+        const endpoint = items.length === 1
+          ? `/api/admin/insurances/${items[0].insuranceId}/activate`
+          : '/api/admin/insurances/activate-batch'
+        const payload = items.length === 1
+          ? {
+              policyNo: items[0].policyNo,
+              effectiveDate: items[0].effectiveDate,
+              expiryDate: items[0].expiryDate
+            }
+          : { items }
+        const method = items.length === 1 ? 'put' : 'post'
+        const res = await this.$axios[method](endpoint, payload)
+        if (this.isSuccess(res)) {
+          this.$message.success(`已生效 ${items.length} 条保单，费用清单状态已同步`)
+          this.insuranceActivationDialogVisible = false
+          this.insuranceActivationItems = []
+          this.selectedInsurances = []
+          this.loadInsurances()
+          this.loadExpenses()
+          this.loadStats()
+        } else {
+          this.$message.error(res.data?.message || '设置生效失败')
+        }
+      } catch (error) {
+        console.error('设置保险生效失败:', error)
+        this.$message.error(error.response?.data?.message || '设置生效失败')
+      } finally {
+        this.insuranceActivationSubmitting = false
+      }
     },
 
     downloadPolicy(row) {
+      if (!row.policyNo) {
+        this.$message.warning('该保单尚未生效，暂无正式保单号')
+        return
+      }
       this.$message.success(`开始下载保单：${row.policyNo}`)
+    },
+
+    async submitInsuranceDraft(row) {
+      try {
+        await this.$confirm('确认提交该投保资料进入审核流程吗？提交后将扣减账户余额。', '提交审核', {
+          confirmButtonText: '确认提交',
+          cancelButtonText: '取消',
+          type: 'warning'
+        })
+        const res = await this.$axios.put(`/api/anxinxuan/insurances/${row.id}/submit`)
+        if (this.isSuccess(res)) {
+          this.$message.success('已提交审核')
+          this.loadInsurances()
+          this.loadExpenses()
+          this.loadBalance()
+          this.loadStats()
+        }
+      } catch (error) {
+        if (error !== 'cancel') {
+          console.error('提交审核失败:', error)
+          this.$message.error(error.response?.data?.message || '提交审核失败')
+        }
+      }
+    },
+
+    openInsuranceReviewDialog(row, action) {
+      this.insuranceReviewAction = action
+      this.insuranceReviewDialogTitle = action === 'approve' ? '审核通过' : '审核驳回'
+      this.insuranceReviewForm = {
+        insuranceId: row.id,
+        reviewComment: row.reviewComment || '',
+        rejectReason: ''
+      }
+      this.insuranceReviewDialogVisible = true
+    },
+
+    async submitInsuranceReview() {
+      if (!this.insuranceReviewForm.reviewComment.trim()) {
+        this.$message.warning('请输入审核意见')
+        return
+      }
+      if (this.insuranceReviewAction === 'reject' && !this.insuranceReviewForm.rejectReason.trim()) {
+        this.$message.warning('请输入驳回原因')
+        return
+      }
+
+      this.insuranceReviewSubmitting = true
+      try {
+        const url = this.insuranceReviewAction === 'approve'
+          ? `/api/admin/insurances/${this.insuranceReviewForm.insuranceId}/approve`
+          : `/api/admin/insurances/${this.insuranceReviewForm.insuranceId}/reject`
+        const payload = this.insuranceReviewAction === 'approve'
+          ? { reviewComment: this.insuranceReviewForm.reviewComment }
+          : {
+              reviewComment: this.insuranceReviewForm.reviewComment,
+              rejectReason: this.insuranceReviewForm.rejectReason
+            }
+        const res = await this.$axios.put(url, payload)
+        if (this.isSuccess(res)) {
+          this.$message.success(this.insuranceReviewAction === 'approve' ? '审核已通过' : '已驳回并退款')
+          this.insuranceReviewDialogVisible = false
+          this.loadInsurances()
+          this.loadExpenses()
+          this.loadRecharges()
+          this.loadStats()
+        } else {
+          this.$message.error(res.data?.message || '审核操作失败')
+        }
+      } catch (error) {
+        console.error('审核操作失败:', error)
+        this.$message.error(error.response?.data?.message || '审核操作失败')
+      } finally {
+        this.insuranceReviewSubmitting = false
+      }
+    },
+
+    async startInsuranceUnderwriting(row) {
+      try {
+        await this.$confirm('确认将该保单推进到承保中吗？', '进入承保', {
+          confirmButtonText: '确认',
+          cancelButtonText: '取消',
+          type: 'warning'
+        })
+        const res = await this.$axios.put(`/api/admin/insurances/${row.id}/underwriting`)
+        if (this.isSuccess(res)) {
+          this.$message.success('已进入承保中')
+          this.loadInsurances()
+          this.loadExpenses()
+          this.loadStats()
+        }
+      } catch (error) {
+        if (error !== 'cancel') {
+          console.error('进入承保失败:', error)
+          this.$message.error(error.response?.data?.message || '进入承保失败')
+        }
+      }
     },
 
     resetRechargeFilter() {
@@ -1614,15 +2625,17 @@ export default {
         this.userForm = {
           id: user.id,
           username: user.username,
-          phone: user.phone,
-          password: ''
+          mobile: user.mobile,
+          password: '',
+          confirmPassword: ''
         }
       } else {
         this.userForm = {
           id: null,
           username: '',
-          phone: '',
-          password: ''
+          mobile: '',
+          password: '',
+          confirmPassword: ''
         }
       }
       this.userDialogVisible = true
@@ -1633,13 +2646,31 @@ export default {
         if (!valid) return
         try {
           const isEdit = !!this.userForm.id
+
+          if (!isEdit && !this.userForm.password) {
+            this.$message.error('请输入密码')
+            return
+          }
+
+          if (this.userForm.password && this.userForm.password.length < 6) {
+            this.$message.error('密码长度不能少于6位')
+            return
+          }
+
+          if ((!isEdit || this.userForm.password) && this.userForm.password !== this.userForm.confirmPassword) {
+            this.$message.error('两次输入的密码不一致')
+            return
+          }
+
           const submitData = { ...this.userForm }
+          delete submitData.confirmPassword
           if (submitData.password === '') {
             delete submitData.password
           }
+
           let res
           if (isEdit) {
-            res = await this.$axios.put(`/api/admin/users/${submitData.id}`, submitData)
+            res = await this.$axios.put('/api/admin/users', submitData)
           } else {
             res = await this.$axios.post('/api/admin/users', submitData)
           }
@@ -1727,10 +2758,15 @@ export default {
 
     getStatusType(status) {
       const typeMap = {
-        已完成: 'success',
         有效: 'success',
+        已完成: 'success',
+        已生效: 'success',
+        待提交: 'info',
+        待审核: 'warning',
+        审核通过: 'success',
+        审核驳回: 'danger',
+        承保中: 'warning',
         待处理: 'warning',
-        待生效: 'warning',
         处理中: 'warning',
         已取消: 'info',
         已过期: 'danger'
@@ -1755,7 +2791,11 @@ export default {
         } catch (error) {
           console.error('退出登录失败:', error)
         } finally {
-          sessionStorage.clear()
+          sessionStorage.removeItem('authToken')
+          sessionStorage.removeItem('isLoggedIn')
+          sessionStorage.removeItem('userId')
+          sessionStorage.removeItem('userType')
+          sessionStorage.removeItem('username')
           this.$message.success('已退出系统')
           this.$router.push('/login')
         }
@@ -1786,6 +2826,11 @@ export default {
 
     // 图片上传前验证
     beforeImageUpload(file) {
+      if (!this.productForm.id) {
+        this.$message.warning('请先保存产品后再上传图片')
+        return false
+      }
+
       const isImage = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'].includes(file.type)
       const isLt10M = file.size / 1024 / 1024 < 10
 
@@ -1832,6 +2877,11 @@ export default {
 
     // 模板文件上传前验证
     beforeTemplateUpload(file) {
+      if (!this.productForm.id) {
+        this.$message.warning('请先保存产品后再上传模板文件')
+        return false
+      }
+
       const allowedTypes = [
         'application/pdf',
         'application/msword',
@@ -2092,6 +3142,7 @@ body {
 .main-content {
   flex: 1;
   display: flex;
+  align-items: flex-start;
   padding: 20px;
   gap: 20px;
   max-width: 1600px;
@@ -2170,6 +3221,7 @@ body {
 /* 右侧内容区域 */
 .content {
   flex: 1;
+  min-width: 0;
   background-color: #fff;
   border-radius: 8px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
@@ -2255,6 +3307,135 @@ body {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 20px;
+}
+
+.notice-board-card {
+  border: 1px solid #f0f0f0;
+  border-radius: 16px;
+  padding: 24px;
+  background: linear-gradient(180deg, #fff7f7 0%, #ffffff 100%);
+  box-shadow: 0 8px 28px rgba(230, 0, 18, 0.06);
+}
+
+.notice-board-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.notice-board-meta h3 {
+  margin: 0 0 8px;
+  font-size: 20px;
+  color: #1f2937;
+}
+
+.notice-board-meta p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #6b7280;
+}
+
+.notice-board-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.notice-admin-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.2fr);
+  gap: 20px;
+}
+
+.notice-editor-panel,
+.notice-list-panel {
+  background: #fff;
+  border: 1px solid #f3f4f6;
+  border-radius: 14px;
+  padding: 20px;
+}
+
+.notice-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.notice-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.notice-list-actions,
+.filter-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.notice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.notice-list-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px;
+  background: #fafafa;
+  border: 1px solid #f3f4f6;
+  border-radius: 12px;
+}
+
+.notice-list-order {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #fff1f0;
+  color: #e60012;
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.notice-list-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.notice-list-content h4 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  color: #1f2937;
+}
+
+.notice-list-content p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #6b7280;
+  white-space: pre-line;
+}
+
+.notice-list-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .stat-card {
@@ -2369,6 +3550,16 @@ body {
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.product-company-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.product-company-group .el-radio-button {
+  margin: 0;
 }
 
 .filter-row:last-child {
@@ -2627,6 +3818,28 @@ body {
   padding: 6px 12px;
 }
 
+@media screen and (max-width: 1200px) {
+  .main-content {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sidebar,
+  .content {
+    width: 100%;
+  }
+
+  .sidebar {
+    position: static;
+    top: auto;
+  }
+
+  .product-filter .filter-header,
+  .product-filter .filter-row {
+    align-items: flex-start;
+  }
+}
+
 /* 图片预览样式 */
 .image-preview-container {
   display: flex;
@@ -2674,6 +3887,26 @@ body {
   gap: 12px;
 }
 
+.insurance-activation-tip {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  background: #fff7e6;
+  border: 1px solid #ffe7ba;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #8c6218;
+}
+
+.notice-publish-dialog .el-dialog {
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.notice-publish-dialog .el-dialog__body {
+  padding-top: 8px;
+}
+
 /* 响应式设计 - 移动端优先 */
 @media screen and (max-width: 1024px) {
   .header {
@@ -2717,6 +3950,7 @@ body {
   .sidebar {
     width: 100%;
     position: static;
+    top: auto;
     padding: 12px;
   }
 
@@ -2753,6 +3987,10 @@ body {
     gap: 12px;
   }
 
+  .notice-admin-layout {
+    grid-template-columns: 1fr;
+  }
+
   .product-card {
     flex-direction: column;
   }
@@ -2785,6 +4023,10 @@ body {
     width: 100% !important;
   }
 
+  .content {
+    width: 100%;
+  }
+
   .table-actions {
     flex-wrap: wrap;
     gap: 8px;
@@ -2793,6 +4035,7 @@ body {
   .table-actions .el-button {
     width: 100%;
   }
+
 }
 
 @media screen and (max-width: 768px) {
@@ -2866,6 +4109,22 @@ body {
     grid-template-columns: 1fr;
   }
 
+  .notice-board-card {
+    padding: 20px 16px;
+  }
+
+  .notice-board-header {
+    flex-direction: column;
+  }
+
+  .filter-header,
+  .filter-header-actions,
+  .notice-list-header,
+  .notice-list-actions,
+  .notice-board-actions {
+    flex-wrap: wrap;
+  }
+
   .stat-card {
     flex-direction: row;
     padding: 16px;
@@ -2920,6 +4179,15 @@ body {
   .pagination {
     flex-wrap: wrap;
     justify-content: center;
+  }
+
+  .notice-list-item {
+    flex-direction: column;
+  }
+
+  .notice-list-item-actions {
+    width: 100%;
+    justify-content: flex-end;
   }
 }
 
@@ -3136,5 +4404,205 @@ body {
 .template-upload-tip {
   font-size: 12px;
   color: #909399;
+}
+
+.admin-analysis-toolbar {
+  margin-bottom: 16px;
+}
+
+.admin-analysis-filter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.admin-analysis-filter-meta h3 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  color: #303133;
+}
+
+.admin-analysis-filter-meta p {
+  margin: 0;
+  font-size: 13px;
+  color: #909399;
+}
+
+.admin-analysis-filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-analysis-grid {
+  display: grid;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.admin-analysis-stack {
+  grid-template-columns: 1fr;
+}
+
+.admin-analysis-card {
+  padding: 20px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.admin-analysis-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.admin-analysis-header h3 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  color: #303133;
+}
+
+.admin-analysis-header p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #909399;
+}
+
+.detail-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-right: 6px;
+}
+
+.detail-dialog-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border: 1px solid #ebeef5;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.detail-dialog-eyebrow {
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: #909399;
+}
+
+.detail-dialog-title {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.4;
+  color: #303133;
+}
+
+.detail-dialog-subtitle {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #606266;
+  word-break: break-all;
+}
+
+.detail-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.detail-summary-card {
+  padding: 16px 18px;
+  border: 1px solid #ebeef5;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.detail-summary-card .label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: #909399;
+}
+
+.detail-summary-card strong {
+  font-size: 15px;
+  color: #303133;
+  word-break: break-word;
+}
+
+.detail-section-block {
+  padding: 18px 20px;
+  border: 1px solid #ebeef5;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.detail-section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.detail-section-header h4 {
+  margin: 0;
+  font-size: 18px;
+  color: #303133;
+}
+
+.detail-section-header span {
+  font-size: 12px;
+  color: #909399;
+}
+
+.policy-timeline {
+  padding-top: 6px;
+}
+
+.policy-timeline-card {
+  padding: 12px 14px;
+  border: 1px solid #ebeef5;
+  border-radius: 12px;
+  background: #fcfcfd;
+}
+
+.policy-timeline-title {
+  margin-bottom: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.policy-timeline-content {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #606266;
+}
+
+@media screen and (max-width: 768px) {
+  .admin-analysis-filter,
+  .admin-analysis-grid,
+  .detail-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-analysis-filter {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 </style>

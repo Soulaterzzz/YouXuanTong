@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS axx_expense_record (
     product_name VARCHAR(128) NOT NULL COMMENT '产品名称',
     contact_name VARCHAR(64) DEFAULT NULL COMMENT '联系人',
     contact_mobile VARCHAR(32) DEFAULT NULL COMMENT '联系电话',
-    expense_status VARCHAR(32) NOT NULL DEFAULT 'PENDING' COMMENT '状态：PENDING-待处理，PROCESSING-处理中，COMPLETED-已完成，CANCELLED-已取消',
+    expense_status VARCHAR(32) NOT NULL DEFAULT 'PENDING_REVIEW' COMMENT '状态：DRAFT-待提交，PENDING_REVIEW-待审核，APPROVED-审核通过，REVIEW_REJECTED-审核驳回，UNDERWRITING-承保中，ACTIVE-已生效，CANCELLED-已取消',
     policy_no VARCHAR(64) DEFAULT NULL COMMENT '电子保单号',
     premium_amount DECIMAL(18,2) NOT NULL COMMENT '保费金额',
     quantity INT NOT NULL DEFAULT 1 COMMENT '份数',
@@ -102,7 +102,15 @@ CREATE TABLE IF NOT EXISTS axx_insurance_record (
     beneficiary_job VARCHAR(64) DEFAULT NULL COMMENT '被保人职业',
     beneficiary_address VARCHAR(255) DEFAULT NULL COMMENT '被保人地址',
     agent_name VARCHAR(64) DEFAULT NULL COMMENT '业务员',
-    insurance_status VARCHAR(32) NOT NULL DEFAULT 'PENDING' COMMENT '状态：PENDING-待生效，ACTIVE-有效，EXPIRED-已过期，CANCELLED-已取消',
+    insurance_status VARCHAR(32) NOT NULL DEFAULT 'PENDING_REVIEW' COMMENT '状态：DRAFT-待提交，PENDING_REVIEW-待审核，APPROVED-审核通过，REVIEW_REJECTED-审核驳回，UNDERWRITING-承保中，ACTIVE-已生效，EXPIRED-已过期，CANCELLED-已取消',
+    review_comment VARCHAR(500) DEFAULT NULL COMMENT '审核意见',
+    reviewer_id BIGINT DEFAULT NULL COMMENT '审核人ID',
+    reviewer_name VARCHAR(64) DEFAULT NULL COMMENT '审核人姓名',
+    review_time DATETIME DEFAULT NULL COMMENT '审核时间',
+    reject_reason VARCHAR(500) DEFAULT NULL COMMENT '驳回原因',
+    submit_time DATETIME DEFAULT NULL COMMENT '提交审核时间',
+    underwriting_time DATETIME DEFAULT NULL COMMENT '进入承保时间',
+    activate_time DATETIME DEFAULT NULL COMMENT '保单生效操作时间',
     policy_no VARCHAR(64) DEFAULT NULL COMMENT '电子保单号',
     premium_amount DECIMAL(18,2) NOT NULL COMMENT '保费金额',
     quantity INT NOT NULL DEFAULT 1 COMMENT '份数',
@@ -139,22 +147,32 @@ CREATE TABLE IF NOT EXISTS axx_product (
     image_path VARCHAR(500) DEFAULT NULL COMMENT '图片路径',
     image_content_type VARCHAR(100) DEFAULT NULL COMMENT '图片类型',
     image_size BIGINT DEFAULT NULL COMMENT '图片大小',
+    template_file_name VARCHAR(255) DEFAULT NULL COMMENT '模板文件名',
+    template_file_path VARCHAR(500) DEFAULT NULL COMMENT '模板文件路径',
     deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除',
     create_by BIGINT DEFAULT NULL COMMENT '创建人',
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_by BIGINT DEFAULT NULL COMMENT '更新人',
     update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    UNIQUE KEY uk_product_code (product_code),
+    UNIQUE KEY uk_product_code_deleted (product_code, deleted),
     KEY idx_category (category_code),
     KEY idx_sale_status (sale_status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='优选通产品表';
 
--- 为已存在的表添加图片字段（如果不存在）
-ALTER TABLE axx_product
-ADD COLUMN IF NOT EXISTS image_url VARCHAR(500) DEFAULT NULL COMMENT '图片URL',
-ADD COLUMN IF NOT EXISTS image_path VARCHAR(500) DEFAULT NULL COMMENT '图片路径',
-ADD COLUMN IF NOT EXISTS image_content_type VARCHAR(100) DEFAULT NULL COMMENT '图片类型',
-ADD COLUMN IF NOT EXISTS image_size BIGINT DEFAULT NULL COMMENT '图片大小';
+CREATE TABLE IF NOT EXISTS axx_notice (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键',
+    title VARCHAR(64) NOT NULL COMMENT '通知标题',
+    content VARCHAR(1000) NOT NULL COMMENT '通知内容',
+    sort_no INT NOT NULL DEFAULT 0 COMMENT '排序号',
+    published_at DATETIME NOT NULL COMMENT '发布时间',
+    deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+    create_by BIGINT DEFAULT NULL COMMENT '创建人',
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_by BIGINT DEFAULT NULL COMMENT '更新人',
+    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    KEY idx_notice_sort_no (sort_no),
+    KEY idx_notice_published_at (published_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='首页通知公告表';
 
 -- ================================================
 -- 测试数据

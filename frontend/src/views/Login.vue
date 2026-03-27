@@ -8,12 +8,12 @@
     </header>
     
     <div class="login-container">
-      <div class="login-tabs">
-        <div class="login-tab" :class="{ active: activeTab === 'login' }" @click="activeTab = 'login'">登录</div>
-        <div class="login-tab" :class="{ active: activeTab === 'register' }" @click="activeTab = 'register'">注册</div>
+      <div class="login-panel-header">
+        <h1>账号登录</h1>
+        <p>普通用户账号请联系管理员在用户管理中创建</p>
       </div>
 
-      <form v-if="activeTab === 'login'" @submit.prevent="handleLogin">
+      <form @submit.prevent="handleLogin">
         <div class="form-item">
           <label>用户名</label>
           <input type="text" v-model="loginForm.username" placeholder="请输入用户名" required>
@@ -30,39 +30,11 @@
         </button>
       </form>
 
-      <form v-else @submit.prevent="handleRegister">
-        <div class="form-item">
-          <label>用户名</label>
-          <input type="text" v-model="registerForm.username" placeholder="请输入用户名" required>
-        </div>
-        <div class="form-item">
-          <label>手机号</label>
-          <input type="tel" v-model="registerForm.mobile" placeholder="请输入手机号" required>
-        </div>
-        <div class="form-item">
-          <label>密码</label>
-          <input type="password" v-model="registerForm.password" placeholder="请输入密码" required>
-        </div>
-        <div class="form-item">
-          <label>确认密码</label>
-          <input type="password" v-model="registerForm.confirmPassword" placeholder="请再次输入密码" required>
-        </div>
-        <div class="form-item" v-if="registerError">
-          <div class="error-msg">{{ registerError }}</div>
-        </div>
-        <button type="submit" class="login-btn" :disabled="registerLoading">
-          {{ registerLoading ? '注册中...' : '注册' }}
-        </button>
-      </form>
-
-      <div class="register-link" v-if="activeTab === 'login'">
-        还没有账号？<a @click="activeTab = 'register'">立即注册</a>
-      </div>
-      <div class="register-link" v-else>
-        已有账号？<a @click="activeTab = 'login'">立即登录</a>
+      <div class="login-tip">
+        如需开通账号，请联系管理员前往用户管理页新增用户。
       </div>
 
-      <div class="admin-hint" v-if="activeTab === 'login'">
+      <div class="admin-hint">
         <p>管理员账号：<strong>admin</strong> / <strong>admin111</strong></p>
       </div>
     </div>
@@ -76,22 +48,12 @@ import { ElMessage } from 'element-plus'
 import axios from 'axios'
 
 const router = useRouter()
-const activeTab = ref('login')
 const loginLoading = ref(false)
-const registerLoading = ref(false)
 const loginError = ref('')
-const registerError = ref('')
 
 const loginForm = reactive({
   username: '',
   password: ''
-})
-
-const registerForm = reactive({
-  username: '',
-  mobile: '',
-  password: '',
-  confirmPassword: ''
 })
 
 const handleLogin = async () => {
@@ -102,6 +64,7 @@ const handleLogin = async () => {
     const response = await axios.post('/api/auth/login', loginForm)
     if (response.data.code === '00000') {
       const data = response.data.data
+      sessionStorage.setItem('authToken', data.token || '')
       sessionStorage.setItem('userId', String(data.userId || ''))
       sessionStorage.setItem('userType', data.userType)
       sessionStorage.setItem('username', data.username)
@@ -124,49 +87,6 @@ const handleLogin = async () => {
     }
   } finally {
     loginLoading.value = false
-  }
-}
-
-const handleRegister = async () => {
-  registerError.value = ''
-  
-  if (registerForm.password !== registerForm.confirmPassword) {
-    registerError.value = '两次输入的密码不一致'
-    return
-  }
-
-  if (registerForm.password.length < 6) {
-    registerError.value = '密码长度不能少于6位'
-    return
-  }
-
-  registerLoading.value = true
-
-  try {
-    const response = await axios.post('/api/auth/register', {
-      username: registerForm.username,
-      mobile: registerForm.mobile,
-      password: registerForm.password
-    })
-    if (response.data.code === '00000') {
-      ElMessage.success('注册成功，请登录')
-      activeTab.value = 'login'
-      loginForm.username = registerForm.username
-      loginForm.password = ''
-      registerForm.password = ''
-      registerForm.confirmPassword = ''
-    } else {
-      registerError.value = response.data.message || '注册失败'
-    }
-  } catch (error) {
-    const errorData = error.response?.data
-    if (errorData?.code === 'A0400' && errorData?.data) {
-      registerError.value = errorData.data
-    } else {
-      registerError.value = errorData?.message || '网络错误，请稍后重试'
-    }
-  } finally {
-    registerLoading.value = false
   }
 }
 </script>
@@ -215,32 +135,22 @@ const handleRegister = async () => {
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
 }
 
-.login-tabs {
-  display: flex;
-  margin-bottom: 30px;
-  border-bottom: 2px solid #eee;
-}
-
-.login-tab {
-  flex: 1;
+.login-panel-header {
   text-align: center;
-  padding: 12px 0;
-  font-size: 16px;
-  color: #666;
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -2px;
-  transition: all 0.3s;
+  margin-bottom: 28px;
 }
 
-.login-tab:hover {
-  color: #e60012;
+.login-panel-header h1 {
+  margin: 0 0 10px;
+  font-size: 26px;
+  color: #1f2937;
 }
 
-.login-tab.active {
-  color: #e60012;
-  border-bottom-color: #e60012;
-  font-weight: 500;
+.login-panel-header p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #6b7280;
 }
 
 .form-item {
@@ -336,13 +246,12 @@ const handleRegister = async () => {
     padding: 24px 20px 30px;
   }
 
-  .login-tabs {
+  .login-panel-header {
     margin-bottom: 24px;
   }
 
-  .login-tab {
-    padding: 10px 0;
-    font-size: 15px;
+  .login-panel-header h1 {
+    font-size: 24px;
   }
 
   .form-item {
@@ -364,7 +273,7 @@ const handleRegister = async () => {
     font-size: 15px;
   }
 
-  .register-link {
+  .login-tip {
     margin-top: 16px;
     font-size: 13px;
   }
@@ -392,21 +301,12 @@ const handleRegister = async () => {
   }
 }
 
-.register-link {
+.login-tip {
   text-align: center;
   margin-top: 20px;
   font-size: 14px;
-  color: #999;
-}
-
-.register-link a {
-  color: #e60012;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.register-link a:hover {
-  text-decoration: underline;
+  line-height: 1.6;
+  color: #6b7280;
 }
 
 .admin-hint {
