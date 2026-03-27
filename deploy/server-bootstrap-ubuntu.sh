@@ -45,9 +45,21 @@ if [[ ! -f "${PROJECT_ROOT}/deploy/docker-compose.yml" ]]; then
 fi
 
 install_base_packages() {
+  local missing_packages=""
+
+  for pkg in ca-certificates curl git gnupg nginx openssl; do
+    if ! dpkg -l "${pkg}" >/dev/null 2>&1; then
+      missing_packages="${missing_packages} ${pkg}"
+    fi
+  done
+
+  if [[ -z "${missing_packages}" ]]; then
+    return
+  fi
+
   export DEBIAN_FRONTEND=noninteractive
   apt-get update
-  apt-get install -y ca-certificates curl git gnupg nginx openssl
+  apt-get install -y${missing_packages}
 }
 
 enable_interactive_prompts() {
@@ -500,15 +512,27 @@ hydrate_defaults() {
 
 install_docker() {
   if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
-    systemctl enable --now docker
     return
   fi
 
   apt-get remove -y docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc || true
   install -m 0755 -d /etc/apt/keyrings
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-  chmod a+r /etc/apt/keyrings/docker.asc
-  cat > /etc/apt/sources.list.d/docker.sources <<EOF_REPO
+
+  DOCKER_MIRROR="${DOCKER_MIRROR:-https://mirrors.aliyun.com}"
+  if curl -fsSL "${DOCKER_MIRROR}/docker-ce/linux/ubuntu/gpg" -o /etc/apt/keyrings/docker.asc 2>/dev/null; then
+    chmod a+r /etc/apt/keyrings/docker.asc
+    cat > /etc/apt/sources.list.d/docker.sources <<EOF_REPO
+Types: deb
+URIs: ${DOCKER_MIRROR}/docker-ce/linux/ubuntu
+Suites: ${UBUNTU_CODENAME:-${VERSION_CODENAME}}
+Components: stable
+Architectures: $(dpkg --print-architecture)
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF_REPO
+  else
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+    chmod a+r /etc/apt/keyrings/docker.asc
+    cat > /etc/apt/sources.list.d/docker.sources <<EOF_REPO
 Types: deb
 URIs: https://download.docker.com/linux/ubuntu
 Suites: ${UBUNTU_CODENAME:-${VERSION_CODENAME}}
@@ -516,9 +540,17 @@ Components: stable
 Architectures: $(dpkg --print-architecture)
 Signed-By: /etc/apt/keyrings/docker.asc
 EOF_REPO
+  fi
+
   apt-get update
   apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-  systemctl enable --now docker
+
+  if [[ -d /run/systemd/system ]]; then
+    systemctl enable --now docker
+  else
+    service docker start 2>/dev/null || dockerd &>/var/log/docker.log &
+    sleep 2
+  fi
 }
 
 configure_user_group() {
@@ -530,6 +562,7 @@ configure_user_group() {
 prepare_directories() {
   mkdir -p /opt/ytbx
   mkdir -p "${HOST_UPLOAD_DIR}/templates"
+  chmod -R 777 "${HOST_UPLOAD_DIR}"
 }
 
 write_env_file() {
