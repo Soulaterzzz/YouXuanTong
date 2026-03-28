@@ -31,11 +31,7 @@
       </form>
 
       <div class="login-tip">
-        如需开通账号，请联系管理员前往用户管理页新增用户。
-      </div>
-
-      <div class="admin-hint">
-        <p>管理员账号：<strong>admin</strong> / <strong>admin111</strong></p>
+        如需开通账号，请联系管理员。
       </div>
     </div>
   </div>
@@ -277,12 +273,6 @@ const handleLogin = async () => {
     margin-top: 16px;
     font-size: 13px;
   }
-
-  .admin-hint {
-    margin-top: 16px;
-    padding: 10px 12px;
-    font-size: 12px;
-  }
 }
 
 @media screen and (max-width: 375px) {
@@ -307,20 +297,5 @@ const handleLogin = async () => {
   font-size: 14px;
   line-height: 1.6;
   color: #6b7280;
-}
-
-.admin-hint {
-  text-align: center;
-  margin-top: 20px;
-  padding: 12px;
-  background: #fdf6ec;
-  border-radius: 4px;
-  font-size: 12px;
-  color: #e6a23c;
-  border: 1px solid #faecd8;
-}
-
-.admin-hint strong {
-  color: #e60012;
 }
 </style>

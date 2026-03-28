@@ -1,7 +1,7 @@
 -- ================================================
 -- 优选通数据库初始化脚本
--- 版本: 1.0.0
--- 说明: 包含完整表结构和测试数据
+-- 版本: 2.0.0
+-- 说明: 包含完整表结构和全流程测试数据
 -- ================================================
 
 -- 1. 用户表
@@ -159,6 +159,7 @@ CREATE TABLE IF NOT EXISTS axx_product (
     KEY idx_sale_status (sale_status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='优选通产品表';
 
+-- 7. 通知公告表
 CREATE TABLE IF NOT EXISTS axx_notice (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键',
     title VARCHAR(64) NOT NULL COMMENT '通知标题',
@@ -186,91 +187,247 @@ TRUNCATE TABLE axx_transaction_record;
 TRUNCATE TABLE axx_account_balance;
 TRUNCATE TABLE axx_user;
 TRUNCATE TABLE axx_product;
+TRUNCATE TABLE axx_notice;
 SET FOREIGN_KEY_CHECKS = 1;
 
--- 1. 初始化产品数据
+-- ================================================
+-- 1. 产品数据（8款保险产品）
+-- ================================================
 INSERT INTO axx_product (product_code, product_name, category_code, company_name, description, features, price, stock, is_new, is_hot, sale_status, sort_no, create_time, update_time) VALUES
-('GS-001', '国寿财1-3类10+5+5+50（青柑）', '1-3', '国寿财险', '个单：18-63；可投保：1-3类；T+1；一三五十截单', '无门诊免赔；承保动物伤害', 55.00, 0, 1, 1, 'ON_SALE', 1, NOW(), NOW()),
-('PA-001', '平安财意外10+1+50+10（含意保）', '1-3', '平安财险', '1-3类职业可投；每周一三五十十点截单', '限投一份；正常1+6生效；1:4新增住院地区和医院', 60.00, 100, 0, 0, 'ON_SALE', 2, NOW(), NOW()),
-('SE-001', '少儿门诊医疗险', 'child', '众安保险', '0-17岁投保；门急诊可报；等待期短', '门急诊保障；住院医疗；特定疾病额外赔', 380.00, 50, 1, 0, 'ON_SALE', 3, NOW(), NOW()),
-('EL-001', '老年意外险（尊享版）', 'elder', '人保财险', '50-80岁可投保；综合意外保障', '意外医疗；骨折津贴；救护车费用', 200.00, 200, 0, 1, 'ON_SALE', 4, NOW(), NOW()),
-('GS-002', '国寿财1-4类意外险', '1-4', '国寿财险', '1-4类职业可投；保障全面', '意外身故伤残；意外医疗', 80.00, 150, 0, 0, 'ON_SALE', 5, NOW(), NOW());
+('GS-001', '国寿财1-3类10+5+5+50（青柑）', '1-3', '国寿财险', '个单：18-63周岁；可投保：1-3类职业；T+1生效；每周一三五十点截单', '无门诊免赔额；承保动物伤害；意外医疗全额赔付', 55.00, 999, 1, 1, 'ON_SALE', 1, NOW(), NOW()),
+('PA-001', '平安财意外10+1+50+10（含意保）', '1-3', '平安财险', '1-3类职业可投；每周一三五十十点截单', '限投一份；正常1+6生效；包含住院津贴', 60.00, 999, 0, 1, 'ON_SALE', 2, NOW(), NOW()),
+('ZA-001', '少儿门诊医疗险', 'child', '众安保险', '0-17岁可投保；门急诊可报销；等待期短', '门急诊保障；住院医疗；特定疾病额外赔付；不限社保', 380.00, 500, 1, 0, 'ON_SALE', 3, NOW(), NOW()),
+('RB-001', '老年意外险（尊享版）', 'elder', '人保财险', '50-80岁可投保；综合意外保障；高龄专属', '意外医疗；骨折津贴；救护车费用；住院护理', 200.00, 999, 0, 1, 'ON_SALE', 4, NOW(), NOW()),
+('GS-002', '国寿财1-4类意外险', '1-4', '国寿财险', '1-4类职业可投；保障全面；性价比高', '意外身故伤残；意外医疗；住院津贴', 80.00, 999, 0, 0, 'ON_SALE', 5, NOW(), NOW()),
+('PA-002', '平安财高危职业意外险', '5-6', '平安财险', '5-6类高危职业专属；保障力度强', '高危职业可投；意外身故伤残；意外医疗', 150.00, 500, 1, 0, 'ON_SALE', 6, NOW(), NOW()),
+('TP-001', '太保百万医疗险', 'medical', '太平洋保险', '一般医疗+重疾医疗；保额高达600万', '重疾绿通；住院垫付；质子重离子', 300.00, 999, 0, 1, 'ON_SALE', 7, NOW(), NOW()),
+('ZA-002', '众安出行意外险', 'travel', '众安保险', '出行保障；飞机/火车/轮船/汽车全覆盖', '交通工具意外；航班延误；行李丢失', 50.00, 999, 0, 0, 'ON_SALE', 8, NOW(), NOW());
 
--- 2. 初始化用户数据（ID从1开始）
-INSERT INTO axx_user (id, username, password, mobile, user_type, status, create_time, update_time) VALUES
-(1, 'admin', 'admin111', '13800138000', 'ADMIN', 'ACTIVE', NOW(), NOW()),
-(2, 'user1', 'user123', '13800138001', 'USER', 'ACTIVE', NOW(), NOW()),
-(3, 'user2', 'user123', '13800138002', 'USER', 'ACTIVE', NOW(), NOW()),
-(4, 'user3', 'user123', '13800138003', 'USER', 'ACTIVE', NOW(), NOW()),
-(5, 'user4', 'user123', '13800138004', 'USER', 'ACTIVE', NOW(), NOW()),
-(6, 'user5', 'user123', '13800138005', 'USER', 'ACTIVE', NOW(), NOW()),
-(7, 'user6', 'user123', '13800138006', 'USER', 'ACTIVE', NOW(), NOW()),
-(8, 'user7', 'user123', '13800138007', 'USER', 'ACTIVE', NOW(), NOW()),
-(9, 'user8', 'user123', '13800138008', 'USER', 'ACTIVE', NOW(), NOW()),
-(10, 'user9', 'user123', '13800138009', 'USER', 'ACTIVE', NOW(), NOW());
+-- ================================================
+-- 2. 用户数据（1管理员 + 12普通用户）
+-- ================================================
+INSERT INTO axx_user (id, username, password, mobile, user_type, status, last_login_time, create_time, update_time) VALUES
+-- 管理员账户
+(1, 'admin', 'admin123', '13800000001', 'ADMIN', 'ACTIVE', DATE_SUB(NOW(), INTERVAL 1 HOUR), DATE_SUB(NOW(), INTERVAL 30 DAY), NOW()),
 
--- 3. 初始化账户余额
+-- 普通用户账户（不同活跃程度）
+(2, 'zhangwei', 'user123', '13800010001', 'USER', 'ACTIVE', DATE_SUB(NOW(), INTERVAL 2 HOUR), DATE_SUB(NOW(), INTERVAL 60 DAY), NOW()),
+(3, 'liming', 'user123', '13800010002', 'USER', 'ACTIVE', DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_SUB(NOW(), INTERVAL 45 DAY), NOW()),
+(4, 'wangfang', 'user123', '13800010003', 'USER', 'ACTIVE', DATE_SUB(NOW(), INTERVAL 3 DAY), DATE_SUB(NOW(), INTERVAL 30 DAY), NOW()),
+(5, 'liuyang', 'user123', '13800010004', 'USER', 'ACTIVE', DATE_SUB(NOW(), INTERVAL 5 DAY), DATE_SUB(NOW(), INTERVAL 20 DAY), NOW()),
+(6, 'chenxin', 'user123', '13800010005', 'USER', 'ACTIVE', DATE_SUB(NOW(), INTERVAL 7 DAY), DATE_SUB(NOW(), INTERVAL 15 DAY), NOW()),
+(7, 'zhaolei', 'user123', '13800010006', 'USER', 'ACTIVE', NULL, DATE_SUB(NOW(), INTERVAL 10 DAY), NOW()),
+(8, 'sunli', 'user123', '13800010007', 'USER', 'ACTIVE', NULL, DATE_SUB(NOW(), INTERVAL 8 DAY), NOW()),
+(9, 'zhoujun', 'user123', '13800010008', 'USER', 'ACTIVE', NULL, DATE_SUB(NOW(), INTERVAL 5 DAY), NOW()),
+(10, 'wuqiang', 'user123', '13800010009', 'USER', 'DISABLED', NULL, DATE_SUB(NOW(), INTERVAL 90 DAY), NOW()),
+(11, 'zhenghua', 'user123', '13800010010', 'USER', 'ACTIVE', NULL, DATE_SUB(NOW(), INTERVAL 3 DAY), NOW()),
+(12, 'huangping', 'user123', '13800010011', 'USER', 'ACTIVE', DATE_SUB(NOW(), INTERVAL 4 HOUR), DATE_SUB(NOW(), INTERVAL 25 DAY), NOW()),
+(13, 'linxiao', 'user123', '13800010012', 'USER', 'ACTIVE', DATE_SUB(NOW(), INTERVAL 6 HOUR), DATE_SUB(NOW(), INTERVAL 40 DAY), NOW());
+
+-- ================================================
+-- 3. 账户余额数据
+-- ================================================
 INSERT INTO axx_account_balance (user_id, balance, frozen_balance, create_by, create_time, update_by, update_time) VALUES
-(1, 50000.00, 0.00, 1, NOW(), 1, NOW()),
-(2, 9945.00, 0.00, 1, NOW(), 1, NOW()),
-(3, 14940.00, 0.00, 1, NOW(), 1, NOW()),
-(4, 7620.00, 0.00, 1, NOW(), 1, NOW()),
-(5, 19800.00, 0.00, 1, NOW(), 1, NOW()),
-(6, 11920.00, 0.00, 1, NOW(), 1, NOW()),
-(7, 18000.00, 0.00, 1, NOW(), 1, NOW()),
-(8, 9000.00, 0.00, 1, NOW(), 1, NOW()),
-(9, 16000.00, 0.00, 1, NOW(), 1, NOW()),
-(10, 11000.00, 0.00, 1, NOW(), 1, NOW());
+-- 管理员账户
+(1, 100000.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 30 DAY), 1, NOW()),
 
--- 4. 初始化费用清单记录（关联用户ID 2-6）
+-- 普通用户账户余额
+(2, 8500.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 60 DAY), 2, NOW()),
+(3, 12380.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 45 DAY), 3, NOW()),
+(4, 5620.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 30 DAY), 4, NOW()),
+(5, 19800.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 20 DAY), 5, NOW()),
+(6, 7450.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 15 DAY), 6, NOW()),
+(7, 3000.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 10 DAY), 7, NOW()),
+(8, 15000.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 8 DAY), 8, NOW()),
+(9, 680.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 5 DAY), 9, NOW()),
+(10, 2500.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 90 DAY), 10, NOW()),
+(11, 9200.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 3 DAY), 11, NOW()),
+(12, 4350.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 25 DAY), 12, NOW()),
+(13, 11200.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 40 DAY), 13, NOW());
+
+-- ================================================
+-- 4. 交易记录（充值记录）
+-- ================================================
+INSERT INTO axx_transaction_record (serial_no, user_id, trans_type, amount, balance_before, balance_after, description, ref_type, ref_id, payment_method, payment_status, create_by, create_time, update_by, update_time) VALUES
+-- 用户2 张伟的充值记录
+('TRX202501010001', 2, 'RECHARGE', 10000.00, 0.00, 10000.00, '账户首次充值', NULL, NULL, 'WECHAT', 'SUCCESS', 2, DATE_SUB(NOW(), INTERVAL 60 DAY), 2, DATE_SUB(NOW(), INTERVAL 60 DAY)),
+('TRX202501150001', 2, 'RECHARGE', 5000.00, 10000.00, 15000.00, '账户充值-微信支付', NULL, NULL, 'WECHAT', 'SUCCESS', 2, DATE_SUB(NOW(), INTERVAL 45 DAY), 2, DATE_SUB(NOW(), INTERVAL 45 DAY)),
+
+-- 用户3 李明的充值记录
+('TRX202501010002', 3, 'RECHARGE', 15000.00, 0.00, 15000.00, '账户首次充值', NULL, NULL, 'ALIPAY', 'SUCCESS', 3, DATE_SUB(NOW(), INTERVAL 45 DAY), 3, DATE_SUB(NOW(), INTERVAL 45 DAY)),
+
+-- 用户4 王芳的充值记录
+('TRX202501010003', 4, 'RECHARGE', 8000.00, 0.00, 8000.00, '账户首次充值', NULL, NULL, 'WECHAT', 'SUCCESS', 4, DATE_SUB(NOW(), INTERVAL 30 DAY), 4, DATE_SUB(NOW(), INTERVAL 30 DAY)),
+
+-- 用户5 刘洋的充值记录
+('TRX202501010004', 5, 'RECHARGE', 20000.00, 0.00, 20000.00, '账户首次充值', NULL, NULL, 'BANK', 'SUCCESS', 5, DATE_SUB(NOW(), INTERVAL 20 DAY), 5, DATE_SUB(NOW(), INTERVAL 20 DAY)),
+
+-- 用户6 陈欣的充值记录
+('TRX202501010005', 6, 'RECHARGE', 10000.00, 0.00, 10000.00, '账户首次充值', NULL, NULL, 'ALIPAY', 'SUCCESS', 6, DATE_SUB(NOW(), INTERVAL 15 DAY), 6, DATE_SUB(NOW(), INTERVAL 15 DAY)),
+
+-- 用户7 赵磊的充值记录
+('TRX202501010006', 7, 'RECHARGE', 5000.00, 0.00, 5000.00, '账户首次充值', NULL, NULL, 'WECHAT', 'SUCCESS', 7, DATE_SUB(NOW(), INTERVAL 10 DAY), 7, DATE_SUB(NOW(), INTERVAL 10 DAY)),
+
+-- 用户8 孙丽的充值记录
+('TRX202501010007', 8, 'RECHARGE', 20000.00, 0.00, 20000.00, '账户首次充值', NULL, NULL, 'ALIPAY', 'SUCCESS', 8, DATE_SUB(NOW(), INTERVAL 8 DAY), 8, DATE_SUB(NOW(), INTERVAL 8 DAY)),
+
+-- 用户9 周军的充值记录
+('TRX202501010008', 9, 'RECHARGE', 3000.00, 0.00, 3000.00, '账户首次充值', NULL, NULL, 'WECHAT', 'SUCCESS', 9, DATE_SUB(NOW(), INTERVAL 5 DAY), 9, DATE_SUB(NOW(), INTERVAL 5 DAY)),
+
+-- 用户10 吴强的充值记录（已禁用用户）
+('TRX202501010009', 10, 'RECHARGE', 5000.00, 0.00, 5000.00, '账户首次充值', NULL, NULL, 'ALIPAY', 'SUCCESS', 10, DATE_SUB(NOW(), INTERVAL 90 DAY), 10, DATE_SUB(NOW(), INTERVAL 90 DAY)),
+
+-- 用户11 郑华的充值记录
+('TRX202501010010', 11, 'RECHARGE', 12000.00, 0.00, 12000.00, '账户首次充值', NULL, NULL, 'WECHAT', 'SUCCESS', 11, DATE_SUB(NOW(), INTERVAL 3 DAY), 11, DATE_SUB(NOW(), INTERVAL 3 DAY)),
+
+-- 用户12 黄平的充值记录
+('TRX202501010011', 12, 'RECHARGE', 8000.00, 0.00, 8000.00, '账户首次充值', NULL, NULL, 'ALIPAY', 'SUCCESS', 12, DATE_SUB(NOW(), INTERVAL 25 DAY), 12, DATE_SUB(NOW(), INTERVAL 25 DAY)),
+
+-- 用户13 林晓的充值记录
+('TRX202501010012', 13, 'RECHARGE', 15000.00, 0.00, 15000.00, '账户首次充值', NULL, NULL, 'WECHAT', 'SUCCESS', 13, DATE_SUB(NOW(), INTERVAL 40 DAY), 13, DATE_SUB(NOW(), INTERVAL 40 DAY));
+
+-- ================================================
+-- 5. 费用清单记录（不同状态的保单）
+-- ================================================
 INSERT INTO axx_expense_record (serial_no, user_id, product_id, product_name, contact_name, contact_mobile, expense_status, policy_no, premium_amount, quantity, total_amount, effective_date, expiry_date, create_by, create_time, update_by, update_time) VALUES
-('EXP202401010001', 2, 1, '国寿财1-3类10+5+5+50（青柑）', '张三', '13800138001', 'COMPLETED', 'POL202401010001', 55.00, 1, 55.00, '2024-01-02', '2025-01-01', 2, NOW(), 2, NOW()),
-('EXP202401010002', 3, 2, '平安财意外10+1+50+10（含意保）', '李四', '13800138002', 'COMPLETED', 'POL202401010002', 60.00, 1, 60.00, '2024-01-02', '2025-01-01', 3, NOW(), 3, NOW()),
-('EXP202401010003', 4, 3, '少儿门诊医疗险', '王五', '13800138003', 'COMPLETED', 'POL202401010003', 380.00, 1, 380.00, '2024-01-02', '2025-01-01', 4, NOW(), 4, NOW()),
-('EXP202401010004', 5, 4, '老年意外险（尊享版）', '赵六', '13800138004', 'COMPLETED', 'POL202401010004', 200.00, 1, 200.00, '2024-01-02', '2025-01-01', 5, NOW(), 5, NOW()),
-('EXP202401010005', 6, 5, '国寿财1-4类意外险', '孙七', '13800138005', 'COMPLETED', 'POL202401010005', 80.00, 1, 80.00, '2024-01-02', '2025-01-01', 6, NOW(), 6, NOW());
+-- 已生效的保单
+('EXP202501010001', 2, 1, '国寿财1-3类10+5+5+50（青柑）', '张伟', '13800010001', 'ACTIVE', 'POL202501010001', 55.00, 2, 110.00, DATE_SUB(CURDATE(), INTERVAL 59 DAY), DATE_ADD(CURDATE(), INTERVAL 305 DAY), 2, DATE_SUB(NOW(), INTERVAL 60 DAY), 2, DATE_SUB(NOW(), INTERVAL 58 DAY)),
+('EXP202501020001', 3, 2, '平安财意外10+1+50+10（含意保）', '李明', '13800010002', 'ACTIVE', 'POL202501020001', 60.00, 1, 60.00, DATE_SUB(CURDATE(), INTERVAL 44 DAY), DATE_ADD(CURDATE(), INTERVAL 320 DAY), 3, DATE_SUB(NOW(), INTERVAL 45 DAY), 3, DATE_SUB(NOW(), INTERVAL 43 DAY)),
+('EXP202501030001', 4, 3, '少儿门诊医疗险', '王芳', '13800010003', 'ACTIVE', 'POL202501030001', 380.00, 1, 380.00, DATE_SUB(CURDATE(), INTERVAL 29 DAY), DATE_ADD(CURDATE(), INTERVAL 335 DAY), 4, DATE_SUB(NOW(), INTERVAL 30 DAY), 4, DATE_SUB(NOW(), INTERVAL 28 DAY)),
+('EXP202501040001', 5, 4, '老年意外险（尊享版）', '刘洋', '13800010004', 'ACTIVE', 'POL202501040001', 200.00, 2, 400.00, DATE_SUB(CURDATE(), INTERVAL 19 DAY), DATE_ADD(CURDATE(), INTERVAL 345 DAY), 5, DATE_SUB(NOW(), INTERVAL 20 DAY), 5, DATE_SUB(NOW(), INTERVAL 18 DAY)),
+('EXP202501050001', 6, 5, '国寿财1-4类意外险', '陈欣', '13800010005', 'ACTIVE', 'POL202501050001', 80.00, 1, 80.00, DATE_SUB(CURDATE(), INTERVAL 14 DAY), DATE_ADD(CURDATE(), INTERVAL 350 DAY), 6, DATE_SUB(NOW(), INTERVAL 15 DAY), 6, DATE_SUB(NOW(), INTERVAL 13 DAY)),
+('EXP202501060001', 8, 6, '平安财高危职业意外险', '孙丽', '13800010007', 'ACTIVE', 'POL202501060001', 150.00, 3, 450.00, DATE_SUB(CURDATE(), INTERVAL 7 DAY), DATE_ADD(CURDATE(), INTERVAL 357 DAY), 8, DATE_SUB(NOW(), INTERVAL 8 DAY), 8, DATE_SUB(NOW(), INTERVAL 6 DAY)),
+('EXP202501070001', 11, 7, '太保百万医疗险', '郑华', '13800010010', 'ACTIVE', 'POL202501070001', 300.00, 1, 300.00, DATE_SUB(CURDATE(), INTERVAL 2 DAY), DATE_ADD(CURDATE(), INTERVAL 362 DAY), 11, DATE_SUB(NOW(), INTERVAL 3 DAY), 11, DATE_SUB(NOW(), INTERVAL 1 DAY)),
 
--- 5. 初始化保险记录（关联费用记录和用户ID 2-6）
-INSERT INTO axx_insurance_record (expense_id, user_id, product_name, insured_name, insured_id_no, insured_mobile, beneficiary_name, beneficiary_id_no, beneficiary_mobile, beneficiary_job, beneficiary_address, agent_name, insurance_status, policy_no, premium_amount, quantity, effective_date, expiry_date, create_by, create_time, update_by, update_time) VALUES
-(1, 2, '国寿财1-3类10+5+5+50（青柑）', '张三', '110101199001011234', '13800138001', '张三', '110101199001011234', '13800138001', '办公室职员', '北京市朝阳区', '系统', 'ACTIVE', 'POL202401010001', 55.00, 1, '2024-01-02', '2025-01-01', 2, NOW(), 2, NOW()),
-(2, 3, '平安财意外10+1+50+10（含意保）', '李四', '110101199002022345', '13800138002', '李四', '110101199002022345', '13800138002', '销售人员', '上海市浦东新区', '系统', 'ACTIVE', 'POL202401010002', 60.00, 1, '2024-01-02', '2025-01-01', 3, NOW(), 3, NOW()),
-(3, 4, '少儿门诊医疗险', '王五', '110101198503033456', '13800138003', '王小五', '110101201004044567', '13800138003', '学生', '广州市天河区', '系统', 'ACTIVE', 'POL202401010003', 380.00, 1, '2024-01-02', '2025-01-01', 4, NOW(), 4, NOW()),
-(4, 5, '老年意外险（尊享版）', '赵六', '110101198005055678', '13800138004', '赵老', '110101195006066789', '13800138004', '退休', '深圳市南山区', '系统', 'ACTIVE', 'POL202401010004', 200.00, 1, '2024-01-02', '2025-01-01', 5, NOW(), 5, NOW()),
-(5, 6, '国寿财1-4类意外险', '孙七', '110101199207077890', '13800138005', '孙七', '110101199207077890', '13800138005', '技术工程师', '杭州市西湖区', '系统', 'ACTIVE', 'POL202401010005', 80.00, 1, '2024-01-02', '2025-01-01', 6, NOW(), 6, NOW());
+-- 待审核的保单
+('EXP202501080001', 12, 1, '国寿财1-3类10+5+5+50（青柑）', '黄平', '13800010011', 'PENDING_REVIEW', NULL, 55.00, 1, 55.00, NULL, NULL, 12, DATE_SUB(NOW(), INTERVAL 1 DAY), 12, NOW()),
 
--- 6. 初始化交易记录（充值记录）
+-- 审核通过的保单（待承保）
+('EXP202501090001', 13, 2, '平安财意外10+1+50+10（含意保）', '林晓', '13800010012', 'APPROVED', NULL, 60.00, 2, 120.00, NULL, NULL, 13, DATE_SUB(NOW(), INTERVAL 2 DAY), 1, DATE_SUB(NOW(), INTERVAL 1 DAY)),
+
+-- 审核驳回的保单
+('EXP202501100001', 7, 3, '少儿门诊医疗险', '赵磊', '13800010006', 'REVIEW_REJECTED', NULL, 380.00, 1, 380.00, NULL, NULL, 7, DATE_SUB(NOW(), INTERVAL 5 DAY), 1, DATE_SUB(NOW(), INTERVAL 4 DAY)),
+
+-- 承保中的保单
+('EXP202501110001', 9, 8, '众安出行意外险', '周军', '13800010008', 'UNDERWRITING', NULL, 50.00, 2, 100.00, NULL, NULL, 9, DATE_SUB(NOW(), INTERVAL 3 DAY), 1, DATE_SUB(NOW(), INTERVAL 2 DAY)),
+
+-- 已取消的保单
+('EXP202501120001', 2, 4, '老年意外险（尊享版）', '张伟', '13800010001', 'CANCELLED', NULL, 200.00, 1, 200.00, NULL, NULL, 2, DATE_SUB(NOW(), INTERVAL 50 DAY), 2, DATE_SUB(NOW(), INTERVAL 48 DAY));
+
+-- ================================================
+-- 6. 保险清单记录（被保人详细信息）
+-- ================================================
+INSERT INTO axx_insurance_record (expense_id, user_id, product_name, insured_name, insured_id_no, insured_mobile, beneficiary_name, beneficiary_id_no, beneficiary_mobile, beneficiary_job, beneficiary_address, agent_name, insurance_status, review_comment, reviewer_id, reviewer_name, review_time, reject_reason, submit_time, underwriting_time, activate_time, policy_no, premium_amount, quantity, effective_date, expiry_date, create_by, create_time, update_by, update_time) VALUES
+-- 费用清单1的保险记录（已生效）
+(1, 2, '国寿财1-3类10+5+5+50（青柑）', '张伟', '110101199001011234', '13800010001', '张伟', '110101199001011234', '13800010001', '软件工程师', '北京市朝阳区望京街道', '系统管理员', 'ACTIVE', '审核通过', 1, 'admin', DATE_SUB(NOW(), INTERVAL 58 DAY), NULL, DATE_SUB(NOW(), INTERVAL 59 DAY), DATE_SUB(NOW(), INTERVAL 58 DAY), DATE_SUB(NOW(), INTERVAL 58 DAY), 'POL202501010001-01', 55.00, 1, DATE_SUB(CURDATE(), INTERVAL 59 DAY), DATE_ADD(CURDATE(), INTERVAL 305 DAY), 2, DATE_SUB(NOW(), INTERVAL 60 DAY), 2, DATE_SUB(NOW(), INTERVAL 58 DAY)),
+(1, 2, '国寿财1-3类10+5+5+50（青柑）', '张伟', '110101199001011234', '13800010001', '张小妹', '110101201505052345', '13800010002', '学生', '北京市朝阳区望京街道', '系统管理员', 'ACTIVE', '审核通过', 1, 'admin', DATE_SUB(NOW(), INTERVAL 58 DAY), NULL, DATE_SUB(NOW(), INTERVAL 59 DAY), DATE_SUB(NOW(), INTERVAL 58 DAY), DATE_SUB(NOW(), INTERVAL 58 DAY), 'POL202501010001-02', 55.00, 1, DATE_SUB(CURDATE(), INTERVAL 59 DAY), DATE_ADD(CURDATE(), INTERVAL 305 DAY), 2, DATE_SUB(NOW(), INTERVAL 60 DAY), 2, DATE_SUB(NOW(), INTERVAL 58 DAY)),
+
+-- 费用清单2的保险记录（已生效）
+(2, 3, '平安财意外10+1+50+10（含意保）', '李明', '310101199202023456', '13800010002', '李明', '310101199202023456', '13800010002', '销售经理', '上海市浦东新区陆家嘴', '系统管理员', 'ACTIVE', '审核通过', 1, 'admin', DATE_SUB(NOW(), INTERVAL 43 DAY), NULL, DATE_SUB(NOW(), INTERVAL 44 DAY), DATE_SUB(NOW(), INTERVAL 43 DAY), DATE_SUB(NOW(), INTERVAL 43 DAY), 'POL202501020001', 60.00, 1, DATE_SUB(CURDATE(), INTERVAL 44 DAY), DATE_ADD(CURDATE(), INTERVAL 320 DAY), 3, DATE_SUB(NOW(), INTERVAL 45 DAY), 3, DATE_SUB(NOW(), INTERVAL 43 DAY)),
+
+-- 费用清单3的保险记录（已生效）
+(3, 4, '少儿门诊医疗险', '王芳', '440101198503033456', '13800010003', '王小宝', '440101201808084321', '13800010003', '学生', '广州市天河区珠江新城', '系统管理员', 'ACTIVE', '审核通过', 1, 'admin', DATE_SUB(NOW(), INTERVAL 28 DAY), NULL, DATE_SUB(NOW(), INTERVAL 29 DAY), DATE_SUB(NOW(), INTERVAL 28 DAY), DATE_SUB(NOW(), INTERVAL 28 DAY), 'POL202501030001', 380.00, 1, DATE_SUB(CURDATE(), INTERVAL 29 DAY), DATE_ADD(CURDATE(), INTERVAL 335 DAY), 4, DATE_SUB(NOW(), INTERVAL 30 DAY), 4, DATE_SUB(NOW(), INTERVAL 28 DAY)),
+
+-- 费用清单4的保险记录（已生效，2份）
+(4, 5, '老年意外险（尊享版）', '刘洋', '330101198005055678', '13800010004', '刘父', '330101195506066789', '13800010004', '退休', '杭州市西湖区文三路', '系统管理员', 'ACTIVE', '审核通过', 1, 'admin', DATE_SUB(NOW(), INTERVAL 18 DAY), NULL, DATE_SUB(NOW(), INTERVAL 19 DAY), DATE_SUB(NOW(), INTERVAL 18 DAY), DATE_SUB(NOW(), INTERVAL 18 DAY), 'POL202501040001-01', 200.00, 1, DATE_SUB(CURDATE(), INTERVAL 19 DAY), DATE_ADD(CURDATE(), INTERVAL 345 DAY), 5, DATE_SUB(NOW(), INTERVAL 20 DAY), 5, DATE_SUB(NOW(), INTERVAL 18 DAY)),
+(4, 5, '老年意外险（尊享版）', '刘洋', '330101198005055678', '13800010004', '刘母', '330101195808088901', '13800010005', '退休', '杭州市西湖区文三路', '系统管理员', 'ACTIVE', '审核通过', 1, 'admin', DATE_SUB(NOW(), INTERVAL 18 DAY), NULL, DATE_SUB(NOW(), INTERVAL 19 DAY), DATE_SUB(NOW(), INTERVAL 18 DAY), DATE_SUB(NOW(), INTERVAL 18 DAY), 'POL202501040001-02', 200.00, 1, DATE_SUB(CURDATE(), INTERVAL 19 DAY), DATE_ADD(CURDATE(), INTERVAL 345 DAY), 5, DATE_SUB(NOW(), INTERVAL 20 DAY), 5, DATE_SUB(NOW(), INTERVAL 18 DAY)),
+
+-- 费用清单5的保险记录（已生效）
+(5, 6, '国寿财1-4类意外险', '陈欣', '350101199207077890', '13800010005', '陈欣', '350101199207077890', '13800010005', '建筑工程师', '福州市鼓楼区五四路', '系统管理员', 'ACTIVE', '审核通过', 1, 'admin', DATE_SUB(NOW(), INTERVAL 13 DAY), NULL, DATE_SUB(NOW(), INTERVAL 14 DAY), DATE_SUB(NOW(), INTERVAL 13 DAY), DATE_SUB(NOW(), INTERVAL 13 DAY), 'POL202501050001', 80.00, 1, DATE_SUB(CURDATE(), INTERVAL 14 DAY), DATE_ADD(CURDATE(), INTERVAL 350 DAY), 6, DATE_SUB(NOW(), INTERVAL 15 DAY), 6, DATE_SUB(NOW(), INTERVAL 13 DAY)),
+
+-- 费用清单6的保险记录（已生效，3份）
+(6, 8, '平安财高危职业意外险', '孙丽', '510101199309099012', '13800010007', '孙丽', '510101199309099012', '13800010007', '电焊工', '成都市武侯区人民南路', '系统管理员', 'ACTIVE', '审核通过', 1, 'admin', DATE_SUB(NOW(), INTERVAL 6 DAY), NULL, DATE_SUB(NOW(), INTERVAL 7 DAY), DATE_SUB(NOW(), INTERVAL 6 DAY), DATE_SUB(NOW(), INTERVAL 6 DAY), 'POL202501060001-01', 150.00, 1, DATE_SUB(CURDATE(), INTERVAL 7 DAY), DATE_ADD(CURDATE(), INTERVAL 357 DAY), 8, DATE_SUB(NOW(), INTERVAL 8 DAY), 8, DATE_SUB(NOW(), INTERVAL 6 DAY)),
+(6, 8, '平安财高危职业意外险', '孙丽', '510101199309099012', '13800010007', '孙强', '510101199501011234', '13800010008', '高空作业员', '成都市武侯区人民南路', '系统管理员', 'ACTIVE', '审核通过', 1, 'admin', DATE_SUB(NOW(), INTERVAL 6 DAY), NULL, DATE_SUB(NOW(), INTERVAL 7 DAY), DATE_SUB(NOW(), INTERVAL 6 DAY), DATE_SUB(NOW(), INTERVAL 6 DAY), 'POL202501060001-02', 150.00, 1, DATE_SUB(CURDATE(), INTERVAL 7 DAY), DATE_ADD(CURDATE(), INTERVAL 357 DAY), 8, DATE_SUB(NOW(), INTERVAL 8 DAY), 8, DATE_SUB(NOW(), INTERVAL 6 DAY)),
+(6, 8, '平安财高危职业意外险', '孙丽', '510101199309099012', '13800010007', '孙梅', '510101199803033456', '13800010009', '化工操作员', '成都市武侯区人民南路', '系统管理员', 'ACTIVE', '审核通过', 1, 'admin', DATE_SUB(NOW(), INTERVAL 6 DAY), NULL, DATE_SUB(NOW(), INTERVAL 7 DAY), DATE_SUB(NOW(), INTERVAL 6 DAY), DATE_SUB(NOW(), INTERVAL 6 DAY), 'POL202501060001-03', 150.00, 1, DATE_SUB(CURDATE(), INTERVAL 7 DAY), DATE_ADD(CURDATE(), INTERVAL 357 DAY), 8, DATE_SUB(NOW(), INTERVAL 8 DAY), 8, DATE_SUB(NOW(), INTERVAL 6 DAY)),
+
+-- 费用清单7的保险记录（已生效）
+(7, 11, '太保百万医疗险', '郑华', '420101199104044567', '13800010010', '郑华', '420101199104044567', '13800010010', '医生', '武汉市江汉区解放大道', '系统管理员', 'ACTIVE', '审核通过', 1, 'admin', DATE_SUB(NOW(), INTERVAL 1 DAY), NULL, DATE_SUB(NOW(), INTERVAL 2 DAY), DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_SUB(NOW(), INTERVAL 1 DAY), 'POL202501070001', 300.00, 1, DATE_SUB(CURDATE(), INTERVAL 2 DAY), DATE_ADD(CURDATE(), INTERVAL 362 DAY), 11, DATE_SUB(NOW(), INTERVAL 3 DAY), 11, DATE_SUB(NOW(), INTERVAL 1 DAY)),
+
+-- 费用清单8的保险记录（待审核）
+(8, 12, '国寿财1-3类10+5+5+50（青柑）', '黄平', '610101199206066789', '13800010011', '黄平', '610101199206066789', '13800010011', '教师', '西安市雁塔区小寨路', NULL, 'PENDING_REVIEW', NULL, NULL, NULL, NULL, NULL, DATE_SUB(NOW(), INTERVAL 1 DAY), NULL, NULL, NULL, 55.00, 1, NULL, NULL, 12, DATE_SUB(NOW(), INTERVAL 1 DAY), 12, NOW()),
+
+-- 费用清单9的保险记录（审核通过，待承保）
+(9, 13, '平安财意外10+1+50+10（含意保）', '林晓', '370101199408088901', '13800010012', '林晓', '370101199408088901', '13800010012', '设计师', '青岛市市南区香港中路', NULL, 'APPROVED', '资料齐全，审核通过', 1, 'admin', DATE_SUB(NOW(), INTERVAL 1 DAY), NULL, DATE_SUB(NOW(), INTERVAL 2 DAY), NULL, NULL, NULL, 60.00, 1, NULL, NULL, 13, DATE_SUB(NOW(), INTERVAL 2 DAY), 1, DATE_SUB(NOW(), INTERVAL 1 DAY)),
+(9, 13, '平安财意外10+1+50+10（含意保）', '林晓', '370101199408088901', '13800010012', '林小妹', '370101201909099012', '13800010013', '学生', '青岛市市南区香港中路', NULL, 'APPROVED', '资料齐全，审核通过', 1, 'admin', DATE_SUB(NOW(), INTERVAL 1 DAY), NULL, DATE_SUB(NOW(), INTERVAL 2 DAY), NULL, NULL, NULL, 60.00, 1, NULL, NULL, 13, DATE_SUB(NOW(), INTERVAL 2 DAY), 1, DATE_SUB(NOW(), INTERVAL 1 DAY)),
+
+-- 费用清单10的保险记录（审核驳回）
+(10, 7, '少儿门诊医疗险', '赵磊', '210101199105055678', '13800010006', '赵小宝', '210101202203033456', '13800010006', '婴幼儿', '沈阳市和平区中山路', NULL, 'REVIEW_REJECTED', NULL, 1, 'admin', DATE_SUB(NOW(), INTERVAL 4 DAY), '被保人年龄需满30天，当前年龄不符合投保要求', DATE_SUB(NOW(), INTERVAL 5 DAY), NULL, NULL, NULL, 380.00, 1, NULL, NULL, 7, DATE_SUB(NOW(), INTERVAL 5 DAY), 1, DATE_SUB(NOW(), INTERVAL 4 DAY)),
+
+-- 费用清单11的保险记录（承保中）
+(11, 9, '众安出行意外险', '周军', '430101199507077890', '13800010008', '周军', '430101199507077890', '13800010008', '商务经理', '长沙市岳麓区麓谷大道', NULL, 'UNDERWRITING', '资料齐全，已提交承保', 1, 'admin', DATE_SUB(NOW(), INTERVAL 2 DAY), NULL, DATE_SUB(NOW(), INTERVAL 3 DAY), DATE_SUB(NOW(), INTERVAL 2 DAY), NULL, NULL, 50.00, 1, NULL, NULL, 9, DATE_SUB(NOW(), INTERVAL 3 DAY), 1, DATE_SUB(NOW(), INTERVAL 2 DAY)),
+(11, 9, '众安出行意外险', '周军', '430101199507077890', '13800010008', '周婷', '430101199808088901', '13800010009', '行政助理', '长沙市岳麓区麓谷大道', NULL, 'UNDERWRITING', '资料齐全，已提交承保', 1, 'admin', DATE_SUB(NOW(), INTERVAL 2 DAY), NULL, DATE_SUB(NOW(), INTERVAL 3 DAY), DATE_SUB(NOW(), INTERVAL 2 DAY), NULL, NULL, 50.00, 1, NULL, NULL, 9, DATE_SUB(NOW(), INTERVAL 3 DAY), 1, DATE_SUB(NOW(), INTERVAL 2 DAY)),
+
+-- 费用清单12的保险记录（已取消）
+(12, 2, '老年意外险（尊享版）', '张伟', '110101199001011234', '13800010001', '张父', '110101195003033456', '13800010003', '退休', '北京市朝阳区望京街道', NULL, 'CANCELLED', NULL, NULL, NULL, NULL, NULL, DATE_SUB(NOW(), INTERVAL 50 DAY), NULL, NULL, NULL, 200.00, 1, NULL, NULL, 2, DATE_SUB(NOW(), INTERVAL 50 DAY), 2, DATE_SUB(NOW(), INTERVAL 48 DAY));
+
+-- ================================================
+-- 7. 交易记录（消费记录）
+-- ================================================
 INSERT INTO axx_transaction_record (serial_no, user_id, trans_type, amount, balance_before, balance_after, description, ref_type, ref_id, payment_method, payment_status, create_by, create_time, update_by, update_time) VALUES
--- user1 充值记录
-('TRX202401010001', 2, 'RECHARGE', 10000.00, 0.00, 10000.00, '初始充值', NULL, NULL, 'WECHAT', 'SUCCESS', 1, NOW(), 1, NOW()),
--- user2 充值记录
-('TRX202401010002', 3, 'RECHARGE', 15000.00, 0.00, 15000.00, '初始充值', NULL, NULL, 'ALIPAY', 'SUCCESS', 1, NOW(), 1, NOW()),
--- user3 充值记录
-('TRX202401010003', 4, 'RECHARGE', 8000.00, 0.00, 8000.00, '初始充值', NULL, NULL, 'WECHAT', 'SUCCESS', 1, NOW(), 1, NOW()),
--- user4 充值记录
-('TRX202401010004', 5, 'RECHARGE', 20000.00, 0.00, 20000.00, '初始充值', NULL, NULL, 'ALIPAY', 'SUCCESS', 1, NOW(), 1, NOW()),
--- user5 充值记录
-('TRX202401010005', 6, 'RECHARGE', 12000.00, 0.00, 12000.00, '初始充值', NULL, NULL, 'WECHAT', 'SUCCESS', 1, NOW(), 1, NOW()),
--- user6-user10 充值记录
-('TRX202401010006', 7, 'RECHARGE', 18000.00, 0.00, 18000.00, '初始充值', NULL, NULL, 'ALIPAY', 'SUCCESS', 1, NOW(), 1, NOW()),
-('TRX202401010007', 8, 'RECHARGE', 9000.00, 0.00, 9000.00, '初始充值', NULL, NULL, 'WECHAT', 'SUCCESS', 1, NOW(), 1, NOW()),
-('TRX202401010008', 9, 'RECHARGE', 16000.00, 0.00, 16000.00, '初始充值', NULL, NULL, 'ALIPAY', 'SUCCESS', 1, NOW(), 1, NOW()),
-('TRX202401010009', 10, 'RECHARGE', 11000.00, 0.00, 11000.00, '初始充值', NULL, NULL, 'WECHAT', 'SUCCESS', 1, NOW(), 1, NOW());
+-- 用户2 张伟的消费记录
+('TRX202501010101', 2, 'EXPENSE', 110.00, 15000.00, 14890.00, '购买保险：国寿财1-3类10+5+5+50（青柑）x2', 'EXPENSE', 1, 'BALANCE', 'SUCCESS', 2, DATE_SUB(NOW(), INTERVAL 60 DAY), 2, DATE_SUB(NOW(), INTERVAL 60 DAY)),
+('TRX202501010102', 2, 'EXPENSE', 200.00, 14890.00, 14690.00, '购买保险：老年意外险（尊享版）- 已取消', 'EXPENSE', 12, 'BALANCE', 'REFUNDED', 2, DATE_SUB(NOW(), INTERVAL 50 DAY), 2, DATE_SUB(NOW(), INTERVAL 48 DAY)),
+('TRX202501010103', 2, 'RECHARGE', 200.00, 14690.00, 14890.00, '订单取消退款', 'REFUND', 12, 'BALANCE', 'SUCCESS', 2, DATE_SUB(NOW(), INTERVAL 48 DAY), 2, DATE_SUB(NOW(), INTERVAL 48 DAY)),
 
--- 7. 初始化交易记录（消费记录）
-INSERT INTO axx_transaction_record (serial_no, user_id, trans_type, amount, balance_before, balance_after, description, ref_type, ref_id, payment_method, payment_status, create_by, create_time, update_by, update_time) VALUES
--- user1 消费记录
-('TRX202401020001', 2, 'EXPENSE', 55.00, 10000.00, 9945.00, '购买保险：国寿财1-3类10+5+5+50（青柑）', 'EXPENSE', 1, 'BALANCE', 'SUCCESS', 2, NOW(), 2, NOW()),
--- user2 消费记录
-('TRX202401020002', 3, 'EXPENSE', 60.00, 15000.00, 14940.00, '购买保险：平安财意外10+1+50+10（含意保）', 'EXPENSE', 2, 'BALANCE', 'SUCCESS', 3, NOW(), 3, NOW()),
--- user3 消费记录
-('TRX202401020003', 4, 'EXPENSE', 380.00, 8000.00, 7620.00, '购买保险：少儿门诊医疗险', 'EXPENSE', 3, 'BALANCE', 'SUCCESS', 4, NOW(), 4, NOW()),
--- user4 消费记录
-('TRX202401020004', 5, 'EXPENSE', 200.00, 20000.00, 19800.00, '购买保险：老年意外险（尊享版）', 'EXPENSE', 4, 'BALANCE', 'SUCCESS', 5, NOW(), 5, NOW()),
--- user5 消费记录
-('TRX202401020005', 6, 'EXPENSE', 80.00, 12000.00, 11920.00, '购买保险：国寿财1-4类意外险', 'EXPENSE', 5, 'BALANCE', 'SUCCESS', 6, NOW(), 6, NOW());
+-- 用户3 李明的消费记录
+('TRX202501010201', 3, 'EXPENSE', 60.00, 15000.00, 14940.00, '购买保险：平安财意外10+1+50+10（含意保）', 'EXPENSE', 2, 'BALANCE', 'SUCCESS', 3, DATE_SUB(NOW(), INTERVAL 45 DAY), 3, DATE_SUB(NOW(), INTERVAL 45 DAY)),
+
+-- 用户4 王芳的消费记录
+('TRX202501010301', 4, 'EXPENSE', 380.00, 8000.00, 7620.00, '购买保险：少儿门诊医疗险', 'EXPENSE', 3, 'BALANCE', 'SUCCESS', 4, DATE_SUB(NOW(), INTERVAL 30 DAY), 4, DATE_SUB(NOW(), INTERVAL 30 DAY)),
+('TRX202501010302', 4, 'RECHARGE', 2000.00, 7620.00, 9620.00, '账户充值-微信支付', NULL, NULL, 'WECHAT', 'SUCCESS', 4, DATE_SUB(NOW(), INTERVAL 15 DAY), 4, DATE_SUB(NOW(), INTERVAL 15 DAY)),
+
+-- 用户5 刘洋的消费记录
+('TRX202501010401', 5, 'EXPENSE', 400.00, 20000.00, 19600.00, '购买保险：老年意外险（尊享版）x2', 'EXPENSE', 4, 'BALANCE', 'SUCCESS', 5, DATE_SUB(NOW(), INTERVAL 20 DAY), 5, DATE_SUB(NOW(), INTERVAL 20 DAY)),
+
+-- 用户6 陈欣的消费记录
+('TRX202501010501', 6, 'EXPENSE', 80.00, 10000.00, 9920.00, '购买保险：国寿财1-4类意外险', 'EXPENSE', 5, 'BALANCE', 'SUCCESS', 6, DATE_SUB(NOW(), INTERVAL 15 DAY), 6, DATE_SUB(NOW(), INTERVAL 15 DAY)),
+('TRX202501010502', 6, 'RECHARGE', 3000.00, 9920.00, 12920.00, '账户充值-支付宝', NULL, NULL, 'ALIPAY', 'SUCCESS', 6, DATE_SUB(NOW(), INTERVAL 10 DAY), 6, DATE_SUB(NOW(), INTERVAL 10 DAY)),
+
+-- 用户7 赵磊的消费记录（驳回后退费）
+('TRX202501010601', 7, 'EXPENSE', 380.00, 5000.00, 4620.00, '购买保险：少儿门诊医疗险', 'EXPENSE', 10, 'BALANCE', 'REFUNDED', 7, DATE_SUB(NOW(), INTERVAL 5 DAY), 7, DATE_SUB(NOW(), INTERVAL 4 DAY)),
+('TRX202501010602', 7, 'RECHARGE', 380.00, 4620.00, 5000.00, '审核驳回退款', 'REFUND', 10, 'BALANCE', 'SUCCESS', 7, DATE_SUB(NOW(), INTERVAL 4 DAY), 7, DATE_SUB(NOW(), INTERVAL 4 DAY)),
+
+-- 用户8 孙丽的消费记录
+('TRX202501010701', 8, 'EXPENSE', 450.00, 20000.00, 19550.00, '购买保险：平安财高危职业意外险 x3', 'EXPENSE', 6, 'BALANCE', 'SUCCESS', 8, DATE_SUB(NOW(), INTERVAL 8 DAY), 8, DATE_SUB(NOW(), INTERVAL 8 DAY)),
+
+-- 用户9 周军的消费记录
+('TRX202501010801', 9, 'EXPENSE', 100.00, 3000.00, 2900.00, '购买保险：众安出行意外险 x2', 'EXPENSE', 11, 'BALANCE', 'SUCCESS', 9, DATE_SUB(NOW(), INTERVAL 3 DAY), 9, DATE_SUB(NOW(), INTERVAL 3 DAY)),
+
+-- 用户10 吴强的消费记录（已禁用）
+('TRX202501010901', 10, 'EXPENSE', 2500.00, 5000.00, 2500.00, '购买保险：国寿财1-4类意外险', 'EXPENSE', NULL, 'BALANCE', 'SUCCESS', 10, DATE_SUB(NOW(), INTERVAL 85 DAY), 10, DATE_SUB(NOW(), INTERVAL 85 DAY)),
+
+-- 用户11 郑华的消费记录
+('TRX202501011001', 11, 'EXPENSE', 300.00, 12000.00, 11700.00, '购买保险：太保百万医疗险', 'EXPENSE', 7, 'BALANCE', 'SUCCESS', 11, DATE_SUB(NOW(), INTERVAL 3 DAY), 11, DATE_SUB(NOW(), INTERVAL 3 DAY)),
+
+-- 用户12 黄平的消费记录（待审核，预扣款）
+('TRX202501011101', 12, 'EXPENSE', 55.00, 8000.00, 7945.00, '购买保险：国寿财1-3类10+5+5+50（青柑）', 'EXPENSE', 8, 'BALANCE', 'PENDING', 12, DATE_SUB(NOW(), INTERVAL 1 DAY), 12, NOW()),
+
+-- 用户13 林晓的消费记录
+('TRX202501011201', 13, 'EXPENSE', 120.00, 15000.00, 14880.00, '购买保险：平安财意外10+1+50+10（含意保）x2', 'EXPENSE', 9, 'BALANCE', 'SUCCESS', 13, DATE_SUB(NOW(), INTERVAL 2 DAY), 13, DATE_SUB(NOW(), INTERVAL 2 DAY));
+
+-- ================================================
+-- 8. 通知公告数据
+-- ================================================
+INSERT INTO axx_notice (title, content, sort_no, published_at, create_by, create_time, update_by, update_time) VALUES
+('欢迎使用优选通保险服务平台', '优选通保险服务平台已正式上线，欢迎各位用户使用。如有任何问题，请联系管理员。', 1, DATE_SUB(NOW(), INTERVAL 60 DAY), 1, DATE_SUB(NOW(), INTERVAL 60 DAY), 1, NOW()),
+('春节假期投保提醒', '春节期间（1月28日-2月4日）提交的投保申请将于节后统一处理，请各位用户知悉。', 2, DATE_SUB(NOW(), INTERVAL 30 DAY), 1, DATE_SUB(NOW(), INTERVAL 30 DAY), 1, NOW()),
+('新产品上线通知', '众安出行意外险现已上线，出行保障更全面，欢迎选购！', 3, DATE_SUB(NOW(), INTERVAL 10 DAY), 1, DATE_SUB(NOW(), INTERVAL 10 DAY), 1, NOW()),
+('系统维护通知', '系统将于本周六凌晨2:00-4:00进行例行维护，届时服务可能短暂中断，请提前做好准备。', 4, DATE_SUB(NOW(), INTERVAL 2 DAY), 1, DATE_SUB(NOW(), INTERVAL 2 DAY), 1, NOW());
 
 -- ================================================
 -- 初始化完成
--- 测试账号：admin/admin111 (管理员)
---          user1-9/user123 (普通用户)
+-- ================================================
+-- 账户说明:
+-- 管理员: admin / admin123
+-- 普通用户: zhangwei, liming, wangfang, liuyang, chenxin, zhaolei, sunli, zhoujun, zhenghua, huangping, linxiao
+-- 密码统一为: user123
+-- 
+-- 测试场景覆盖:
+-- 1. 已生效保单 (ACTIVE) - 7个费用清单，多个被保人
+-- 2. 待审核保单 (PENDING_REVIEW) - 1个
+-- 3. 审核通过待承保 (APPROVED) - 1个
+-- 4. 审核驳回保单 (REVIEW_REJECTED) - 1个
+-- 5. 承保中保单 (UNDERWRITING) - 1个
+-- 6. 已取消保单 (CANCELLED) - 1个
+-- 7. 禁用用户 - 1个 (wuqiang)
 -- ================================================
