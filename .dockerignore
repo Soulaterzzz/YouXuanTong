@@ -1,15 +1,38 @@
+# 构建相关
 .git
 .github
+.gitignore
 .idea
 .vscode
-node_modules
-frontend/node_modules
-frontend/dist
+.DS_Store
+**/node_modules
+**/dist
 target
+!target/*.jar
+
+# 运行时数据
 uploads
 logs
 *.log
 *.tmp
 *.bak
-.DS_Store
+
+# 敏感配置
 deploy/.env
+.env
+.env.*
+
+# 文档
+docs
+*.md
+!README.md
+
+# 测试
+**/test
+**/__tests__
+coverage
+
+# 临时文件
+*.swp
+*.swo
+*~
