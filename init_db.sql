@@ -4,6 +4,10 @@
 -- 说明: 包含完整表结构和全流程测试数据
 -- ================================================
 
+-- 设置字符集为 utf8mb4
+SET NAMES utf8mb4;
+SET CHARACTER SET utf8mb4;
+
 -- 1. 用户表
 CREATE TABLE IF NOT EXISTS axx_user (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键',
