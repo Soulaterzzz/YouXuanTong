@@ -6,7 +6,8 @@ import java.math.BigDecimal;
 
 @Data
 public class CreateRechargeRequest {
-    private BigDecimal amount;
+    private Long userId;
+    private java.math.BigDecimal amount;
     private String method;
     private String remark;
 }

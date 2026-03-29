@@ -190,6 +190,13 @@ public class AdminController {
         return ApiResponse.success(adminService.listAllRecharges(query));
     }
 
+    @PostMapping("/recharges")
+    public ApiResponse<Void> rechargeUser(@Valid @RequestBody CreateRechargeRequest request) {
+        SessionUser admin = requireAdmin();
+        adminService.rechargeUser(request.getUserId(), request.getAmount(), request.getMethod(), request.getRemark());
+        return ApiResponse.success(null);
+    }
+
     @GetMapping("/stats")
     public ApiResponse<AdminStatsVO> getAdminStats(@ModelAttribute AdminStatsQuery query) {
         requireAdmin();

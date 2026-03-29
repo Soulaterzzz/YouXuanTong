@@ -785,6 +785,44 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void rechargeUser(Long userId, BigDecimal amount, String method, String remark) {
+        AccountBalanceEntity balance = accountBalanceMapper.selectOne(
+            new LambdaQueryWrapper<AccountBalanceEntity>()
+                .eq(AccountBalanceEntity::getUserId, userId));
+        
+        if (balance == null) {
+            balance = new AccountBalanceEntity();
+            balance.setUserId(userId);
+            balance.setBalance(BigDecimal.ZERO);
+            balance.setFrozenBalance(BigDecimal.ZERO);
+            balance.setCreateTime(LocalDateTime.now());
+            balance.setUpdateTime(LocalDateTime.now());
+            accountBalanceMapper.insert(balance);
+        }
+
+        BigDecimal balanceBefore = balance.getBalance();
+        BigDecimal balanceAfter = balanceBefore.add(amount);
+        balance.setBalance(balanceAfter);
+        balance.setUpdateTime(LocalDateTime.now());
+        accountBalanceMapper.updateById(balance);
+
+        TransactionRecordEntity transaction = new TransactionRecordEntity();
+        transaction.setSerialNo(generateSerialNo("RCH"));
+        transaction.setUserId(userId);
+        transaction.setTransType("RECHARGE");
+        transaction.setAmount(amount);
+        transaction.setBalanceBefore(balanceBefore);
+        transaction.setBalanceAfter(balanceAfter);
+        transaction.setDescription(remark != null ? remark : "管理员充值");
+        transaction.setPaymentMethod(method);
+        transaction.setPaymentStatus("SUCCESS");
+        transaction.setCreateTime(LocalDateTime.now());
+        transaction.setUpdateTime(LocalDateTime.now());
+        transactionRecordMapper.insert(transaction);
+    }
+
+    @Override
     public Long getTodayNewOrders() {
         LocalDateTime todayStart = LocalDateTime.of(LocalDate.now(), LocalTime.MIN);
         return expenseRecordMapper.selectCount(

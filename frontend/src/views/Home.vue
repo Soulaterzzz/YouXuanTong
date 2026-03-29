@@ -287,6 +287,14 @@
             <div class="filter-header">
               <h3><el-icon><Filter /></el-icon> 产品筛选</h3>
               <div class="filter-header-actions">
+                <el-button v-if="isAdmin" type="warning" plain @click="openCategoryDialog">
+                  <el-icon><Setting /></el-icon>
+                  管理类别
+                </el-button>
+                <el-button v-if="isAdmin" type="success" plain @click="openCompanyDialog">
+                  <el-icon><Setting /></el-icon>
+                  管理公司
+                </el-button>
                 <el-button text @click="resetProductFilter" v-if="companyFilter !== 'all' || activeCategory !== 'all'">
                   <el-icon><Refresh /></el-icon>
                   重置筛选
@@ -301,11 +309,9 @@
               <span class="filter-label">承保公司：</span>
               <el-radio-group v-model="companyFilter" @change="handleCompanyChange" size="default" class="product-company-group">
                 <el-radio-button label="all">全部</el-radio-button>
-                <el-radio-button label="guoshou">国寿财险</el-radio-button>
-                <el-radio-button label="pingan">平安财险</el-radio-button>
-                <el-radio-button label="zhonghua">中华联合</el-radio-button>
-                <el-radio-button label="taiping">太平财险</el-radio-button>
-                <el-radio-button label="renbao">人保财险</el-radio-button>
+                <el-radio-button v-for="company in companyList" :key="company.code" :label="company.code">
+                  {{ company.name }}
+                </el-radio-button>
               </el-radio-group>
             </div>
           </div>
@@ -837,17 +843,14 @@
           <el-input v-model="productForm.productName" placeholder="请输入产品名称" />
         </el-form-item>
         <el-form-item label="产品类别">
-          <el-select v-model="productForm.categoryCode" style="width: 100%">
-            <el-option label="1-3类意外" value="1-3" />
-            <el-option label="1-4类意外" value="1-4" />
-            <el-option label="1-5类意外" value="1-5" />
-            <el-option label="1-6类意外" value="1-6" />
-            <el-option label="少儿医疗" value="child" />
-            <el-option label="老年意外" value="elder" />
+          <el-select v-model="productForm.categoryCode" style="width: 100%" placeholder="请选择产品类别">
+            <el-option v-for="category in categoryList" :key="category.code" :label="category.name" :value="category.code" />
           </el-select>
         </el-form-item>
         <el-form-item label="承保公司">
-          <el-input v-model="productForm.companyName" placeholder="请输入承保公司" />
+          <el-select v-model="productForm.companyCode" style="width: 100%" placeholder="请选择承保公司">
+            <el-option v-for="company in companyList" :key="company.code" :label="company.name" :value="company.code" />
+          </el-select>
         </el-form-item>
         <el-form-item label="价格">
           <el-input-number v-model="productForm.price" :min="0.01" :precision="2" style="width: 100%" />
@@ -923,6 +926,80 @@
           <el-button type="primary" :loading="productSubmitting" @click="saveProduct">保存</el-button>
         </span>
       </template>
+    </el-dialog>
+
+    <!-- 产品类别管理对话框 -->
+    <el-dialog v-model="categoryDialogVisible" title="产品类别管理" width="700px" :close-on-click-modal="false">
+      <div class="category-management">
+        <div class="category-form">
+          <el-form :inline="true" :model="categoryForm" label-width="80px">
+            <el-form-item label="类别编码">
+              <el-input v-model="categoryForm.code" placeholder="如：1-3" style="width: 150px" />
+            </el-form-item>
+            <el-form-item label="类别名称">
+              <el-input v-model="categoryForm.name" placeholder="如：1-3类意外" style="width: 200px" />
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" @click="addCategory">
+                <el-icon><Plus /></el-icon>
+                添加
+              </el-button>
+              <el-button @click="resetCategoryForm">重置</el-button>
+            </el-form-item>
+          </el-form>
+        </div>
+        <div class="category-list">
+          <el-table :data="categoryList" border stripe>
+            <el-table-column prop="code" label="类别编码" width="120" />
+            <el-table-column prop="name" label="类别名称" />
+            <el-table-column label="操作" width="120" align="center">
+              <template #default="scope">
+                <el-button type="danger" size="small" @click="deleteCategory(scope.row)">
+                  <el-icon><Delete /></el-icon>
+                  删除
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+      </div>
+    </el-dialog>
+
+    <!-- 承保公司管理对话框 -->
+    <el-dialog v-model="companyDialogVisible" title="承保公司管理" width="700px" :close-on-click-modal="false">
+      <div class="company-management">
+        <div class="company-form">
+          <el-form :inline="true" :model="companyForm" label-width="80px">
+            <el-form-item label="公司编码">
+              <el-input v-model="companyForm.code" placeholder="如：guoshou" style="width: 150px" />
+            </el-form-item>
+            <el-form-item label="公司名称">
+              <el-input v-model="companyForm.name" placeholder="如：国寿财险" style="width: 200px" />
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" @click="addCompany">
+                <el-icon><Plus /></el-icon>
+                添加
+              </el-button>
+              <el-button @click="resetCompanyForm">重置</el-button>
+            </el-form-item>
+          </el-form>
+        </div>
+        <div class="company-list">
+          <el-table :data="companyList" border stripe>
+            <el-table-column prop="code" label="公司编码" width="150" />
+            <el-table-column prop="name" label="公司名称" />
+            <el-table-column label="操作" width="120" align="center">
+              <template #default="scope">
+                <el-button type="danger" size="small" @click="deleteCompany(scope.row)">
+                  <el-icon><Delete /></el-icon>
+                  删除
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+      </div>
     </el-dialog>
 
     <!-- 激活弹窗 -->
@@ -1366,7 +1443,7 @@ import {
   Grid, Menu, Sunny, Star, Present, OfficeBuilding,
   CircleCheck, Refresh, Search, Picture, Upload, Lightning, View, Download,
   Clock, Link, Edit, Switch, ZoomIn, Calendar, Timer, Notebook, Plus, Filter,
-  ArrowDown, Delete, Bell
+  ArrowDown, Delete, Bell, Setting
 } from '@element-plus/icons-vue'
 
 export default {
@@ -1376,7 +1453,7 @@ export default {
     Grid, Menu, Sunny, Star, Present, OfficeBuilding,
     CircleCheck, Refresh, Search, Picture, Upload, Lightning, View, Download,
     Clock, Link, Edit, Switch, ZoomIn, Calendar, Timer, Notebook, Plus, Filter,
-    ArrowDown, Delete, Bell
+    ArrowDown, Delete, Bell, Setting
   },
   data() {
     return {
@@ -1413,7 +1490,8 @@ export default {
         id: null,
         productCode: '',
         productName: '',
-        categoryCode: '1-3',
+        categoryCode: '',
+        companyCode: '',
         companyName: '',
         description: '',
         features: '',
@@ -1545,6 +1623,7 @@ export default {
       rechargeDialogVisible: false,
       rechargeSubmitting: false,
       rechargeForm: {
+        userId: null,
         amount: 1000,
         method: 'alipay',
         remark: ''
@@ -1556,7 +1635,24 @@ export default {
       // 图片预览相关
       previewImageDialogVisible: false,
       previewImageUrl: '',
-      previewImageTitle: ''
+      previewImageTitle: '',
+      // 通知公告弹窗
+      noticePopupDialogVisible: false,
+      noticePopupData: null,
+      // 产品类别管理
+      categoryDialogVisible: false,
+      categoryForm: {
+        code: '',
+        name: ''
+      },
+      categoryList: [],
+      // 承保公司管理
+      companyDialogVisible: false,
+      companyForm: {
+        code: '',
+        name: ''
+      },
+      companyList: []
     }
   },
   computed: {
@@ -1601,6 +1697,8 @@ export default {
     this.loadProducts()
     this.loadBalance()
     this.initializeNoticeCenter()
+    this.loadCategories()
+    this.loadCompanies()
   },
   methods: {
     isSuccess(res) {
@@ -1929,15 +2027,8 @@ export default {
     },
 
     getFilterText() {
-      const companyMap = {
-        'guoshou': '国寿财险',
-        'pingan': '平安财险',
-        'zhonghua': '中华联合',
-        'taiping': '太平财险',
-        'renbao': '人保财险'
-      }
       if (this.companyFilter !== 'all') {
-        return companyMap[this.companyFilter] || this.companyFilter
+        return this.getCompanyName(this.companyFilter) || this.companyFilter
       }
       return ''
     },
@@ -1945,18 +2036,12 @@ export default {
     async loadProducts() {
       this.productLoading = true
       try {
-        const companyMap = {
-          'guoshou': '国寿财险',
-          'pingan': '平安财险',
-          'zhonghua': '中华联合',
-          'taiping': '太平财险',
-          'renbao': '人保财险'
-        }
+        const company = this.companyFilter !== 'all' ? this.getCompanyName(this.companyFilter) : ''
         const params = {
           page: this.productCurrentPage,
           size: this.productPageSize,
           category: this.activeCategory === 'all' ? '' : this.activeCategory,
-          company: this.companyFilter === 'all' ? '' : (companyMap[this.companyFilter] || this.companyFilter)
+          company: company
         }
         const endpoint = this.isAdmin ? '/api/admin/products' : '/api/anxinxuan/products'
         const res = await this.$axios.get(endpoint, { params })
@@ -1977,6 +2062,159 @@ export default {
       }
     },
 
+    // 产品类别管理
+    async loadCategories() {
+      try {
+        // 从本地存储加载，如果没有则使用默认类别
+        const storedCategories = localStorage.getItem('productCategories')
+        if (storedCategories) {
+          this.categoryList = JSON.parse(storedCategories)
+        } else {
+          // 默认类别列表
+          this.categoryList = [
+            { code: '1-3', name: '1-3类意外' },
+            { code: '1-4', name: '1-4类意外' },
+            { code: '1-5', name: '1-5类意外' },
+            { code: '1-6', name: '1-6类意外' },
+            { code: 'child', name: '少儿医疗' },
+            { code: 'elder', name: '老年意外' },
+            { code: 'travel', name: '旅游险' },
+            { code: 'maternity', name: '驾乘险' }
+          ]
+          localStorage.setItem('productCategories', JSON.stringify(this.categoryList))
+        }
+      } catch (error) {
+        console.error('加载产品类别失败:', error)
+      }
+    },
+
+    openCategoryDialog() {
+      this.categoryDialogVisible = true
+    },
+
+    addCategory() {
+      if (!this.categoryForm.code || !this.categoryForm.name) {
+        this.$message.warning('请填写类别编码和类别名称')
+        return
+      }
+
+      // 检查编码是否重复
+      if (this.categoryList.some(cat => cat.code === this.categoryForm.code)) {
+        this.$message.warning('类别编码已存在')
+        return
+      }
+
+      this.categoryList.push({
+        code: this.categoryForm.code,
+        name: this.categoryForm.name
+      })
+
+      // 保存到本地存储
+      localStorage.setItem('productCategories', JSON.stringify(this.categoryList))
+
+      this.$message.success('添加成功')
+      this.resetCategoryForm()
+    },
+
+    deleteCategory(category) {
+      this.$confirm(`确定删除类别"${category.name}"吗？`, '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(() => {
+        this.categoryList = this.categoryList.filter(cat => cat.code !== category.code)
+        localStorage.setItem('productCategories', JSON.stringify(this.categoryList))
+        this.$message.success('删除成功')
+      }).catch(() => {
+        // 用户取消删除
+      })
+    },
+
+    resetCategoryForm() {
+      this.categoryForm = {
+        code: '',
+        name: ''
+      }
+    },
+
+    // 承保公司管理
+    async loadCompanies() {
+      try {
+        // 从本地存储加载，如果没有则使用默认公司列表
+        const storedCompanies = localStorage.getItem('insuranceCompanies')
+        if (storedCompanies) {
+          this.companyList = JSON.parse(storedCompanies)
+        } else {
+          // 默认公司列表
+          this.companyList = [
+            { code: 'guoshou', name: '国寿财险' },
+            { code: 'pingan', name: '平安财险' },
+            { code: 'zhonghua', name: '中华联合' },
+            { code: 'taiping', name: '太平财险' },
+            { code: 'renbao', name: '人保财险' }
+          ]
+          localStorage.setItem('insuranceCompanies', JSON.stringify(this.companyList))
+        }
+      } catch (error) {
+        console.error('加载承保公司失败:', error)
+      }
+    },
+
+    openCompanyDialog() {
+      this.companyDialogVisible = true
+    },
+
+    addCompany() {
+      if (!this.companyForm.code || !this.companyForm.name) {
+        this.$message.warning('请填写公司编码和公司名称')
+        return
+      }
+
+      // 检查编码是否重复
+      if (this.companyList.some(company => company.code === this.companyForm.code)) {
+        this.$message.warning('公司编码已存在')
+        return
+      }
+
+      this.companyList.push({
+        code: this.companyForm.code,
+        name: this.companyForm.name
+      })
+
+      // 保存到本地存储
+      localStorage.setItem('insuranceCompanies', JSON.stringify(this.companyList))
+
+      this.$message.success('添加成功')
+      this.resetCompanyForm()
+    },
+
+    deleteCompany(company) {
+      this.$confirm(`确定删除公司"${company.name}"吗？`, '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(() => {
+        this.companyList = this.companyList.filter(comp => comp.code !== company.code)
+        localStorage.setItem('insuranceCompanies', JSON.stringify(this.companyList))
+        this.$message.success('删除成功')
+      }).catch(() => {
+        // 用户取消删除
+      })
+    },
+
+    resetCompanyForm() {
+      this.companyForm = {
+        code: '',
+        name: ''
+      }
+    },
+
+    getCompanyName(companyCode) {
+      if (!companyCode) return ''
+      const company = this.companyList.find(comp => comp.code === companyCode)
+      return company ? company.name : ''
+    },
+
     handleProductPageChange(page) {
       this.productCurrentPage = page
       this.loadProducts()
@@ -1989,20 +2227,13 @@ export default {
     },
 
     getDefaultProductForm() {
-      const companyMap = {
-        guoshou: '国寿财险',
-        pingan: '平安财险',
-        zhonghua: '中华联合',
-        taiping: '太平财险',
-        renbao: '人保财险'
-      }
-
       return {
         id: null,
         productCode: '',
         productName: '',
-        categoryCode: this.activeCategory !== 'all' ? this.activeCategory : '1-3',
-        companyName: this.companyFilter !== 'all' ? (companyMap[this.companyFilter] || this.companyFilter) : '',
+        categoryCode: this.activeCategory !== 'all' ? this.activeCategory : (this.categoryList[0]?.code || '1-3'),
+        companyCode: this.companyFilter !== 'all' ? this.companyFilter : '',
+        companyName: '',
         description: '',
         features: '',
         price: 0.01,
@@ -2055,7 +2286,8 @@ export default {
         productCode: this.productForm.productCode,
         productName: this.productForm.productName,
         categoryCode: this.productForm.categoryCode,
-        companyName: this.productForm.companyName,
+        companyCode: this.productForm.companyCode,
+        companyName: this.getCompanyName(this.productForm.companyCode),
         description: this.productForm.description,
         features: this.productForm.features,
         price: this.productForm.price,
@@ -2780,7 +3012,7 @@ export default {
         }
         this.rechargeSubmitting = true
         try {
-          const res = await this.$axios.post('/api/anxinxuan/recharges', this.rechargeForm)
+          const res = await this.$axios.post('/api/admin/recharges', this.rechargeForm)
           if (this.isSuccess(res)) {
             this.$message.success('充值成功')
             this.rechargeDialogVisible = false
@@ -4647,5 +4879,41 @@ body {
     flex-direction: column;
     align-items: stretch;
   }
+}
+
+/* 产品类别管理样式 */
+.category-management {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.category-form {
+  padding: 16px;
+  background: #f5f7fa;
+  border-radius: 8px;
+}
+
+.category-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+/* 承保公司管理样式 */
+.company-management {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.company-form {
+  padding: 16px;
+  background: #f5f7fa;
+  border-radius: 8px;
+}
+
+.company-list {
+  max-height: 400px;
+  overflow-y: auto;
 }
 </style>

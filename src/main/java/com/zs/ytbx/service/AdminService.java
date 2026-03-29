@@ -31,6 +31,7 @@ public interface AdminService {
     void activateInsurance(Long insuranceId, ActivateInsuranceRequest request);
     void activateInsurances(List<BatchActivateInsuranceRequest.Item> items);
     PageResponse<RechargeVO> listAllRecharges(RechargeQuery query);
+    void rechargeUser(Long userId, java.math.BigDecimal amount, String method, String remark);
 
     Long getTodayNewOrders();
     Long getPendingOrders();
