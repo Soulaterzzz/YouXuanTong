@@ -17,6 +17,8 @@ jobs:
   deploy:
     runs-on: self-hosted
     environment: production
+    needs: [build-test]
+    if: success() || github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout repository
@@ -68,7 +70,83 @@ jobs:
           HOST_UPLOAD_DIR_VALUE="${HOST_UPLOAD_DIR_VALUE:-/data/ytbx/uploads}"
           mkdir -p "$HOST_UPLOAD_DIR_VALUE/templates"
 
-      - name: Deploy application
+      - name: Tag current image for rollback
         run: |
-          docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --build --remove-orphans
-          docker image prune -f
+          if docker image inspect ytbx-app:latest >/dev/null 2>&1; then
+            docker tag ytbx-app:latest ytbx-app:rollback
+            echo "ROLLBACK_AVAILABLE=true" >> "$GITHUB_ENV"
+            echo "已标记当前镜像为 ytbx-app:rollback"
+          else
+            echo "ROLLBACK_AVAILABLE=false" >> "$GITHUB_ENV"
+            echo "首次部署，无回滚镜像"
+          fi
+
+      - name: Deploy application
+        id: deploy
+        run: |
+          START_TIME=$(date +%s)
+          echo "::group::构建并启动服务"
+
+          if docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --build --remove-orphans; then
+            END_TIME=$(date +%s)
+            DEPLOY_DURATION=$((END_TIME - START_TIME))
+            echo "DEPLOY_DURATION=${DEPLOY_DURATION}" >> "$GITHUB_ENV"
+            echo "部署构建耗时: ${DEPLOY_DURATION} 秒"
+          else
+            echo "::error::部署构建失败"
+            exit 1
+          fi
+
+          echo "::endgroup::"
+
+      - name: Health check
+        id: health
+        if: steps.deploy.outcome == 'success'
+        run: |
+          source deploy/.env
+          APP_PORT="${APP_PORT:-8080}"
+          HEALTH_URL="http://127.0.0.1:${APP_PORT}"
+          MAX_ATTEMPTS=30
+          ATTEMPT=0
+
+          echo "等待服务启动..."
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            if curl -sf "$HEALTH_URL" >/dev/null 2>&1; then
+              echo "服务健康检查通过 (耗时 $((ATTEMPT * 2)) 秒)"
+              exit 0
+            fi
+            ATTEMPT=$((ATTEMPT + 1))
+            echo "等待中... ($ATTEMPT/$MAX_ATTEMPTS)"
+            sleep 2
+          done
+
+          echo "::error::服务健康检查超时"
+          exit 1
+
+      - name: Cleanup old images
+        if: steps.health.outcome == 'success'
+        run: docker image prune -f
+
+      - name: Deployment summary
+        if: steps.health.outcome == 'success'
+        run: |
+          echo "========================================="
+          echo "部署成功"
+          echo "========================================="
+          echo "提交: ${{ github.sha }}"
+          echo "分支: ${{ github.ref_name }}"
+          echo "触发: ${{ github.event_name }}"
+          echo "部署构建耗时: ${DEPLOY_DURATION} 秒"
+          echo "========================================="
+
+      - name: Rollback on failure
+        if: failure() && env.ROLLBACK_AVAILABLE == 'true'
+        run: |
+          echo "::group::回滚到上一版本"
+          if docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d ytbx-app \
+              && docker tag ytbx-app:rollback ytbx-app:latest; then
+            echo "回滚成功，已恢复到上一版本"
+          else
+            echo "::error::回滚失败，请手动检查"
+          fi
+          echo "::endgroup::"

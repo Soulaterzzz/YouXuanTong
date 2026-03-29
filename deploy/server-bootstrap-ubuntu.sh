@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+# 脚本功能：Ubuntu 服务器自动化部署脚本，用于配置 Docker、Nginx 和应用服务
+# 使用方法：sudo bash deploy/server-bootstrap-ubuntu.sh
+# 环境要求：Ubuntu 22.04+/24.04+
+
+# ============================================================================
+# 全局变量和配置
+# ============================================================================
+
 if [[ "${EUID}" -ne 0 ]]; then
   echo "请使用 sudo 运行：sudo bash deploy/server-bootstrap-ubuntu.sh" >&2
   exit 1
@@ -20,6 +28,10 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 DEPLOY_ENV_FILE="${PROJECT_ROOT}/deploy/.env"
+LOG_FILE="${PROJECT_ROOT}/deploy/deploy-$(date +%Y%m%d_%H%M%S).log"
+DOCKER_GPG_KEY="/etc/apt/keyrings/docker.asc"
+DOCKER_SOURCES="/etc/apt/sources.list.d/docker.sources"
+
 APP_PORT="${APP_PORT:-8080}"
 HOST_UPLOAD_DIR="${HOST_UPLOAD_DIR:-/data/ytbx/uploads}"
 MYSQL_DATABASE="${MYSQL_DATABASE:-ytbx}"
@@ -39,27 +51,84 @@ INTERACTIVE_PROMPTS="0"
 TTY_DEVICE="/dev/tty"
 VALIDATION_ERROR=""
 
+# 记录日志函数
+log() {
+  local level="$1"
+  shift
+  local message="$*"
+  local timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
+  echo "[${timestamp}] [${level}] ${message}" | tee -a "${LOG_FILE}"
+}
+
 if [[ ! -f "${PROJECT_ROOT}/deploy/docker-compose.yml" ]]; then
   echo "未找到 deploy/docker-compose.yml，请在项目根目录内运行此脚本。" >&2
   exit 1
 fi
 
-install_base_packages() {
-  local missing_packages=""
+# ============================================================================
+# 包安装函数
+# ============================================================================
 
-  for pkg in ca-certificates curl git gnupg nginx openssl; do
-    if ! dpkg -l "${pkg}" >/dev/null 2>&1; then
-      missing_packages="${missing_packages} ${pkg}"
+# 检查单个包是否已安装
+check_package_installed() {
+  local pkg="$1"
+  dpkg -l "${pkg}" >/dev/null 2>&1
+}
+
+# 一次性检查多个包，返回未安装的包列表
+get_missing_packages() {
+  local missing=()
+  for pkg in "$@"; do
+    if ! check_package_installed "${pkg}"; then
+      missing+=("${pkg}")
     fi
   done
+  echo "${missing[*]}"
+}
 
-  if [[ -z "${missing_packages}" ]]; then
-    return
+# 更新包索引（只执行一次）
+update_package_index() {
+  log "INFO" "更新软件包索引..."
+  export DEBIAN_FRONTEND=noninteractive
+  if apt-get update > >(tee -a "${LOG_FILE}") 2>&1; then
+    log "INFO" "软件包索引更新成功"
+    return 0
+  else
+    log "ERROR" "软件包索引更新失败"
+    return 1
+  fi
+}
+
+# 安装基础软件包和 Docker（合并为一次安装）
+install_all_packages() {
+  local base_packages="ca-certificates curl git gnupg nginx openssl"
+  local docker_packages="docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
+
+  # 检查需要安装的包
+  local missing_base=($(get_missing_packages ${base_packages}))
+  local missing_packages=("${missing_base[@]}")
+
+  # 检查 Docker 是否已安装
+  if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+    log "INFO" "Docker 已安装，跳过 Docker 安装"
+  else
+    log "INFO" "Docker 未安装或版本不兼容"
+    missing_packages+=(${docker_packages})
   fi
 
-  export DEBIAN_FRONTEND=noninteractive
-  apt-get update
-  apt-get install -y${missing_packages}
+  if [[ ${#missing_packages[@]} -eq 0 ]]; then
+    log "INFO" "所有依赖包已安装"
+    return 0
+  fi
+
+  log "INFO" "即将安装以下软件包: ${missing_packages[*]}"
+  if apt-get install -y "${missing_packages[@]}" > >(tee -a "${LOG_FILE}") 2>&1; then
+    log "INFO" "软件包安装成功"
+    return 0
+  else
+    log "ERROR" "软件包安装失败"
+    return 1
+  fi
 }
 
 enable_interactive_prompts() {
@@ -113,6 +182,12 @@ validate_app_port() {
 
   if (( 10#${value} < 1 || 10#${value} > 65535 )); then
     VALIDATION_ERROR="端口范围必须在 1-65535 之间"
+    return 1
+  fi
+
+  # 检查端口是否被占用
+  if command -v ss >/dev/null 2>&1 && ss -tuln | grep -q ":${value} "; then
+    VALIDATION_ERROR="端口 ${value} 已被占用，请选择其他端口"
     return 1
   fi
 
@@ -223,7 +298,7 @@ validate_max_file_size() {
   local value="$1"
 
   if [[ ! "${value}" =~ ^[0-9]+$ ]]; then
-    VALIDATION_ERROR="请输入大于 0 的整数，单位为字节"
+    VALIDATION_ERROR="请输入大于 0 的整数，单位为字节（如：10485760 表示 10MB）"
     return 1
   fi
 
@@ -343,6 +418,29 @@ prompt_text_input() {
     printf -v "${var_name}" '%s' "${candidate_value}"
     return
   done
+}
+
+# 统一的输入读取函数，提高代码复用性
+read_input_safely() {
+  local prompt="$1"
+  local silent="${2:-0}"
+  local user_input=""
+
+  if [[ "${silent}" == "1" ]]; then
+    if ! IFS= read -r -s user_input < "${TTY_DEVICE}"; then
+      printf "\n读取输入失败，继续使用当前值。\n" > "${TTY_DEVICE}"
+      return 1
+    fi
+    printf "\n" > "${TTY_DEVICE}"
+  else
+    if ! IFS= read -r user_input < "${TTY_DEVICE}"; then
+      print_notice "读取输入失败，继续使用当前值。"
+      return 1
+    fi
+  fi
+
+  echo "${user_input}"
+  return 0
 }
 
 prompt_secret_input() {
@@ -497,66 +595,130 @@ prompt_for_configuration() {
   fi
 }
 
-hydrate_defaults() {
-  if [[ -z "${MYSQL_PASSWORD}" ]]; then
-    MYSQL_PASSWORD="$(openssl rand -hex 12)"
-  fi
-  if [[ -z "${MYSQL_ROOT_PASSWORD}" ]]; then
-    MYSQL_ROOT_PASSWORD="$(openssl rand -hex 16)"
-  fi
-  if hostname -I >/dev/null 2>&1; then
-    LOCAL_IP="$(hostname -I | awk '{print $1}')"
-    LOCAL_IP="${LOCAL_IP:-127.0.0.1}"
+# ============================================================================
+# 密码和网络配置
+# ============================================================================
+
+# 生成随机密码
+generate_password() {
+  local length="${1:-16}"
+  openssl rand -hex "${length}"
+}
+
+# 获取本机 IP 地址
+get_local_ip() {
+  if command -v hostname >/dev/null 2>&1; then
+    local ip
+    ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+    echo "${ip:-127.0.0.1}"
+  else
+    echo "127.0.0.1"
   fi
 }
 
-install_docker() {
-  if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
-    return
+hydrate_defaults() {
+  if [[ -z "${MYSQL_PASSWORD}" ]]; then
+    MYSQL_PASSWORD="$(generate_password 12)"
+    log "INFO" "已自动生成 MySQL 用户密码"
   fi
+  if [[ -z "${MYSQL_ROOT_PASSWORD}" ]]; then
+    MYSQL_ROOT_PASSWORD="$(generate_password 16)"
+    log "INFO" "已自动生成 MySQL Root 密码"
+  fi
+  LOCAL_IP="$(get_local_ip)"
+}
 
-  apt-get remove -y docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc || true
+# ============================================================================
+# Docker 安装和配置
+# ============================================================================
+
+# 移除旧的 Docker 包
+remove_old_docker_packages() {
+  log "INFO" "移除旧的 Docker 包..."
+  apt-get remove -y docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc 2>&1 || true
+}
+
+# 配置 Docker APT 源
+configure_docker_repository() {
+  log "INFO" "配置 Docker APT 源..."
+
+  # 创建密钥目录
   install -m 0755 -d /etc/apt/keyrings
 
+  # 优先使用国内镜像源
   DOCKER_MIRROR="${DOCKER_MIRROR:-https://mirrors.aliyun.com}"
-  if curl -fsSL "${DOCKER_MIRROR}/docker-ce/linux/ubuntu/gpg" -o /etc/apt/keyrings/docker.asc 2>/dev/null; then
-    chmod a+r /etc/apt/keyrings/docker.asc
-    cat > /etc/apt/sources.list.d/docker.sources <<EOF_REPO
+
+  # 检查镜像源是否可用
+  if curl -fsSL "${DOCKER_MIRROR}/docker-ce/linux/ubuntu/gpg" -o "${DOCKER_GPG_KEY}" 2>/dev/null; then
+    log "INFO" "使用国内镜像源: ${DOCKER_MIRROR}"
+  else
+    log "WARN" "国内镜像源不可用，使用官方源"
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o "${DOCKER_GPG_KEY}" 2>/dev/null
+  fi
+
+  chmod a+r "${DOCKER_GPG_KEY}"
+
+  # 写入 APT 源配置
+  cat > "${DOCKER_SOURCES}" <<EOF_REPO
 Types: deb
 URIs: ${DOCKER_MIRROR}/docker-ce/linux/ubuntu
 Suites: ${UBUNTU_CODENAME:-${VERSION_CODENAME}}
 Components: stable
 Architectures: $(dpkg --print-architecture)
-Signed-By: /etc/apt/keyrings/docker.asc
+Signed-By: ${DOCKER_GPG_KEY}
 EOF_REPO
-  else
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-    chmod a+r /etc/apt/keyrings/docker.asc
-    cat > /etc/apt/sources.list.d/docker.sources <<EOF_REPO
-Types: deb
-URIs: https://download.docker.com/linux/ubuntu
-Suites: ${UBUNTU_CODENAME:-${VERSION_CODENAME}}
-Components: stable
-Architectures: $(dpkg --print-architecture)
-Signed-By: /etc/apt/keyrings/docker.asc
-EOF_REPO
-  fi
 
-  apt-get update
-  apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  log "INFO" "Docker APT 源配置完成"
+}
 
+# 启动 Docker 服务
+start_docker_service() {
+  log "INFO" "启动 Docker 服务..."
   if [[ -d /run/systemd/system ]]; then
     systemctl enable --now docker
   else
     service docker start 2>/dev/null || dockerd &>/var/log/docker.log &
     sleep 2
   fi
+
+  # 验证 Docker 是否启动成功
+  if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    log "INFO" "Docker 服务启动成功"
+    return 0
+  else
+    log "ERROR" "Docker 服务启动失败"
+    return 1
+  fi
 }
+
+# ============================================================================
+# 用户和目录配置
+# ============================================================================
 
 configure_user_group() {
   if [[ -n "${PRIMARY_USER}" ]] && id -u "${PRIMARY_USER}" >/dev/null 2>&1; then
-    usermod -aG docker "${PRIMARY_USER}" || true
+    if usermod -aG docker "${PRIMARY_USER}" 2>/dev/null; then
+      log "INFO" "已将用户 ${PRIMARY_USER} 加入 docker 组"
+    else
+      log "WARN" "将用户 ${PRIMARY_USER} 加入 docker 组失败"
+    fi
   fi
+}
+
+prepare_directories() {
+  log "INFO" "准备必要的目录..."
+  mkdir -p /opt/ytbx
+  mkdir -p "${HOST_UPLOAD_DIR}/templates"
+
+  # 使用更安全的权限设置（775 而不是 777）
+  chmod -R 775 "${HOST_UPLOAD_DIR}"
+
+  # 确保目录所有者正确
+  if [[ -n "${PRIMARY_USER}" ]]; then
+    chown -R "${PRIMARY_USER}:${PRIMARY_USER}" "${HOST_UPLOAD_DIR}" 2>/dev/null || true
+  fi
+
+  log "INFO" "目录准备完成"
 }
 
 prepare_directories() {
@@ -592,16 +754,27 @@ load_env_file() {
   set +a
 }
 
+# ============================================================================
+# Nginx 配置
+# ============================================================================
+
 configure_nginx() {
   if [[ "${ENABLE_NGINX}" != "1" ]]; then
+    log "INFO" "跳过 Nginx 配置"
     return
   fi
+
+  log "INFO" "配置 Nginx 反向代理..."
+
+  # 计算最大上传大小（MB）
+  local max_size_mb=$((MAX_FILE_SIZE / 1024 / 1024))
+  [[ ${max_size_mb} -lt 1 ]] && max_size_mb=1
 
   cat > /etc/nginx/conf.d/ytbx.conf <<EOF_NGINX
 server {
     listen 80;
     server_name ${SERVER_NAME};
-    client_max_body_size 20m;
+    client_max_body_size ${max_size_mb}m;
 
     location / {
         proxy_pass http://127.0.0.1:${APP_PORT};
@@ -610,53 +783,214 @@ server {
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_read_timeout 86400;
     }
 }
 EOF_NGINX
 
+  # 移除默认配置
   rm -f /etc/nginx/sites-enabled/default /etc/nginx/conf.d/default.conf || true
-  nginx -t
-  systemctl enable --now nginx
-  systemctl reload nginx
+
+  # 测试并重载 Nginx
+  if nginx -t 2>&1 | tee -a "${LOG_FILE}"; then
+    systemctl enable --now nginx 2>&1 | tee -a "${LOG_FILE}"
+    systemctl reload nginx 2>&1 | tee -a "${LOG_FILE}"
+    log "INFO" "Nginx 配置完成"
+  else
+    log "ERROR" "Nginx 配置测试失败"
+    return 1
+  fi
 }
 
+# ============================================================================
+# 服务启动和健康检查
+# ============================================================================
+
 start_services() {
+  log "INFO" "启动 Docker 服务..."
   cd "${PROJECT_ROOT}"
-  docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --build
+
+  if docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --build > >(tee -a "${LOG_FILE}") 2>&1; then
+    log "INFO" "服务启动成功"
+  else
+    log "ERROR" "服务启动失败"
+    return 1
+  fi
 }
+
+# 简单的健康检查
+check_service_health() {
+  local max_attempts=30
+  local attempt=0
+  local health_url="http://127.0.0.1:${APP_PORT}"
+
+  log "INFO" "检查服务健康状态..."
+
+  if ! command -v curl >/dev/null 2>&1; then
+    log "WARN" "curl 命令不可用，跳过健康检查"
+    return 0
+  fi
+
+  while [[ ${attempt} -lt ${max_attempts} ]]; do
+    if curl -sf "${health_url}" >/dev/null 2>&1; then
+      log "INFO" "服务健康检查通过"
+      return 0
+    fi
+
+    attempt=$((attempt + 1))
+    log "INFO" "等待服务启动... (${attempt}/${max_attempts})"
+    sleep 2
+  done
+
+  log "WARN" "服务健康检查超时，请手动检查服务状态"
+  return 1
+}
+
+# ============================================================================
+# 部署完成总结
+# ============================================================================
 
 print_summary() {
   echo
-  echo "部署完成。"
+  echo "========================================="
+  echo "部署完成"
+  echo "========================================="
   echo "项目目录: ${PROJECT_ROOT}"
   echo "环境文件: ${DEPLOY_ENV_FILE}"
-  echo "应用端口: ${APP_PORT}"
-  echo "上传目录: ${HOST_UPLOAD_DIR}"
-  echo "MySQL 数据库: ${MYSQL_DATABASE}"
-  echo "MySQL 用户: ${MYSQL_USER}"
-  echo "MySQL 密码: ${MYSQL_PASSWORD}"
-  echo "MySQL Root 密码: ${MYSQL_ROOT_PASSWORD}"
-  echo "访问地址: http://${LOCAL_IP}:${APP_PORT}"
+  echo "日志文件: ${LOG_FILE}"
+  echo ""
+  echo "配置信息："
+  echo "  应用端口: ${APP_PORT}"
+  echo "  上传目录: ${HOST_UPLOAD_DIR}"
+  echo "  MySQL 数据库: ${MYSQL_DATABASE}"
+  echo "  MySQL 用户: ${MYSQL_USER}"
+  echo "  MySQL 密码: ${MYSQL_PASSWORD}"
+  echo "  MySQL Root 密码: ${MYSQL_ROOT_PASSWORD}"
+  echo ""
+  echo "访问地址:"
+  echo "  http://${LOCAL_IP}:${APP_PORT}"
   if [[ "${ENABLE_NGINX}" == "1" ]]; then
-    echo "Nginx 域名: ${SERVER_NAME}"
+    echo "  Nginx 域名: ${SERVER_NAME}"
+  fi
+  echo ""
+  echo "管理命令："
+  echo "  查看状态: docker compose --env-file deploy/.env -f deploy/docker-compose.yml ps"
+  echo "  查看日志: docker compose --env-file deploy/.env -f deploy/docker-compose.yml logs -f ytbx-app"
+  echo "  停止服务: docker compose --env-file deploy/.env -f deploy/docker-compose.yml down"
+  echo ""
+  if [[ -d /opt/actions-runner ]]; then
+    echo "自动部署（Actions Runner）："
+    echo "  Runner 状态: cd /opt/actions-runner && ./svc.sh status"
+    echo "  Runner 管理: cd /opt/actions-runner && ./svc.sh [start|stop]"
+  fi
+  if systemctl is-active --quiet ytbx-webhook 2>/dev/null; then
+    echo "自动部署（Webhook）："
+    echo "  服务状态: systemctl status ytbx-webhook"
+    echo "  服务日志: journalctl -u ytbx-webhook -f"
+  fi
+  if [[ -d /opt/actions-runner ]] || systemctl is-active --quiet ytbx-webhook 2>/dev/null; then
+    echo ""
   fi
   if [[ -n "${PRIMARY_USER}" ]]; then
-    echo "已尝试将用户 ${PRIMARY_USER} 加入 docker 组，重新登录后生效。"
+    echo "注意: 已将用户 ${PRIMARY_USER} 加入 docker 组，请重新登录后生效"
   fi
-  echo "查看状态: docker compose --env-file deploy/.env -f deploy/docker-compose.yml ps"
-  echo "查看日志: docker compose --env-file deploy/.env -f deploy/docker-compose.yml logs -f ytbx-app"
+  echo "========================================="
 }
 
-enable_interactive_prompts
-prompt_for_configuration
-validate_configuration
-hydrate_defaults
-install_base_packages
-install_docker
-configure_user_group
-prepare_directories
-write_env_file
-load_env_file
-configure_nginx
-start_services
-print_summary
+# ============================================================================
+# 自动部署配置
+# ============================================================================
+
+setup_auto_deploy() {
+  if [[ "${INTERACTIVE_PROMPTS}" != "1" ]]; then
+    return
+  fi
+
+  echo > "${TTY_DEVICE}"
+  echo "===== 自动部署配置（可选）=====" > "${TTY_DEVICE}"
+
+  # GitHub Actions Runner
+  local setup_runner="0"
+  if [[ -d /opt/actions-runner ]]; then
+    log "INFO" "GitHub Actions Runner 已安装，跳过"
+  else
+    prompt_yes_no setup_runner "是否配置 GitHub Actions Runner（push 自动部署）"
+  fi
+
+  if [[ "${setup_runner}" == "1" ]]; then
+    if [[ -f "${PROJECT_ROOT}/deploy/setup-runner.sh" ]]; then
+      if bash "${PROJECT_ROOT}/deploy/setup-runner.sh" --user "${PRIMARY_USER:-root}"; then
+        log "INFO" "GitHub Actions Runner 配置成功"
+      else
+        log "WARN" "GitHub Actions Runner 配置失败，可稍后手动执行: sudo bash deploy/setup-runner.sh"
+      fi
+    else
+      log "WARN" "setup-runner.sh 不存在，跳过 Runner 配置"
+    fi
+  fi
+
+  # Webhook 自动部署
+  local setup_webhook="0"
+  if systemctl is-active --quiet ytbx-webhook 2>/dev/null; then
+    log "INFO" "Webhook 服务已在运行，跳过"
+  else
+    prompt_yes_no setup_webhook "是否配置 Webhook 自动部署（轻量备用方案）"
+  fi
+
+  if [[ "${setup_webhook}" == "1" ]]; then
+    if [[ -f "${PROJECT_ROOT}/deploy/webhook/setup-webhook.sh" ]]; then
+      if bash "${PROJECT_ROOT}/deploy/webhook/setup-webhook.sh"; then
+        log "INFO" "Webhook 自动部署配置成功"
+      else
+        log "WARN" "Webhook 配置失败，可稍后手动执行: sudo bash deploy/webhook/setup-webhook.sh"
+      fi
+    else
+      log "WARN" "setup-webhook.sh 不存在，跳过 Webhook 配置"
+    fi
+  fi
+}
+
+# ============================================================================
+# 主流程
+# ============================================================================
+
+main() {
+  log "INFO" "开始部署流程..."
+  log "INFO" "工作目录: ${PROJECT_ROOT}"
+
+  # 初始化
+  enable_interactive_prompts
+  prompt_for_configuration
+  validate_configuration
+  hydrate_defaults
+
+  # 安装依赖
+  update_package_index
+  remove_old_docker_packages
+  configure_docker_repository
+  install_all_packages
+  start_docker_service
+
+  # 配置环境
+  configure_user_group
+  prepare_directories
+  write_env_file
+  load_env_file
+  configure_nginx
+
+  # 启动服务
+  start_services
+  check_service_health
+
+  # 自动部署配置（可选）
+  setup_auto_deploy
+
+  # 完成总结
+  log "INFO" "部署流程完成"
+  print_summary
+}
+
+# 执行主流程
+main
