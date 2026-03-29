@@ -28,6 +28,10 @@
             <el-icon><Wallet /></el-icon>
             <span class="nav-text">消费明细</span>
           </el-menu-item>
+          <el-menu-item index="notice">
+            <el-icon><Bell /></el-icon>
+            <span class="nav-text">通知公告</span>
+          </el-menu-item>
           <el-menu-item index="userAdmin" v-if="isAdmin">
             <el-icon><User /></el-icon>
             <span class="nav-text">用户管理</span>
@@ -265,7 +269,9 @@
             </div>
 
             <div v-if="publishedNoticeList.length" class="notice-list notice-published-list">
-              <div v-for="(item, index) in publishedNoticeList" :key="item.id || index" class="notice-list-item notice-published-item">
+              <div v-for="(item, index) in publishedNoticeList" :key="item.id || index" 
+                   class="notice-list-item notice-published-item" 
+                   @click="openNoticeDetail(item)">
                 <div class="notice-list-order">{{ index + 1 }}</div>
                 <div class="notice-list-content">
                   <h4>{{ item.title }}</h4>
@@ -1265,6 +1271,25 @@
       </div>
     </el-dialog>
 
+    <!-- 通知详情弹窗 -->
+    <el-dialog v-model="noticeDetailDialogVisible" :title="noticeDetail.title" width="600px">
+      <div class="notice-detail-content">
+        <div class="notice-detail-meta">
+          <el-icon><Clock /></el-icon>
+          <span>发布时间：{{ noticeDetail.publishedAt ? new Date(noticeDetail.publishedAt).toLocaleString('zh-CN', { hour12: false }) : '未知' }}</span>
+        </div>
+        <el-divider />
+        <div class="notice-detail-body">
+          {{ noticeDetail.content }}
+        </div>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button type="primary" @click="noticeDetailDialogVisible = false">确定</el-button>
+        </span>
+      </template>
+    </el-dialog>
+
     <el-dialog
       v-model="noticePublishDialogVisible"
       title="发布通知"
@@ -1344,7 +1369,7 @@ import {
   Grid, Menu, Sunny, Star, Present, OfficeBuilding,
   CircleCheck, Refresh, Search, Picture, Upload, Lightning, View, Download,
   Clock, Link, Edit, Switch, ZoomIn, Calendar, Timer, Notebook, Plus, Filter,
-  ArrowDown, Delete
+  ArrowDown, Delete, Bell
 } from '@element-plus/icons-vue'
 
 export default {
@@ -1354,7 +1379,7 @@ export default {
     Grid, Menu, Sunny, Star, Present, OfficeBuilding,
     CircleCheck, Refresh, Search, Picture, Upload, Lightning, View, Download,
     Clock, Link, Edit, Switch, ZoomIn, Calendar, Timer, Notebook, Plus, Filter,
-    ArrowDown, Delete
+    ArrowDown, Delete, Bell
   },
   data() {
     return {
@@ -1481,6 +1506,12 @@ export default {
         content: ''
       },
       editingNoticeIndex: -1,
+      noticeDetailDialogVisible: false,
+      noticeDetail: {
+        title: '',
+        content: '',
+        publishedAt: ''
+      },
       selectedProduct: null,
       activeDialogVisible: false,
       activeSubmitting: false,
@@ -1689,6 +1720,15 @@ export default {
       this.noticePublishDialogVisible = true
     },
 
+    openNoticeDetail(item) {
+      this.noticeDetail = {
+        title: item.title || '',
+        content: item.content || '',
+        publishedAt: item.publishedAt || ''
+      }
+      this.noticeDetailDialogVisible = true
+    },
+
     resetNoticeDraft() {
       this.noticeDraft = {
         id: null,
@@ -1857,6 +1897,12 @@ export default {
           if (this.isAdmin) {
             this.loadAllUsers()
           }
+          break
+        case 'notice':
+          // 通知公告页面，切换到首页显示通知列表
+          this.activeMenu = 'home'
+          this.loadStats()
+          this.refreshPublishedNotices()
           break
         case 'userAdmin':
           this.loadUsers()

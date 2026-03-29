@@ -86,6 +86,56 @@ get_missing_packages() {
   echo "${missing[*]}"
 }
 
+# 优先配置国内 APT 源（防止国外源下载失败）
+configure_chinese_apt_mirrors() {
+  log "INFO" "配置国内 APT 镜像源..."
+
+  # 备份原始 sources.list
+  if [[ -f /etc/apt/sources.list ]] && [[ ! -f /etc/apt/sources.list.backup ]]; then
+    cp /etc/apt/sources.list /etc/apt/sources.list.backup
+    log "INFO" "已备份原始 sources.list"
+  fi
+
+  # 检测 Ubuntu 版本代号
+  local codename="${UBUNTU_CODENAME:-${VERSION_CODENAME}}"
+  if [[ -z "${codename}" ]]; then
+    codename=$(lsb_release -cs 2>/dev/null || echo "jammy")
+  fi
+
+  # 国内镜像源列表（按优先级排序）
+  local mirrors=(
+    "https://mirrors.aliyun.com/ubuntu"
+    "https://mirrors.tuna.tsinghua.edu.cn/ubuntu"
+    "https://mirrors.ustc.edu.cn/ubuntu"
+  )
+
+  # 尝试使用可用的镜像源
+  local selected_mirror=""
+  for mirror in "${mirrors[@]}"; do
+    if curl -fsSL "${mirror}/dists/${codename}/Release" -o /dev/null 2>&1; then
+      selected_mirror="${mirror}"
+      break
+    fi
+  done
+
+  if [[ -n "${selected_mirror}" ]]; then
+    log "INFO" "使用国内镜像源: ${selected_mirror}"
+
+    # 写入新的 sources.list
+    cat > /etc/apt/sources.list <<EOF
+deb ${selected_mirror}/ ${codename} main restricted universe multiverse
+deb ${selected_mirror}/ ${codename}-updates main restricted universe multiverse
+deb ${selected_mirror}/ ${codename}-backports main restricted universe multiverse
+deb ${selected_mirror}/ ${codename}-security main restricted universe multiverse
+EOF
+    log "INFO" "国内 APT 镜像源配置完成"
+    return 0
+  else
+    log "WARN" "无法连接到国内镜像源，使用原始源"
+    return 1
+  fi
+}
+
 # 更新包索引（只执行一次）
 update_package_index() {
   log "INFO" "更新软件包索引..."
@@ -94,7 +144,12 @@ update_package_index() {
     log "INFO" "软件包索引更新成功"
     return 0
   else
-    log "ERROR" "软件包索引更新失败"
+    log "ERROR" "软件包索引更新失败，尝试配置国内源..."
+    configure_chinese_apt_mirrors
+    if apt-get update > >(tee -a "${LOG_FILE}") 2>&1; then
+      log "INFO" "使用国内源后软件包索引更新成功"
+      return 0
+    fi
     return 1
   fi
 }
@@ -849,6 +904,228 @@ check_service_health() {
 }
 
 # ============================================================================
+# 服务管理命令
+# ============================================================================
+
+# 检查服务状态
+cmd_status() {
+  echo "========================================="
+  echo "YTBX 服务状态"
+  echo "========================================="
+  echo ""
+
+  # Docker 容器状态
+  echo "【Docker 容器】"
+  if command -v docker >/dev/null 2>&1; then
+    cd "${PROJECT_ROOT}"
+    if docker compose --env-file deploy/.env -f deploy/docker-compose.yml ps 2>/dev/null; then
+      :
+    else
+      echo "  提示：无法获取容器状态，请检查 Docker 是否运行"
+    fi
+  else
+    echo "  Docker 未安装"
+  fi
+  echo ""
+
+  # Nginx 状态
+  echo "【Nginx 状态】"
+  if command -v nginx >/dev/null 2>&1; then
+    if systemctl is-active --quiet nginx 2>/dev/null; then
+      echo "  Nginx: 运行中"
+    else
+      echo "  Nginx: 未运行"
+    fi
+  else
+    echo "  Nginx: 未安装"
+  fi
+  echo ""
+
+  # Docker 服务状态
+  echo "【Docker 服务状态】"
+  if command -v docker >/dev/null 2>&1; then
+    if systemctl is-active --quiet docker 2>/dev/null; then
+      echo "  Docker: 运行中"
+    else
+      echo "  Docker: 未运行"
+    fi
+  else
+    echo "  Docker: 未安装"
+  fi
+  echo ""
+
+  # 端口监听状态
+  echo "【端口监听状态】"
+  if command -v ss >/dev/null 2>&1; then
+    echo "  应用端口 (${APP_PORT}):"
+    if ss -tuln 2>/dev/null | grep -q ":${APP_PORT} "; then
+      echo "    状态: 监听中"
+    else
+      echo "    状态: 未监听"
+    fi
+  elif command -v netstat >/dev/null 2>&1; then
+    echo "  应用端口 (${APP_PORT}):"
+    if netstat -tuln 2>/dev/null | grep -q ":${APP_PORT} "; then
+      echo "    状态: 监听中"
+    else
+      echo "    状态: 未监听"
+    fi
+  fi
+  echo ""
+
+  # 自动部署状态
+  echo "【自动部署服务】"
+  if [[ -d /opt/actions-runner ]]; then
+    echo "  GitHub Actions Runner: 已安装"
+    if [[ -f /opt/actions-runner/svc.sh ]]; then
+      cd /opt/actions-runner && ./svc.sh status 2>/dev/null || echo "    状态: 未知"
+    fi
+  else
+    echo "  GitHub Actions Runner: 未安装"
+  fi
+
+  if systemctl is-active --quiet ytbx-webhook 2>/dev/null; then
+    echo "  Webhook 服务: 运行中"
+  else
+    echo "  Webhook 服务: 未安装/未运行"
+  fi
+  echo ""
+
+  echo "========================================="
+}
+
+# 停止服务
+cmd_stop() {
+  echo "========================================="
+  echo "停止 YTBX 服务"
+  echo "========================================="
+  echo ""
+
+  # 停止 Docker 容器
+  echo "【停止 Docker 容器】"
+  cd "${PROJECT_ROOT}"
+  if docker compose --env-file deploy/.env -f deploy/docker-compose.yml down >/dev/null 2>&1; then
+    echo "  Docker 容器已停止"
+  else
+    echo "  无法停止 Docker 容器，可能未运行"
+  fi
+  echo ""
+
+  # 停止 Nginx
+  echo "【停止 Nginx】"
+  if command -v nginx >/dev/null 2>&1; then
+    if systemctl is-active --quiet nginx 2>/dev/null; then
+      systemctl stop nginx 2>/dev/null && echo "  Nginx 已停止" || echo "  Nginx 停止失败"
+    else
+      echo "  Nginx 未运行"
+    fi
+  fi
+  echo ""
+
+  # 停止自动部署服务
+  echo "【停止自动部署服务】"
+  if [[ -f /opt/actions-runner/svc.sh ]]; then
+    cd /opt/actions-runner && ./svc.sh stop 2>/dev/null && echo "  Actions Runner 已停止" || echo "  Actions Runner 停止失败/未运行"
+  fi
+
+  if systemctl is-active --quiet ytbx-webhook 2>/dev/null; then
+    systemctl stop ytbx-webhook 2>/dev/null && echo "  Webhook 服务已停止" || echo "  Webhook 服务停止失败"
+  fi
+  echo ""
+
+  echo "========================================="
+  echo "服务已停止"
+  echo "========================================="
+}
+
+# 卸载服务
+cmd_uninstall() {
+  echo "========================================="
+  echo "卸载 YTBX 服务"
+  echo "========================================="
+  echo ""
+  echo "警告：此操作将执行以下操作："
+  echo "  1. 停止并删除所有 Docker 容器"
+  echo "  2. 删除 Docker 镜像（可选）"
+  echo "  3. 移除 Nginx 配置"
+  echo "  4. 移除应用数据目录"
+  echo "  5. 移除自动部署服务"
+  echo ""
+
+  local confirm=""
+  read -p "确认卸载? (输入 'yes' 确认): " confirm
+  if [[ "${confirm}" != "yes" ]]; then
+    echo "取消卸载操作"
+    return 0
+  fi
+
+  # 停止所有服务
+  cmd_stop
+  echo ""
+
+  # 删除 Docker 镜像
+  echo "【删除 Docker 镜像】"
+  local remove_images=""
+  read -p "是否删除 Docker 镜像? (yes/no, 建议选 yes): " remove_images
+  if [[ "${remove_images}" == "yes" ]]; then
+    cd "${PROJECT_ROOT}"
+    docker compose --env-file deploy/.env -f deploy/docker-compose.yml down --rmi local 2>/dev/null || true
+    echo "  Docker 镜像已删除"
+  fi
+  echo ""
+
+  # 删除应用数据
+  echo "【删除应用数据】"
+  local remove_data=""
+  read -p "是否删除应用数据 (${HOST_UPLOAD_DIR})? (yes/no, 建议选 no): " remove_data
+  if [[ "${remove_data}" == "yes" ]]; then
+    rm -rf "${HOST_UPLOAD_DIR}" && echo "  应用数据已删除" || echo "  应用数据删除失败"
+  fi
+  echo ""
+
+  # 移除 Nginx 配置
+  echo "【移除 Nginx 配置】"
+  rm -f /etc/nginx/conf.d/ytbx.conf
+  systemctl reload nginx 2>/dev/null || true
+  echo "  Nginx 配置已移除"
+  echo ""
+
+  # 移除自动部署服务
+  echo "【移除自动部署服务】"
+  if [[ -d /opt/actions-runner ]]; then
+    if [[ -f /opt/actions-runner/svc.sh ]]; then
+      cd /opt/actions-runner && ./svc.sh uninstall 2>/dev/null || true
+    fi
+    rm -rf /opt/actions-runner
+    echo "  Actions Runner 已移除"
+  fi
+
+  if systemctl is-active --quiet ytbx-webhook 2>/dev/null || systemctl is-enabled --quiet ytbx-webhook 2>/dev/null; then
+    systemctl stop ytbx-webhook 2>/dev/null || true
+    systemctl disable ytbx-webhook 2>/dev/null || true
+    rm -f /etc/systemd/system/ytbx-webhook.service
+    systemctl daemon-reload
+    echo "  Webhook 服务已移除"
+  fi
+  echo ""
+
+  # 移除部署文件
+  echo "【移除部署文件】"
+  rm -f "${DEPLOY_ENV_FILE}"
+  rm -f /opt/ytbx/docker-compose.yml
+  echo "  部署配置文件已移除"
+  echo ""
+
+  echo "========================================="
+  echo "卸载完成"
+  echo ""
+  echo "注意：Docker 和 Nginx 如需保留可手动卸载："
+  echo "  Docker: apt-get remove docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
+  echo "  Nginx: apt-get remove nginx"
+  echo "========================================="
+}
+
+# ============================================================================
 # 部署完成总结
 # ============================================================================
 
@@ -957,6 +1234,66 @@ setup_auto_deploy() {
 # ============================================================================
 
 main() {
+  # 加载已有配置
+  load_env_file 2>/dev/null || true
+
+  # 显示主菜单
+  while true; do
+    echo ""
+    echo "========================================="
+    echo "  YTBX 服务器管理"
+    echo "========================================="
+    echo ""
+    echo "  请选择操作："
+    echo ""
+    echo "  [1] 部署服务"
+    echo "  [2] 查看服务状态"
+    echo "  [3] 停止服务"
+    echo "  [4] 卸载服务"
+    echo "  [5] 退出"
+    echo ""
+    echo "========================================="
+
+    local choice=""
+    read -p "请输入选项 [1-5]: " choice
+
+    case "${choice}" in
+      1)
+        # 执行部署流程
+        break
+        ;;
+      2)
+        cmd_status
+        echo ""
+        read -p "按回车键继续..."
+        continue
+        ;;
+      3)
+        cmd_stop
+        echo ""
+        read -p "按回车键继续..."
+        continue
+        ;;
+      4)
+        cmd_uninstall
+        echo ""
+        read -p "按回车键继续..."
+        continue
+        ;;
+      5)
+        echo "已退出"
+        exit 0
+        ;;
+      *)
+        echo "无效选项，请输入 1-5"
+        echo ""
+        read -p "按回车键继续..."
+        continue
+        ;;
+    esac
+    break
+  done
+
   log "INFO" "开始部署流程..."
   log "INFO" "工作目录: ${PROJECT_ROOT}"
 
@@ -966,7 +1303,8 @@ main() {
   validate_configuration
   hydrate_defaults
 
-  # 安装依赖
+  # 安装依赖（先尝试配置国内源）
+  configure_chinese_apt_mirrors
   update_package_index
   remove_old_docker_packages
   configure_docker_repository
