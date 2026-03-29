@@ -10,7 +10,7 @@
     <div class="login-container">
       <div class="login-panel-header">
         <h1>账号登录</h1>
-        <p>普通用户账号请联系管理员在用户管理中创建</p>
+        <p>请联系管理员在用户管理中创建用户账号</p>
       </div>
 
       <form @submit.prevent="handleLogin">
@@ -31,7 +31,7 @@
       </form>
 
       <div class="login-tip">
-        如需开通账号，请联系管理员。
+        如有账号问题，请联系管理员。
       </div>
     </div>
   </div>

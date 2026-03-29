@@ -973,24 +973,6 @@ cmd_status() {
   fi
   echo ""
 
-  # 自动部署状态
-  echo "【自动部署服务】"
-  if [[ -d /opt/actions-runner ]]; then
-    echo "  GitHub Actions Runner: 已安装"
-    if [[ -f /opt/actions-runner/svc.sh ]]; then
-      cd /opt/actions-runner && ./svc.sh status 2>/dev/null || echo "    状态: 未知"
-    fi
-  else
-    echo "  GitHub Actions Runner: 未安装"
-  fi
-
-  if systemctl is-active --quiet ytbx-webhook 2>/dev/null; then
-    echo "  Webhook 服务: 运行中"
-  else
-    echo "  Webhook 服务: 未安装/未运行"
-  fi
-  echo ""
-
   echo "========================================="
 }
 
@@ -1177,59 +1159,6 @@ print_summary() {
 }
 
 # ============================================================================
-# 自动部署配置
-# ============================================================================
-
-setup_auto_deploy() {
-  if [[ "${INTERACTIVE_PROMPTS}" != "1" ]]; then
-    return
-  fi
-
-  echo > "${TTY_DEVICE}"
-  echo "===== 自动部署配置（可选）=====" > "${TTY_DEVICE}"
-
-  # GitHub Actions Runner
-  local setup_runner="0"
-  if [[ -d /opt/actions-runner ]]; then
-    log "INFO" "GitHub Actions Runner 已安装，跳过"
-  else
-    prompt_yes_no setup_runner "是否配置 GitHub Actions Runner（push 自动部署）"
-  fi
-
-  if [[ "${setup_runner}" == "1" ]]; then
-    if [[ -f "${PROJECT_ROOT}/deploy/setup-runner.sh" ]]; then
-      if bash "${PROJECT_ROOT}/deploy/setup-runner.sh" --user "${PRIMARY_USER:-root}"; then
-        log "INFO" "GitHub Actions Runner 配置成功"
-      else
-        log "WARN" "GitHub Actions Runner 配置失败，可稍后手动执行: sudo bash deploy/setup-runner.sh"
-      fi
-    else
-      log "WARN" "setup-runner.sh 不存在，跳过 Runner 配置"
-    fi
-  fi
-
-  # Webhook 自动部署
-  local setup_webhook="0"
-  if systemctl is-active --quiet ytbx-webhook 2>/dev/null; then
-    log "INFO" "Webhook 服务已在运行，跳过"
-  else
-    prompt_yes_no setup_webhook "是否配置 Webhook 自动部署（轻量备用方案）"
-  fi
-
-  if [[ "${setup_webhook}" == "1" ]]; then
-    if [[ -f "${PROJECT_ROOT}/deploy/webhook/setup-webhook.sh" ]]; then
-      if bash "${PROJECT_ROOT}/deploy/webhook/setup-webhook.sh"; then
-        log "INFO" "Webhook 自动部署配置成功"
-      else
-        log "WARN" "Webhook 配置失败，可稍后手动执行: sudo bash deploy/webhook/setup-webhook.sh"
-      fi
-    else
-      log "WARN" "setup-webhook.sh 不存在，跳过 Webhook 配置"
-    fi
-  fi
-}
-
-# ============================================================================
 # 主流程
 # ============================================================================
 
@@ -1321,9 +1250,6 @@ main() {
   # 启动服务
   start_services
   check_service_health
-
-  # 自动部署配置（可选）
-  setup_auto_deploy
 
   # 完成总结
   log "INFO" "部署流程完成"

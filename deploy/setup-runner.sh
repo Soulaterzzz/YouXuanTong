@@ -176,35 +176,61 @@ detect_arch() {
 }
 
 download_runner() {
+  # 检查是否已安装
+  if [[ -d "${RUNNER_DIR}" ]] && [[ -f "${RUNNER_DIR}/config.sh" ]]; then
+    log "INFO" "Runner 已安装于 ${RUNNER_DIR}，跳过下载"
+    return 0
+  fi
+
   local arch
   arch="$(detect_arch)"
   local runner_os="linux"
 
-  # 获取最新 Runner 版本
-  log "INFO" "获取最新 Actions Runner 版本..."
-  local latest_version
-  latest_version="$(curl -sL "https://api.github.com/repos/actions/runner/releases/latest" \
-    | grep -oP '"tag_name":\s*"\K[^"]+' || true)"
-
-  if [[ -z "${latest_version}" ]]; then
-    latest_version="v2.321.0"
-    log "WARN" "无法获取最新版本，使用 ${latest_version}"
-  fi
+  # 使用固定版本号（避免 API 请求卡住）
+  local latest_version="v2.333.1"
+  log "INFO" "使用 Actions Runner 版本 ${latest_version}"
 
   local pkg_name="actions-runner-${runner_os}-${arch}-${latest_version#v}.tar.gz"
-  local download_url="https://github.com/actions/runner/releases/download/${latest_version}/${pkg_name}"
+  local original_url="https://github.com/actions/runner/releases/download/${latest_version}/${pkg_name}"
+
+  # 腾讯云 GitHub 加速镜像（https://mirrors.cloud.tencent.com/github）
+  local tencent_mirror="https://mirrors.cloud.tencent.com/github"
+  local download_url="${tencent_mirror}/actions/runner/releases/download/${latest_version}/${pkg_name}"
+
+  # 备用镜像列表
+  local backup_mirrors=(
+    "${original_url}"
+  )
 
   log "INFO" "下载 Actions Runner ${latest_version#v} (${arch})..."
 
   mkdir -p "${RUNNER_DIR}"
 
-  if ! curl -fsSL -o "/tmp/${pkg_name}" "${download_url}"; then
-    die "下载 Runner 失败，请检查网络连接"
+  # 尝试主镜像（腾讯云）
+  log "INFO" "尝试使用腾讯云加速镜像..."
+  if curl -fsSL --max-time 300 -o "/tmp/${pkg_name}" "${download_url}"; then
+    log "INFO" "下载成功"
+  else
+    # 尝试备用镜像
+    local success=0
+    for mirror in "${backup_mirrors[@]}"; do
+      log "INFO" "尝试备用镜像: ${mirror}"
+      if curl -fsSL --max-time 300 -o "/tmp/${pkg_name}" "${mirror}"; then
+        log "INFO" "下载成功"
+        success=1
+        break
+      fi
+    done
+
+    if [[ "${success}" -eq 0 ]]; then
+      die "下载 Runner 失败，所有镜像源均无法访问"
+    fi
   fi
 
   log "INFO" "解压 Runner 到 ${RUNNER_DIR}..."
   tar xzf "/tmp/${pkg_name}" -C "${RUNNER_DIR}"
   rm -f "/tmp/${pkg_name}"
+  log "INFO" "Runner 下载并解压完成"
 }
 
 configure_runner() {

@@ -28,10 +28,7 @@
             <el-icon><Wallet /></el-icon>
             <span class="nav-text">消费明细</span>
           </el-menu-item>
-          <el-menu-item index="notice">
-            <el-icon><Bell /></el-icon>
-            <span class="nav-text">通知公告</span>
-          </el-menu-item>
+
           <el-menu-item index="userAdmin" v-if="isAdmin">
             <el-icon><User /></el-icon>
             <span class="nav-text">用户管理</span>
