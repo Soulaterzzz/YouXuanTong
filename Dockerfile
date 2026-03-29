@@ -69,4 +69,5 @@ ENV TZ=Asia/Shanghai \
 EXPOSE 8080
 
 # 使用 exec 形式启动，支持信号传递
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS org.springframework.boot.loader.JarLauncher"]
+# Spring Boot 分层 JAR 需要使用 -cp 指定当前目录
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -cp . org.springframework.boot.loader.launch.JarLauncher"]
