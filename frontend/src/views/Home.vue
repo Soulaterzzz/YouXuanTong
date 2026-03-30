@@ -1183,6 +1183,30 @@
             placeholder="请输入审核意见"
           />
         </el-form-item>
+        <el-form-item v-if="insuranceReviewAction === 'approve'" label="保单号">
+          <el-input
+            v-model="insuranceReviewForm.policyNo"
+            placeholder="请输入保单号（可选，填写后将直接生效）"
+          />
+        </el-form-item>
+        <el-form-item v-if="insuranceReviewAction === 'approve'" label="起保日期">
+          <el-date-picker
+            v-model="insuranceReviewForm.effectiveDate"
+            type="date"
+            value-format="YYYY-MM-DD"
+            placeholder="请选择起保日期"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item v-if="insuranceReviewAction === 'approve'" label="结束日期">
+          <el-date-picker
+            v-model="insuranceReviewForm.expiryDate"
+            type="date"
+            value-format="YYYY-MM-DD"
+            placeholder="请选择结束日期"
+            style="width: 100%"
+          />
+        </el-form-item>
         <el-form-item v-if="insuranceReviewAction === 'reject'" label="驳回原因">
           <el-input
             v-model="insuranceReviewForm.rejectReason"
@@ -1613,7 +1637,10 @@ export default {
       insuranceReviewForm: {
         insuranceId: null,
         reviewComment: '',
-        rejectReason: ''
+        rejectReason: '',
+        policyNo: '',
+        effectiveDate: '',
+        expiryDate: ''
       },
       expenseDetailDialogVisible: false,
       expenseDetailRow: null,
@@ -2732,7 +2759,10 @@ export default {
       this.insuranceReviewForm = {
         insuranceId: row.id,
         reviewComment: row.reviewComment || '',
-        rejectReason: ''
+        rejectReason: '',
+        policyNo: '',
+        effectiveDate: '',
+        expiryDate: ''
       }
       this.insuranceReviewDialogVisible = true
     },
@@ -2753,14 +2783,25 @@ export default {
           ? `/api/admin/insurances/${this.insuranceReviewForm.insuranceId}/approve`
           : `/api/admin/insurances/${this.insuranceReviewForm.insuranceId}/reject`
         const payload = this.insuranceReviewAction === 'approve'
-          ? { reviewComment: this.insuranceReviewForm.reviewComment }
+          ? {
+              reviewComment: this.insuranceReviewForm.reviewComment,
+              policyNo: this.insuranceReviewForm.policyNo || null,
+              effectiveDate: this.insuranceReviewForm.effectiveDate || null,
+              expiryDate: this.insuranceReviewForm.expiryDate || null
+            }
           : {
               reviewComment: this.insuranceReviewForm.reviewComment,
               rejectReason: this.insuranceReviewForm.rejectReason
             }
         const res = await this.$axios.put(url, payload)
         if (this.isSuccess(res)) {
-          this.$message.success(this.insuranceReviewAction === 'approve' ? '审核已通过' : '已驳回并退款')
+          const hasPolicy = this.insuranceReviewAction === 'approve'
+            && this.insuranceReviewForm.policyNo
+            && this.insuranceReviewForm.effectiveDate
+            && this.insuranceReviewForm.expiryDate
+          this.$message.success(this.insuranceReviewAction === 'approve'
+            ? (hasPolicy ? '审核通过并已生效' : '审核已通过')
+            : '已驳回并退款')
           this.insuranceReviewDialogVisible = false
           this.loadInsurances()
           this.loadExpenses()

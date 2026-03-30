@@ -424,18 +424,35 @@ public class AdminServiceImpl implements AdminService {
         InsuranceRecordEntity insurance = requireInsurance(insuranceId);
         ensureTransition(insurance, InsuranceStatus.PENDING_REVIEW, InsuranceStatus.APPROVED);
 
-        insurance.setInsuranceStatus(InsuranceStatus.APPROVED.getCode());
         insurance.setReviewComment(request.getReviewComment().trim());
         insurance.setReviewerId(reviewerId);
         insurance.setReviewerName(reviewerName);
         insurance.setReviewTime(LocalDateTime.now());
         insurance.setRejectReason(null);
-        insurance.setUnderwritingTime(null);
-        insurance.setActivateTime(null);
         insurance.setUpdateTime(LocalDateTime.now());
-        insuranceRecordMapper.updateById(insurance);
 
-        syncExpenseStatus(insurance.getExpenseId(), InsuranceStatus.APPROVED, insurance.getPolicyNo(), insurance.getEffectiveDate(), insurance.getExpiryDate());
+        boolean hasPolicyInfo = request.getPolicyNo() != null && !request.getPolicyNo().isBlank()
+                && request.getEffectiveDate() != null && request.getExpiryDate() != null;
+
+        if (hasPolicyInfo) {
+            if (request.getExpiryDate().isBefore(request.getEffectiveDate())) {
+                throw new BusinessException(ResultCode.INVALID_PARAM, "结束日期不能早于起保日期");
+            }
+            insurance.setInsuranceStatus(InsuranceStatus.ACTIVE.getCode());
+            insurance.setPolicyNo(request.getPolicyNo().trim());
+            insurance.setEffectiveDate(request.getEffectiveDate());
+            insurance.setExpiryDate(request.getExpiryDate());
+            insurance.setUnderwritingTime(LocalDateTime.now());
+            insurance.setActivateTime(LocalDateTime.now());
+            insuranceRecordMapper.updateById(insurance);
+            syncExpenseStatus(insurance.getExpenseId(), InsuranceStatus.ACTIVE, insurance.getPolicyNo(), insurance.getEffectiveDate(), insurance.getExpiryDate());
+        } else {
+            insurance.setInsuranceStatus(InsuranceStatus.APPROVED.getCode());
+            insurance.setUnderwritingTime(null);
+            insurance.setActivateTime(null);
+            insuranceRecordMapper.updateById(insurance);
+            syncExpenseStatus(insurance.getExpenseId(), InsuranceStatus.APPROVED, insurance.getPolicyNo(), insurance.getEffectiveDate(), insurance.getExpiryDate());
+        }
     }
 
     @Override
