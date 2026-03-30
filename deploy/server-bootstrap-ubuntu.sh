@@ -764,22 +764,13 @@ prepare_directories() {
   log "INFO" "准备必要的目录..."
   mkdir -p /opt/ytbx
   mkdir -p "${HOST_UPLOAD_DIR}/templates"
-
-  # 使用更安全的权限设置（775 而不是 777）
   chmod -R 775 "${HOST_UPLOAD_DIR}"
 
-  # 确保目录所有者正确
   if [[ -n "${PRIMARY_USER}" ]]; then
     chown -R "${PRIMARY_USER}:${PRIMARY_USER}" "${HOST_UPLOAD_DIR}" 2>/dev/null || true
   fi
 
   log "INFO" "目录准备完成"
-}
-
-prepare_directories() {
-  mkdir -p /opt/ytbx
-  mkdir -p "${HOST_UPLOAD_DIR}/templates"
-  chmod -R 777 "${HOST_UPLOAD_DIR}"
 }
 
 write_env_file() {

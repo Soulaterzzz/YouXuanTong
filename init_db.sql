@@ -148,8 +148,8 @@ CREATE TABLE IF NOT EXISTS axx_product (
     sale_status VARCHAR(32) NOT NULL DEFAULT 'ON_SALE' COMMENT '销售状态',
     sort_no INT NOT NULL DEFAULT 0 COMMENT '排序',
     image_url VARCHAR(500) DEFAULT NULL COMMENT '图片URL',
-    image_path VARCHAR(500) DEFAULT NULL COMMENT '图片路径',
-    image_content_type VARCHAR(100) DEFAULT NULL COMMENT '图片类型',
+    image_path VARCHAR(500) DEFAULT NULL COMMENT '图片本地存储路径',
+    image_content_type VARCHAR(100) DEFAULT NULL COMMENT '图片内容类型',
     image_size BIGINT DEFAULT NULL COMMENT '图片大小',
     template_file_name VARCHAR(255) DEFAULT NULL COMMENT '模板文件名',
     template_file_path VARCHAR(500) DEFAULT NULL COMMENT '模板文件路径',
@@ -178,6 +178,19 @@ CREATE TABLE IF NOT EXISTS axx_notice (
     KEY idx_notice_sort_no (sort_no),
     KEY idx_notice_published_at (published_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='首页通知公告表';
+
+-- 修复产品表索引（兼容旧版本数据库）
+SET @old_index_exists := (
+    SELECT COUNT(1)
+    FROM information_schema.statistics
+    WHERE table_schema = DATABASE()
+      AND table_name = 'axx_product'
+      AND index_name = 'uk_product_code'
+);
+SET @drop_old_index_sql := IF(@old_index_exists > 0, 'ALTER TABLE axx_product DROP INDEX uk_product_code', 'SELECT 1');
+PREPARE drop_old_index_stmt FROM @drop_old_index_sql;
+EXECUTE drop_old_index_stmt;
+DEALLOCATE PREPARE drop_old_index_stmt;
 
 -- ================================================
 -- 测试数据
@@ -229,25 +242,25 @@ INSERT INTO axx_user (id, username, password, mobile, user_type, status, last_lo
 (13, 'linxiao', 'user123', '13800010012', 'USER', 'ACTIVE', DATE_SUB(NOW(), INTERVAL 6 HOUR), DATE_SUB(NOW(), INTERVAL 40 DAY), NOW());
 
 -- ================================================
--- 3. 账户余额数据
+-- 3. 账户余额数据（根据交易记录计算得出的最终余额）
 -- ================================================
 INSERT INTO axx_account_balance (user_id, balance, frozen_balance, create_by, create_time, update_by, update_time) VALUES
 -- 管理员账户
 (1, 100000.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 30 DAY), 1, NOW()),
 
--- 普通用户账户余额
-(2, 8500.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 60 DAY), 2, NOW()),
-(3, 12380.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 45 DAY), 3, NOW()),
-(4, 5620.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 30 DAY), 4, NOW()),
-(5, 19800.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 20 DAY), 5, NOW()),
-(6, 7450.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 15 DAY), 6, NOW()),
-(7, 3000.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 10 DAY), 7, NOW()),
-(8, 15000.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 8 DAY), 8, NOW()),
-(9, 680.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 5 DAY), 9, NOW()),
+-- 普通用户账户余额（最终余额 = 充值总和 - 消费成功金额 + 退款金额）
+(2, 14890.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 60 DAY), 2, NOW()),
+(3, 14940.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 45 DAY), 3, NOW()),
+(4, 7620.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 30 DAY), 4, NOW()),
+(5, 19600.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 20 DAY), 5, NOW()),
+(6, 12920.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 15 DAY), 6, NOW()),
+(7, 5000.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 10 DAY), 7, NOW()),
+(8, 19550.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 8 DAY), 8, NOW()),
+(9, 2900.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 5 DAY), 9, NOW()),
 (10, 2500.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 90 DAY), 10, NOW()),
-(11, 9200.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 3 DAY), 11, NOW()),
-(12, 4350.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 25 DAY), 12, NOW()),
-(13, 11200.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 40 DAY), 13, NOW());
+(11, 11700.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 3 DAY), 11, NOW()),
+(12, 7945.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 25 DAY), 12, NOW()),
+(13, 14880.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 40 DAY), 13, NOW());
 
 -- ================================================
 -- 4. 交易记录（充值记录）
@@ -397,8 +410,9 @@ INSERT INTO axx_transaction_record (serial_no, user_id, trans_type, amount, bala
 -- 用户9 周军的消费记录
 ('TRX202501010801', 9, 'EXPENSE', 100.00, 3000.00, 2900.00, '购买保险：众安出行意外险 x2', 'EXPENSE', 11, 'BALANCE', 'SUCCESS', 9, DATE_SUB(NOW(), INTERVAL 3 DAY), 9, DATE_SUB(NOW(), INTERVAL 3 DAY)),
 
--- 用户10 吴强的消费记录（已禁用）
-('TRX202501010901', 10, 'EXPENSE', 2500.00, 5000.00, 2500.00, '购买保险：国寿财1-4类意外险', 'EXPENSE', NULL, 'BALANCE', 'SUCCESS', 10, DATE_SUB(NOW(), INTERVAL 85 DAY), 10, DATE_SUB(NOW(), INTERVAL 85 DAY)),
+-- 用户10 吴强的消费记录（已禁用，余额已消费完）
+('TRX202501010901', 10, 'RECHARGE', 5000.00, 0.00, 5000.00, '账户首次充值', NULL, NULL, 'ALIPAY', 'SUCCESS', 10, DATE_SUB(NOW(), INTERVAL 90 DAY), 10, DATE_SUB(NOW(), INTERVAL 90 DAY)),
+('TRX202501010902', 10, 'EXPENSE', 2500.00, 5000.00, 2500.00, '购买保险：国寿财1-4类意外险', 'EXPENSE', 13, 'BALANCE', 'SUCCESS', 10, DATE_SUB(NOW(), INTERVAL 85 DAY), 10, DATE_SUB(NOW(), INTERVAL 85 DAY)),
 
 -- 用户11 郑华的消费记录
 ('TRX202501011001', 11, 'EXPENSE', 300.00, 12000.00, 11700.00, '购买保险：太保百万医疗险', 'EXPENSE', 7, 'BALANCE', 'SUCCESS', 11, DATE_SUB(NOW(), INTERVAL 3 DAY), 11, DATE_SUB(NOW(), INTERVAL 3 DAY)),
