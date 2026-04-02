@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ytbx-app
+  namespace: default
+  labels:
+    app: ytbx
+    tier: backend
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+      name: http
+  selector:
+    app: ytbx
+    tier: backend
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ytbx-mysql
+  namespace: default
+  labels:
+    app: ytbx
+    tier: database
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3306
+      targetPort: 3306
+      protocol: TCP
+      name: mysql
+  selector:
+    app: ytbx
+    tier: database
