@@ -3,10 +3,15 @@ package com.zs.ytbx.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.zs.ytbx.common.api.PageResponse;
+import com.zs.ytbx.common.auth.AuthContext;
 import com.zs.ytbx.common.enums.InsuranceStatus;
 import com.zs.ytbx.common.enums.ResultCode;
 import com.zs.ytbx.common.exception.BusinessException;
+import com.zs.ytbx.common.export.SimplePdfWriter;
+import com.zs.ytbx.common.export.SimpleXlsxWriter;
+import com.zs.ytbx.common.export.SimpleXlsxReader;
 import com.zs.ytbx.dto.*;
 import com.zs.ytbx.entity.*;
 import com.zs.ytbx.mapper.*;
@@ -16,12 +21,22 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.awt.image.BufferedImage;
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +47,7 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
     private final InsuranceRecordMapper insuranceRecordMapper;
     private final TransactionRecordMapper transactionRecordMapper;
     private final AccountBalanceMapper accountBalanceMapper;
+    private final AuthContext authContext;
 
     @Override
     public PageResponse<ProductVO> listProducts(ProductQuery query) {
@@ -169,18 +185,7 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
 
     @Override
     public PageResponse<ExpenseVO> listExpenses(ExpenseQuery query, Long userId) {
-        LambdaQueryWrapper<ExpenseRecordEntity> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(ExpenseRecordEntity::getUserId, userId)
-                .ne(ExpenseRecordEntity::getExpenseStatus, InsuranceStatus.DRAFT.getCode());
-
-        if (query.getStatus() != null && !query.getStatus().isEmpty() && !"all".equals(query.getStatus())) {
-            applyExpenseStatusFilter(wrapper, query.getStatus());
-        }
-
-        if (query.getSerialNo() != null && !query.getSerialNo().isEmpty()) {
-            wrapper.like(ExpenseRecordEntity::getSerialNo, query.getSerialNo());
-        }
-
+        LambdaQueryWrapper<ExpenseRecordEntity> wrapper = buildExpenseWrapper(query, userId);
         wrapper.orderByDesc(ExpenseRecordEntity::getCreateTime);
 
         IPage<ExpenseRecordEntity> page = expenseRecordMapper.selectPage(
@@ -201,25 +206,7 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
 
     @Override
     public PageResponse<InsuranceVO> listInsurances(InsuranceQuery query, Long userId) {
-        LambdaQueryWrapper<InsuranceRecordEntity> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(InsuranceRecordEntity::getUserId, userId);
-
-        if (query.getStatus() != null && !query.getStatus().isEmpty() && !"all".equals(query.getStatus())) {
-            applyInsuranceStatusFilter(wrapper, query.getStatus());
-        }
-
-        if (query.getSerialNo() != null && !query.getSerialNo().isEmpty()) {
-            wrapper.like(InsuranceRecordEntity::getPolicyNo, query.getSerialNo());
-        }
-
-        if (query.getInsuredName() != null && !query.getInsuredName().isEmpty()) {
-            wrapper.like(InsuranceRecordEntity::getInsuredName, query.getInsuredName());
-        }
-
-        if (query.getBeneficiaryName() != null && !query.getBeneficiaryName().isEmpty()) {
-            wrapper.like(InsuranceRecordEntity::getBeneficiaryName, query.getBeneficiaryName());
-        }
-
+        LambdaQueryWrapper<InsuranceRecordEntity> wrapper = buildInsuranceWrapper(query, userId);
         wrapper.orderByDesc(InsuranceRecordEntity::getCreateTime);
 
         IPage<InsuranceRecordEntity> page = insuranceRecordMapper.selectPage(
@@ -239,7 +226,104 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
     }
 
     @Override
-    public void exportInsurances(ExportRequest request) {
+    public byte[] exportExpenses(ExpenseQuery query) {
+        Long userId = isAdmin() ? null : currentUserId();
+        LambdaQueryWrapper<ExpenseRecordEntity> wrapper = buildExpenseWrapper(query, userId);
+        wrapper.orderByDesc(ExpenseRecordEntity::getCreateTime);
+
+        List<List<String>> rows = expenseRecordMapper.selectList(wrapper).stream()
+                .map(this::toExpenseExportRow)
+                .collect(Collectors.toList());
+        return SimpleXlsxWriter.write("费用清单", expenseExportHeaders(), rows);
+    }
+
+    @Override
+    public byte[] exportInsurances(InsuranceQuery query) {
+        Long userId = isAdmin() ? null : currentUserId();
+        LambdaQueryWrapper<InsuranceRecordEntity> wrapper = buildInsuranceWrapper(query, userId);
+        wrapper.orderByDesc(InsuranceRecordEntity::getCreateTime);
+
+        List<BufferedImage> pages = insuranceRecordMapper.selectList(wrapper).stream()
+                .map(record -> SimplePdfWriter.renderDetailPage(
+                        "保险清单",
+                        toInsurancePdfFields(record),
+                        "保单号：" + defaultText(record.getPolicyNo()) + " · 状态：" + defaultText(mapStatus(record.getInsuranceStatus()))))
+                .collect(Collectors.toList());
+        if (pages.isEmpty()) {
+            pages = List.of(SimplePdfWriter.renderDetailPage(
+                    "保险清单",
+                    List.of(new SimplePdfWriter.FieldLine("提示", "当前筛选条件下没有保险记录")),
+                    "请调整筛选条件后重试"));
+        }
+        return SimplePdfWriter.writePages(pages);
+    }
+
+    @Override
+    public byte[] exportInsurancePdf(Long insuranceId) {
+        InsuranceRecordEntity insurance = requireInsuranceVisible(insuranceId);
+        BufferedImage page = SimplePdfWriter.renderDetailPage(
+                "保险清单",
+                toInsurancePdfFields(insurance),
+                "保单号：" + defaultText(insurance.getPolicyNo()) + " · 状态：" + defaultText(mapStatus(insurance.getInsuranceStatus())));
+        return SimplePdfWriter.writePages(List.of(page));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public List<ProductInsurancePreviewVO> previewProductInsurances(Long productId, MultipartFile file) {
+        return processProductInsuranceTemplate(productId, file, true);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int importProductInsurances(Long productId, MultipartFile file) {
+        return processProductInsuranceTemplate(productId, file, false).size();
+    }
+
+    private List<ProductInsurancePreviewVO> processProductInsuranceTemplate(Long productId, MultipartFile file, boolean previewOnly) {
+        if (file == null || file.isEmpty()) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "导入文件不能为空");
+        }
+        String filename = file.getOriginalFilename();
+        if (filename == null) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "导入文件不能为空");
+        }
+        String lowerFilename = filename.toLowerCase();
+        if (!lowerFilename.endsWith(".xls") && !lowerFilename.endsWith(".xlsx")) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "仅支持导入 .xls 或 .xlsx 文件");
+        }
+
+        AxxProductEntity product = requireProduct(productId);
+
+        List<List<String>> rows;
+        try {
+            rows = SimpleXlsxReader.readFirstSheet(file.getInputStream());
+        } catch (Exception e) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "Excel文件解析失败：" + e.getMessage());
+        }
+
+        if (rows.size() <= 1) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "Excel中没有可导入的数据");
+        }
+
+        Map<String, Integer> columnIndexes = buildProductInsuranceColumnIndexes(rows.get(0));
+
+        List<ProductInsurancePreviewVO> previewRows = new ArrayList<>();
+        for (int i = 1; i < rows.size(); i++) {
+            List<String> row = rows.get(i);
+            if (shouldSkipProductInsuranceRow(row, columnIndexes)) {
+                continue;
+            }
+            ActivateRequest request = buildInsuranceImportRequest(product, row, i + 1, columnIndexes);
+            previewRows.add(buildProductInsurancePreviewRow(request, i + 1));
+            if (!previewOnly) {
+                activateProduct(request, currentUserId());
+            }
+        }
+        if (!previewOnly && previewRows.isEmpty()) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "Excel中没有可导入的数据，请先填写模板后再上传");
+        }
+        return previewRows;
     }
 
     @Override
@@ -546,6 +630,355 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
                 .serial(entity.getSerialNo())
                 .balance(entity.getBalanceAfter())
                 .build();
+    }
+
+    private LambdaQueryWrapper<ExpenseRecordEntity> buildExpenseWrapper(ExpenseQuery query, Long userId) {
+        LambdaQueryWrapper<ExpenseRecordEntity> wrapper = new LambdaQueryWrapper<>();
+        if (userId != null) {
+            wrapper.eq(ExpenseRecordEntity::getUserId, userId);
+        }
+        if (userId == null && (query == null || query.getStatus() == null || query.getStatus().isBlank() || "all".equalsIgnoreCase(query.getStatus()))) {
+            wrapper.ne(ExpenseRecordEntity::getExpenseStatus, InsuranceStatus.DRAFT.getCode());
+        }
+        applyExpenseFilters(wrapper, query);
+        return wrapper;
+    }
+
+    private LambdaQueryWrapper<InsuranceRecordEntity> buildInsuranceWrapper(InsuranceQuery query, Long userId) {
+        LambdaQueryWrapper<InsuranceRecordEntity> wrapper = new LambdaQueryWrapper<>();
+        if (userId != null) {
+            wrapper.eq(InsuranceRecordEntity::getUserId, userId);
+        }
+        if (userId == null && (query == null || query.getStatus() == null || query.getStatus().isBlank() || "all".equalsIgnoreCase(query.getStatus()))) {
+            wrapper.ne(InsuranceRecordEntity::getInsuranceStatus, InsuranceStatus.DRAFT.getCode());
+        }
+        applyInsuranceFilters(wrapper, query);
+        return wrapper;
+    }
+
+    private void applyExpenseFilters(LambdaQueryWrapper<ExpenseRecordEntity> wrapper, ExpenseQuery query) {
+        if (query == null) {
+            return;
+        }
+        if (query.getPlan() != null && !query.getPlan().isBlank() && !"all".equalsIgnoreCase(query.getPlan())) {
+            wrapper.like(ExpenseRecordEntity::getProductName, resolvePlanKeyword(query.getPlan()));
+        }
+        if (query.getStatus() != null && !query.getStatus().isBlank() && !"all".equalsIgnoreCase(query.getStatus())) {
+            applyExpenseStatusFilter(wrapper, query.getStatus());
+        }
+        if (query.getSerialNo() != null && !query.getSerialNo().isBlank()) {
+            wrapper.like(ExpenseRecordEntity::getSerialNo, query.getSerialNo().trim());
+        }
+        applyDateRange(wrapper, query.getStartDate(), query.getEndDate(), ExpenseRecordEntity::getCreateTime);
+    }
+
+    private void applyInsuranceFilters(LambdaQueryWrapper<InsuranceRecordEntity> wrapper, InsuranceQuery query) {
+        if (query == null) {
+            return;
+        }
+        if (query.getPlan() != null && !query.getPlan().isBlank() && !"all".equalsIgnoreCase(query.getPlan())) {
+            wrapper.like(InsuranceRecordEntity::getProductName, resolvePlanKeyword(query.getPlan()));
+        }
+        if (query.getStatus() != null && !query.getStatus().isBlank() && !"all".equalsIgnoreCase(query.getStatus())) {
+            applyInsuranceStatusFilter(wrapper, query.getStatus());
+        }
+        if (query.getSerialNo() != null && !query.getSerialNo().isBlank()) {
+            wrapper.like(InsuranceRecordEntity::getPolicyNo, query.getSerialNo().trim());
+        }
+        if (query.getInsuredName() != null && !query.getInsuredName().isBlank()) {
+            wrapper.like(InsuranceRecordEntity::getInsuredName, query.getInsuredName().trim());
+        }
+        if (query.getInsuredId() != null && !query.getInsuredId().isBlank()) {
+            wrapper.like(InsuranceRecordEntity::getInsuredIdNo, query.getInsuredId().trim());
+        }
+        if (query.getBeneficiaryName() != null && !query.getBeneficiaryName().isBlank()) {
+            wrapper.like(InsuranceRecordEntity::getBeneficiaryName, query.getBeneficiaryName().trim());
+        }
+        if (query.getBeneficiaryId() != null && !query.getBeneficiaryId().isBlank()) {
+            wrapper.like(InsuranceRecordEntity::getBeneficiaryIdNo, query.getBeneficiaryId().trim());
+        }
+        if (query.getAgent() != null && !query.getAgent().isBlank()) {
+            wrapper.like(InsuranceRecordEntity::getAgentName, query.getAgent().trim());
+        }
+        applyDateRange(wrapper, query.getStartDate(), query.getEndDate(), InsuranceRecordEntity::getCreateTime);
+    }
+
+    private <T> void applyDateRange(LambdaQueryWrapper<T> wrapper,
+                                    Date startDate,
+                                    Date endDate,
+                                    SFunction<T, LocalDateTime> columnGetter) {
+        if (startDate != null) {
+            wrapper.ge(columnGetter, toStartOfDay(startDate));
+        }
+        if (endDate != null) {
+            wrapper.le(columnGetter, toEndOfDay(endDate));
+        }
+    }
+
+    private LocalDateTime toStartOfDay(Date date) {
+        return Instant.ofEpochMilli(date.getTime()).atZone(ZoneId.systemDefault()).toLocalDate().atStartOfDay();
+    }
+
+    private LocalDateTime toEndOfDay(Date date) {
+        return Instant.ofEpochMilli(date.getTime()).atZone(ZoneId.systemDefault()).toLocalDate().atTime(LocalTime.MAX);
+    }
+
+    private Long currentUserId() {
+        return authContext.requireCurrentUser().getUserId();
+    }
+
+    private boolean isAdmin() {
+        return "ADMIN".equals(authContext.requireCurrentUser().getUserType());
+    }
+
+    private InsuranceRecordEntity requireInsuranceVisible(Long insuranceId) {
+        InsuranceRecordEntity insurance = insuranceRecordMapper.selectById(insuranceId);
+        if (insurance == null) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "保险记录不存在");
+        }
+        if (!isAdmin() && !currentUserId().equals(insurance.getUserId())) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "保险记录不存在");
+        }
+        return insurance;
+    }
+
+    private List<String> expenseExportHeaders() {
+        return List.of("分销商ID", "序列号", "产品名称", "联系人", "手机号", "状态", "保单号", "起保日期", "结束日期", "份数", "单价", "金额", "创建时间");
+    }
+
+    private List<String> toExpenseExportRow(ExpenseRecordEntity entity) {
+        return List.of(
+                String.valueOf(entity.getUserId()),
+                defaultText(entity.getSerialNo()),
+                defaultText(entity.getProductName()),
+                defaultText(entity.getContactName()),
+                defaultText(entity.getContactMobile()),
+                defaultText(mapStatus(entity.getExpenseStatus())),
+                defaultText(entity.getPolicyNo()),
+                entity.getEffectiveDate() == null ? "" : entity.getEffectiveDate().toString(),
+                entity.getExpiryDate() == null ? "" : entity.getExpiryDate().toString(),
+                entity.getQuantity() == null ? "" : String.valueOf(entity.getQuantity()),
+                entity.getPremiumAmount() == null ? "" : entity.getPremiumAmount().toPlainString(),
+                entity.getTotalAmount() == null ? "" : entity.getTotalAmount().toPlainString(),
+                entity.getCreateTime() == null ? "" : entity.getCreateTime().toString()
+        );
+    }
+
+    private List<SimplePdfWriter.FieldLine> toInsurancePdfFields(InsuranceRecordEntity entity) {
+        return List.of(
+                new SimplePdfWriter.FieldLine("分销商ID", String.valueOf(entity.getUserId())),
+                new SimplePdfWriter.FieldLine("保单号", defaultText(entity.getPolicyNo())),
+                new SimplePdfWriter.FieldLine("产品名称", defaultText(entity.getProductName())),
+                new SimplePdfWriter.FieldLine("投保人", defaultText(entity.getInsuredName())),
+                new SimplePdfWriter.FieldLine("投保人证件号", defaultText(entity.getInsuredIdNo())),
+                new SimplePdfWriter.FieldLine("被保人", defaultText(entity.getBeneficiaryName())),
+                new SimplePdfWriter.FieldLine("被保人证件号", defaultText(entity.getBeneficiaryIdNo())),
+                new SimplePdfWriter.FieldLine("业务员", defaultText(entity.getAgentName())),
+                new SimplePdfWriter.FieldLine("状态", defaultText(mapStatus(entity.getInsuranceStatus()))),
+                new SimplePdfWriter.FieldLine("起保日期", entity.getEffectiveDate() == null ? "" : entity.getEffectiveDate().toString()),
+                new SimplePdfWriter.FieldLine("结束日期", entity.getExpiryDate() == null ? "" : entity.getExpiryDate().toString()),
+                new SimplePdfWriter.FieldLine("份数", entity.getQuantity() == null ? "" : String.valueOf(entity.getQuantity())),
+                new SimplePdfWriter.FieldLine("保费", entity.getPremiumAmount() == null ? "" : entity.getPremiumAmount().toPlainString()),
+                new SimplePdfWriter.FieldLine("审核人", defaultText(entity.getReviewerName())),
+                new SimplePdfWriter.FieldLine("审核时间", entity.getReviewTime() == null ? "" : entity.getReviewTime().toString()),
+                new SimplePdfWriter.FieldLine("承保时间", entity.getUnderwritingTime() == null ? "" : entity.getUnderwritingTime().toString()),
+                new SimplePdfWriter.FieldLine("生效时间", entity.getActivateTime() == null ? "" : entity.getActivateTime().toString())
+        );
+    }
+
+    private List<String> productInsuranceTemplateHeaders() {
+        return List.of("方案名称", "被保人姓名", "被保人证件号", "被保人职业", "份数", "地址", "业务员");
+    }
+
+    private void validateProductInsuranceTemplateHeaders(List<String> headers) {
+        buildProductInsuranceColumnIndexes(headers);
+    }
+
+    private Map<String, Integer> buildProductInsuranceColumnIndexes(List<String> headers) {
+        Map<String, Integer> indexes = new HashMap<>();
+        indexes.put("planName", findHeaderIndex(headers, "方案名称", "产品名称", "计划名称"));
+        indexes.put("beneficiaryName", findHeaderIndex(headers, "被保人姓名", "被保险人姓名", "姓名"));
+        indexes.put("beneficiaryId", findHeaderIndex(headers, "被保人证件号", "被保人证件号码", "证件号", "证件号码"));
+        indexes.put("beneficiaryJobCategory", findHeaderIndex(headers, "被保人职业", "职业类别", "职业"));
+        indexes.put("beneficiaryJobDetail", findHeaderIndex(headers, "具体职业", "职业明细"));
+        indexes.put("count", findHeaderIndex(headers, "份数", "数量"));
+        indexes.put("address", findHeaderIndex(headers, "地址", "联系地址"));
+        indexes.put("agent", findHeaderIndex(headers, "业务员", "销售员", "代理人"));
+
+        List<String> missing = new ArrayList<>();
+        if (indexes.get("planName") < 0) {
+            missing.add("方案名称");
+        }
+        if (indexes.get("beneficiaryName") < 0) {
+            missing.add("被保人姓名");
+        }
+        if (indexes.get("beneficiaryId") < 0) {
+            missing.add("被保人证件号");
+        }
+        if (indexes.get("count") < 0) {
+            missing.add("份数");
+        }
+        if (indexes.get("agent") < 0) {
+            missing.add("业务员");
+        }
+        if (!missing.isEmpty()) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "Excel模板表头不正确，缺少：" + String.join("、", missing));
+        }
+        return indexes;
+    }
+
+    private int findHeaderIndex(List<String> headers, String... aliases) {
+        if (headers == null || headers.isEmpty() || aliases == null || aliases.length == 0) {
+            return -1;
+        }
+        for (int i = 0; i < headers.size(); i++) {
+            String header = normalizeHeader(headers.get(i));
+            if (header.isEmpty()) {
+                continue;
+            }
+            for (String alias : aliases) {
+                if (header.equals(normalizeHeader(alias))) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+
+    private ActivateRequest buildInsuranceImportRequest(AxxProductEntity product,
+                                                        List<String> row,
+                                                        int rowNumber,
+                                                        Map<String, Integer> columnIndexes) {
+        ActivateRequest request = new ActivateRequest();
+        request.setProductId(product.getId());
+        String planName = normalizeCell(getCell(row, columnIndexes.get("planName")));
+        request.setPlanName(planName.isBlank() ? product.getProductName() : planName);
+        request.setBeneficiaryName(requireCell(row, columnIndexes.get("beneficiaryName"), rowNumber, "被保人姓名"));
+        request.setBeneficiaryId(requireCell(row, columnIndexes.get("beneficiaryId"), rowNumber, "被保人证件号"));
+        String beneficiaryJobCategory = normalizeCell(getCell(row, columnIndexes.get("beneficiaryJobCategory")));
+        String beneficiaryJobDetail = normalizeCell(getCell(row, columnIndexes.get("beneficiaryJobDetail")));
+        String beneficiaryJob = !beneficiaryJobDetail.isBlank()
+                ? beneficiaryJobDetail
+                : beneficiaryJobCategory;
+        request.setBeneficiaryJob(beneficiaryJob.isBlank() ? "1" : beneficiaryJob);
+        request.setCount(parseInteger(getCell(row, columnIndexes.get("count")), rowNumber, "份数", 1));
+        request.setAddress(normalizeCell(getCell(row, columnIndexes.get("address"))));
+        request.setAgent(normalizeCell(getCell(row, columnIndexes.get("agent"))));
+        return request;
+    }
+
+    private ProductInsurancePreviewVO buildProductInsurancePreviewRow(ActivateRequest request, int rowNumber) {
+        return ProductInsurancePreviewVO.builder()
+                .rowNumber(rowNumber)
+                .planName(defaultText(request.getPlanName()))
+                .beneficiaryName(defaultText(request.getBeneficiaryName()))
+                .beneficiaryId(defaultText(request.getBeneficiaryId()))
+                .beneficiaryJob(defaultText(request.getBeneficiaryJob()))
+                .count(request.getCount())
+                .address(defaultText(request.getAddress()))
+                .agent(defaultText(request.getAgent()))
+                .build();
+    }
+
+    private String defaultText(String value) {
+        return value == null || value.isBlank() ? "-" : value;
+    }
+
+    private String requireCell(List<String> row, Integer index, int rowNumber, String fieldName) {
+        if (index == null || index < 0) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "第" + rowNumber + "行【" + fieldName + "】列不存在");
+        }
+        String value = normalizeCell(getCell(row, index));
+        if (value.isBlank()) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "第" + rowNumber + "行【" + fieldName + "】不能为空");
+        }
+        return value;
+    }
+
+    private String getCell(List<String> row, Integer index) {
+        if (index == null || index < 0) {
+            return "";
+        }
+        if (row == null || index < 0 || index >= row.size()) {
+            return "";
+        }
+        String value = row.get(index);
+        return value == null ? "" : value;
+    }
+
+    private String normalizeHeader(String value) {
+        return normalizeCell(value).replaceAll("\\s+", "");
+    }
+
+    private String normalizeCell(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private Integer parseInteger(String value, int rowNumber, String fieldName, Integer defaultValue) {
+        if (value == null || value.isBlank()) {
+            return defaultValue;
+        }
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException e) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "第" + rowNumber + "行【" + fieldName + "】格式不正确");
+        }
+    }
+
+    private boolean isBlankRow(List<String> row) {
+        if (row == null || row.isEmpty()) {
+            return true;
+        }
+        for (String cell : row) {
+            if (cell != null && !cell.trim().isEmpty()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean shouldSkipProductInsuranceRow(List<String> row, Map<String, Integer> columnIndexes) {
+        if (row == null || row.isEmpty()) {
+            return true;
+        }
+        return isBlankValue(row, columnIndexes.get("beneficiaryName"))
+                || isBlankValue(row, columnIndexes.get("beneficiaryId"));
+    }
+
+    private boolean isBlankValue(List<String> row, Integer index) {
+        return normalizeCell(getCell(row, index)).isBlank();
+    }
+
+    private String resolvePlanKeyword(String plan) {
+        String normalized = plan == null ? "" : plan.trim().toLowerCase();
+        if (normalized.contains("guoshou") || normalized.contains("国寿") || normalized.contains("1-3")) {
+            return "国寿";
+        }
+        if (normalized.contains("pingan") || normalized.contains("平安")) {
+            return "平安";
+        }
+        if (normalized.contains("child") || normalized.contains("少儿")) {
+            return "少儿";
+        }
+        if (normalized.contains("elder") || normalized.contains("老年")) {
+            return "老年";
+        }
+        if (normalized.contains("travel") || normalized.contains("旅游")) {
+            return "旅游";
+        }
+        if (normalized.contains("maternity") || normalized.contains("驾乘")) {
+            return "驾乘";
+        }
+        if (normalized.contains("zhonghua") || normalized.contains("中华")) {
+            return "中华";
+        }
+        if (normalized.contains("taiping") || normalized.contains("太平")) {
+            return "太平";
+        }
+        if (normalized.contains("renbao") || normalized.contains("人保")) {
+            return "人保";
+        }
+        return plan.trim();
     }
 
     private String mapStatus(String status) {

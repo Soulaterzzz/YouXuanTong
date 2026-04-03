@@ -3,10 +3,13 @@ package com.zs.ytbx.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.zs.ytbx.common.api.PageResponse;
 import com.zs.ytbx.common.enums.InsuranceStatus;
 import com.zs.ytbx.common.enums.ResultCode;
 import com.zs.ytbx.common.exception.BusinessException;
+import com.zs.ytbx.common.export.SimpleXlsxReader;
+import com.zs.ytbx.common.export.SimpleXlsxWriter;
 import com.zs.ytbx.dto.*;
 import com.zs.ytbx.entity.*;
 import com.zs.ytbx.mapper.*;
@@ -15,16 +18,20 @@ import com.zs.ytbx.vo.anxinxuan.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -350,14 +357,7 @@ public class AdminServiceImpl implements AdminService {
     public PageResponse<ExpenseVO> listAllExpenses(ExpenseQuery query) {
         LambdaQueryWrapper<ExpenseRecordEntity> wrapper = new LambdaQueryWrapper<>();
         wrapper.ne(ExpenseRecordEntity::getExpenseStatus, InsuranceStatus.DRAFT.getCode());
-        
-        if (query.getStatus() != null && !query.getStatus().isEmpty() && !"all".equals(query.getStatus())) {
-            applyExpenseStatusFilter(wrapper, query.getStatus());
-        }
-        
-        if (query.getSerialNo() != null && !query.getSerialNo().isEmpty()) {
-            wrapper.like(ExpenseRecordEntity::getSerialNo, query.getSerialNo());
-        }
+        applyExpenseFilters(wrapper, query);
         
         wrapper.orderByDesc(ExpenseRecordEntity::getCreateTime);
         
@@ -380,26 +380,9 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public PageResponse<InsuranceVO> listAllInsurances(InsuranceQuery query) {
         LambdaQueryWrapper<InsuranceRecordEntity> wrapper = new LambdaQueryWrapper<>();
-        if (query.getStatus() == null || query.getStatus().isEmpty() || "all".equals(query.getStatus())) {
-            wrapper.ne(InsuranceRecordEntity::getInsuranceStatus, InsuranceStatus.DRAFT.getCode());
-        }
-        
-        if (query.getStatus() != null && !query.getStatus().isEmpty() && !"all".equals(query.getStatus())) {
-            applyInsuranceStatusFilter(wrapper, query.getStatus());
-        }
-        
-        if (query.getSerialNo() != null && !query.getSerialNo().isEmpty()) {
-            wrapper.like(InsuranceRecordEntity::getPolicyNo, query.getSerialNo());
-        }
-        
-        if (query.getInsuredName() != null && !query.getInsuredName().isEmpty()) {
-            wrapper.like(InsuranceRecordEntity::getInsuredName, query.getInsuredName());
-        }
-        
-        if (query.getBeneficiaryName() != null && !query.getBeneficiaryName().isEmpty()) {
-            wrapper.like(InsuranceRecordEntity::getBeneficiaryName, query.getBeneficiaryName());
-        }
-        
+        wrapper.ne(InsuranceRecordEntity::getInsuranceStatus, InsuranceStatus.DRAFT.getCode());
+        applyInsuranceFilters(wrapper, query);
+
         wrapper.orderByDesc(InsuranceRecordEntity::getCreateTime);
         
         IPage<InsuranceRecordEntity> page = insuranceRecordMapper.selectPage(
@@ -416,6 +399,68 @@ public class AdminServiceImpl implements AdminService {
                 .total(page.getTotal())
                 .totalPages(page.getPages())
                 .build();
+    }
+
+    @Override
+    public byte[] downloadProductImportTemplate() {
+        List<String> headers = productImportHeaders();
+        List<List<String>> rows = List.of(List.of(
+                "P-20240401-001",
+                "示例产品",
+                "1-3",
+                "示例承保公司",
+                "这里填写产品描述",
+                "这里填写产品特点",
+                "99.00",
+                "100",
+                "1",
+                "0",
+                "ON_SALE",
+                "1"
+        ));
+        return SimpleXlsxWriter.write("产品导入模板", headers, rows);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int importProducts(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "导入文件不能为空");
+        }
+        String filename = file.getOriginalFilename();
+        if (filename == null) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "导入文件不能为空");
+        }
+        String lowerFilename = filename.toLowerCase();
+        if (!lowerFilename.endsWith(".xls") && !lowerFilename.endsWith(".xlsx")) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "仅支持导入 .xls 或 .xlsx 文件");
+        }
+
+        List<List<String>> rows;
+        try {
+            rows = SimpleXlsxReader.readFirstSheet(file.getInputStream());
+        } catch (Exception e) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "Excel文件解析失败：" + e.getMessage());
+        }
+
+        if (rows.size() <= 1) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "Excel中没有可导入的数据");
+        }
+
+        List<String> headers = rows.get(0);
+        validateProductImportHeaders(headers);
+
+        int importedCount = 0;
+        for (int i = 1; i < rows.size(); i++) {
+            List<String> row = rows.get(i);
+            if (isBlankRow(row)) {
+                continue;
+            }
+            ProductRequest request = buildProductRequestFromRow(row, i + 1);
+            createProduct(request);
+            importedCount++;
+        }
+        return importedCount;
     }
 
     @Override
@@ -1053,6 +1098,207 @@ public class AdminServiceImpl implements AdminService {
             cursor = cursor.plusDays(1);
         }
         return total;
+    }
+
+    private void applyExpenseFilters(LambdaQueryWrapper<ExpenseRecordEntity> wrapper, ExpenseQuery query) {
+        if (query == null) {
+            return;
+        }
+
+        if (query.getPlan() != null && !query.getPlan().isBlank() && !"all".equalsIgnoreCase(query.getPlan())) {
+            wrapper.like(ExpenseRecordEntity::getProductName, resolvePlanKeyword(query.getPlan()));
+        }
+        if (query.getStatus() != null && !query.getStatus().isBlank() && !"all".equalsIgnoreCase(query.getStatus())) {
+            applyExpenseStatusFilter(wrapper, query.getStatus());
+        }
+        if (query.getSerialNo() != null && !query.getSerialNo().isBlank()) {
+            wrapper.like(ExpenseRecordEntity::getSerialNo, query.getSerialNo().trim());
+        }
+        applyDateRange(wrapper, query.getStartDate(), query.getEndDate(), ExpenseRecordEntity::getCreateTime);
+    }
+
+    private void applyInsuranceFilters(LambdaQueryWrapper<InsuranceRecordEntity> wrapper, InsuranceQuery query) {
+        if (query == null) {
+            return;
+        }
+
+        if (query.getPlan() != null && !query.getPlan().isBlank() && !"all".equalsIgnoreCase(query.getPlan())) {
+            wrapper.like(InsuranceRecordEntity::getProductName, resolvePlanKeyword(query.getPlan()));
+        }
+        if (query.getStatus() != null && !query.getStatus().isBlank() && !"all".equalsIgnoreCase(query.getStatus())) {
+            applyInsuranceStatusFilter(wrapper, query.getStatus());
+        }
+        if (query.getSerialNo() != null && !query.getSerialNo().isBlank()) {
+            wrapper.like(InsuranceRecordEntity::getPolicyNo, query.getSerialNo().trim());
+        }
+        if (query.getInsuredName() != null && !query.getInsuredName().isBlank()) {
+            wrapper.like(InsuranceRecordEntity::getInsuredName, query.getInsuredName().trim());
+        }
+        if (query.getInsuredId() != null && !query.getInsuredId().isBlank()) {
+            wrapper.like(InsuranceRecordEntity::getInsuredIdNo, query.getInsuredId().trim());
+        }
+        if (query.getBeneficiaryName() != null && !query.getBeneficiaryName().isBlank()) {
+            wrapper.like(InsuranceRecordEntity::getBeneficiaryName, query.getBeneficiaryName().trim());
+        }
+        if (query.getBeneficiaryId() != null && !query.getBeneficiaryId().isBlank()) {
+            wrapper.like(InsuranceRecordEntity::getBeneficiaryIdNo, query.getBeneficiaryId().trim());
+        }
+        if (query.getAgent() != null && !query.getAgent().isBlank()) {
+            wrapper.like(InsuranceRecordEntity::getAgentName, query.getAgent().trim());
+        }
+        applyDateRange(wrapper, query.getStartDate(), query.getEndDate(), InsuranceRecordEntity::getCreateTime);
+    }
+
+    private <T> void applyDateRange(LambdaQueryWrapper<T> wrapper,
+                                    java.util.Date startDate,
+                                    java.util.Date endDate,
+                                    SFunction<T, LocalDateTime> columnGetter) {
+        if (startDate != null) {
+            wrapper.ge(columnGetter, toStartOfDay(startDate));
+        }
+        if (endDate != null) {
+            wrapper.le(columnGetter, toEndOfDay(endDate));
+        }
+    }
+
+    private LocalDateTime toStartOfDay(java.util.Date date) {
+        return Instant.ofEpochMilli(date.getTime()).atZone(ZoneId.systemDefault()).toLocalDate().atStartOfDay();
+    }
+
+    private LocalDateTime toEndOfDay(java.util.Date date) {
+        return Instant.ofEpochMilli(date.getTime()).atZone(ZoneId.systemDefault()).toLocalDate().atTime(LocalTime.MAX);
+    }
+
+    private List<String> productImportHeaders() {
+        return List.of("产品编码", "产品名称", "分类编码", "承保公司", "产品描述", "产品特点", "价格", "库存", "是否新品", "是否热销", "上架状态", "排序号");
+    }
+
+    private void validateProductImportHeaders(List<String> headers) {
+        List<String> expected = productImportHeaders();
+        if (headers == null || headers.size() < expected.size()) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "Excel模板表头不完整，请使用系统下载的模板");
+        }
+        for (int i = 0; i < expected.size(); i++) {
+            String actual = normalizeCell(headers.get(i));
+            if (!expected.get(i).equals(actual)) {
+                throw new BusinessException(ResultCode.INVALID_PARAM, "Excel模板表头不正确，请使用系统下载的模板");
+            }
+        }
+    }
+
+    private ProductRequest buildProductRequestFromRow(List<String> row, int rowNumber) {
+        ProductRequest request = new ProductRequest();
+        request.setProductCode(requireCell(row, 0, rowNumber, "产品编码"));
+        request.setProductName(requireCell(row, 1, rowNumber, "产品名称"));
+        request.setCategoryCode(requireCell(row, 2, rowNumber, "分类编码"));
+        request.setCompanyName(requireCell(row, 3, rowNumber, "承保公司"));
+        request.setDescription(getCell(row, 4));
+        request.setFeatures(getCell(row, 5));
+        request.setPrice(parseBigDecimal(requireCell(row, 6, rowNumber, "价格"), rowNumber, "价格"));
+        request.setStock(parseInteger(getCell(row, 7), rowNumber, "库存", 0));
+        request.setIsNew(parseInteger(getCell(row, 8), rowNumber, "是否新品", 0));
+        request.setIsHot(parseInteger(getCell(row, 9), rowNumber, "是否热销", 0));
+        request.setSaleStatus(normalizeSaleStatus(getCell(row, 10)));
+        request.setSortNo(parseInteger(getCell(row, 11), rowNumber, "排序号", 0));
+        return request;
+    }
+
+    private String normalizeSaleStatus(String value) {
+        String normalized = normalizeCell(value);
+        if (normalized.isEmpty()) {
+            return "ON_SALE";
+        }
+        String upper = normalized.toUpperCase();
+        if (!List.of("ON_SALE", "OFF_SALE").contains(upper)) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "上架状态仅支持 ON_SALE 或 OFF_SALE");
+        }
+        return upper;
+    }
+
+    private String requireCell(List<String> row, int index, int rowNumber, String fieldName) {
+        String value = getCell(row, index);
+        if (value.isBlank()) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "第" + rowNumber + "行【" + fieldName + "】不能为空");
+        }
+        return value;
+    }
+
+    private String getCell(List<String> row, int index) {
+        if (row == null || index < 0 || index >= row.size()) {
+            return "";
+        }
+        return normalizeCell(row.get(index));
+    }
+
+    private String normalizeCell(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private BigDecimal parseBigDecimal(String value, int rowNumber, String fieldName) {
+        try {
+            BigDecimal result = new BigDecimal(value.trim());
+            if (result.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new BusinessException(ResultCode.INVALID_PARAM, "第" + rowNumber + "行【" + fieldName + "】必须大于0");
+            }
+            return result;
+        } catch (NumberFormatException e) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "第" + rowNumber + "行【" + fieldName + "】格式不正确");
+        }
+    }
+
+    private Integer parseInteger(String value, int rowNumber, String fieldName, Integer defaultValue) {
+        if (value == null || value.isBlank()) {
+            return defaultValue;
+        }
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException e) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "第" + rowNumber + "行【" + fieldName + "】格式不正确");
+        }
+    }
+
+    private boolean isBlankRow(List<String> row) {
+        if (row == null || row.isEmpty()) {
+            return true;
+        }
+        for (String cell : row) {
+            if (cell != null && !cell.trim().isEmpty()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private String resolvePlanKeyword(String plan) {
+        String normalized = plan == null ? "" : plan.trim().toLowerCase();
+        if (normalized.contains("guoshou") || normalized.contains("国寿") || normalized.contains("1-3")) {
+            return "国寿";
+        }
+        if (normalized.contains("pingan") || normalized.contains("平安")) {
+            return "平安";
+        }
+        if (normalized.contains("child") || normalized.contains("少儿")) {
+            return "少儿";
+        }
+        if (normalized.contains("elder") || normalized.contains("老年")) {
+            return "老年";
+        }
+        if (normalized.contains("travel") || normalized.contains("旅游")) {
+            return "旅游";
+        }
+        if (normalized.contains("maternity") || normalized.contains("驾乘")) {
+            return "驾乘";
+        }
+        if (normalized.contains("zhonghua") || normalized.contains("中华")) {
+            return "中华";
+        }
+        if (normalized.contains("taiping") || normalized.contains("太平")) {
+            return "太平";
+        }
+        if (normalized.contains("renbao") || normalized.contains("人保")) {
+            return "人保";
+        }
+        return plan.trim();
     }
 
     private RechargeVO convertToRechargeVO(TransactionRecordEntity entity) {

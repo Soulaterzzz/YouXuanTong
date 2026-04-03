@@ -4,6 +4,8 @@ import com.zs.ytbx.common.api.PageResponse;
 import com.zs.ytbx.dto.*;
 import com.zs.ytbx.vo.anxinxuan.*;
 
+import org.springframework.web.multipart.MultipartFile;
+
 import java.util.List;
 
 public interface AdminService {
@@ -38,4 +40,7 @@ public interface AdminService {
     Long getMonthOrders();
     List<ProductSalesAnalysisVO> getProductSalesRanking(java.time.LocalDate startDate, java.time.LocalDate endDate);
     List<OrderTrendAnalysisVO> getOrderTrendAnalysis(java.time.LocalDate startDate, java.time.LocalDate endDate, String periodType);
+
+    byte[] downloadProductImportTemplate();
+    int importProducts(MultipartFile file);
 }

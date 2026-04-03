@@ -359,15 +359,17 @@
                     </p>
                   </div>
                   <div class="product-footer">
-                    <div class="price-info">
-                      <span class="price-label">价格：</span>
-                      <span class="price-value">¥{{ product.price }}</span>
-                    </div>
-                    <div class="stock-info">
-                      <span class="stock-label">库存：</span>
-                      <span class="stock-value" :class="{ 'low-stock': product.stock < 10 }">
-                        {{ product.stock > 0 ? product.stock : '充足' }}
-                      </span>
+                    <div class="product-stats-row">
+                      <div class="price-info">
+                        <span class="price-label">价格：</span>
+                        <span class="price-value">¥{{ product.price }}</span>
+                      </div>
+                      <div class="stock-info">
+                        <span class="stock-label">库存：</span>
+                        <span class="stock-value" :class="{ 'low-stock': product.stock < 10 }">
+                          {{ product.stock > 0 ? product.stock : '充足' }}
+                        </span>
+                      </div>
                     </div>
                     <div class="product-actions">
                       <el-button v-if="isAdmin" type="primary" size="small" @click="openProductDialog(product)">
@@ -387,9 +389,25 @@
                         <el-icon><Delete /></el-icon>
                         删除
                       </el-button>
-                      <el-button type="primary" plain size="small" @click="downloadProductTemplate(product)">
+                      <el-button
+                        type="warning"
+                        plain
+                        size="small"
+                        :disabled="!product.templateFileName"
+                        @click="openProductInsuranceBatchDialog(product)"
+                      >
+                        <el-icon><Upload /></el-icon>
+                        批量激活
+                      </el-button>
+                      <el-button
+                        type="primary"
+                        plain
+                        size="small"
+                        :disabled="!product.templateFileName"
+                        @click="downloadProductTemplate(product)"
+                      >
                         <el-icon><Download /></el-icon>
-                        模板
+                        下载模板
                       </el-button>
                       <el-button
                         type="warning"
@@ -430,17 +448,27 @@
           <div class="filter-form">
             <div class="filter-header">
               <h3>{{ isAdmin ? '全部费用清单' : '费用筛选' }}</h3>
-              <el-button text @click="resetExpenseFilter">
-                <el-icon><Refresh /></el-icon>
-                重置筛选
-              </el-button>
+              <div class="filter-header-actions">
+                <el-button text @click="resetExpenseFilter">
+                  <el-icon><Refresh /></el-icon>
+                  重置筛选
+                </el-button>
+                <el-button type="success" plain @click="downloadExpenseExport">
+                  <el-icon><Download /></el-icon>
+                  导出Excel
+                </el-button>
+              </div>
             </div>
             <el-form :inline="true" :model="expenseFilter" class="demo-form-inline">
               <el-form-item label="方案">
                 <el-select v-model="expenseFilter.plan" placeholder="请选择" clearable style="width: 150px;">
                   <el-option label="所有方案" value="all"></el-option>
-                  <el-option label="国寿财1-3类" value="guoshou-3"></el-option>
-                  <el-option label="平安财意外" value="pingan"></el-option>
+                  <el-option label="国寿财意外险（1-3类）" value="guoshou-3"></el-option>
+                  <el-option label="平安财意外险" value="pingan-10"></el-option>
+                  <el-option label="少儿医疗险" value="child-med"></el-option>
+                  <el-option label="老年意外险" value="elder-acc"></el-option>
+                  <el-option label="旅游险" value="travel"></el-option>
+                  <el-option label="驾乘险" value="maternity"></el-option>
                 </el-select>
               </el-form-item>
               <el-form-item label="状态">
@@ -458,7 +486,15 @@
                 <el-input v-model="expenseFilter.serial" placeholder="请输入序列号" clearable style="width: 150px;"></el-input>
               </el-form-item>
               <el-form-item label="上传日期">
-                <el-date-picker v-model="expenseFilter.dateRange" type="daterange" range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" style="width: 240px;"></el-date-picker>
+                <el-date-picker
+                  v-model="expenseFilter.dateRange"
+                  type="daterange"
+                  value-format="YYYY-MM-DD"
+                  range-separator="至"
+                  start-placeholder="开始日期"
+                  end-placeholder="结束日期"
+                  style="width: 240px;"
+                />
               </el-form-item>
               <el-form-item>
                 <el-button type="primary" @click="queryExpenses">
@@ -497,7 +533,7 @@
               background
               layout="total, prev, pager, next"
               :total="expenseTotal"
-              :page-size="10"
+              :page-size="expensePageSize"
               @current-change="handleExpensePageChange"
             />
           </div>
@@ -509,15 +545,27 @@
           <div class="filter-form">
             <div class="filter-header">
               <h3>{{ isAdmin ? '全部保险清单' : '保险筛选' }}</h3>
-              <el-button text @click="resetInsuranceFilter">
-                <el-icon><Refresh /></el-icon>
-                重置筛选
-              </el-button>
+              <div class="filter-header-actions">
+                <el-button text @click="resetInsuranceFilter">
+                  <el-icon><Refresh /></el-icon>
+                  重置筛选
+                </el-button>
+                <el-button type="success" plain @click="downloadInsuranceExport">
+                  <el-icon><Download /></el-icon>
+                  导出PDF
+                </el-button>
+              </div>
             </div>
             <el-form :inline="true" :model="insuranceFilter" class="demo-form-inline">
               <el-form-item label="方案">
                 <el-select v-model="insuranceFilter.plan" placeholder="请选择" clearable style="width: 150px;">
                   <el-option label="所有方案" value="all"></el-option>
+                  <el-option label="国寿财意外险（1-3类）" value="guoshou-3"></el-option>
+                  <el-option label="平安财意外险" value="pingan-10"></el-option>
+                  <el-option label="少儿医疗险" value="child-med"></el-option>
+                  <el-option label="老年意外险" value="elder-acc"></el-option>
+                  <el-option label="旅游险" value="travel"></el-option>
+                  <el-option label="驾乘险" value="maternity"></el-option>
                 </el-select>
               </el-form-item>
               <el-form-item label="状态">
@@ -536,7 +584,15 @@
                 <el-input v-model="insuranceFilter.serial" placeholder="请输入序列号" clearable style="width: 150px;"></el-input>
               </el-form-item>
               <el-form-item label="上传日期">
-                <el-date-picker v-model="insuranceFilter.dateRange" type="daterange" range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" style="width: 240px;"></el-date-picker>
+                <el-date-picker
+                  v-model="insuranceFilter.dateRange"
+                  type="daterange"
+                  value-format="YYYY-MM-DD"
+                  range-separator="至"
+                  start-placeholder="开始日期"
+                  end-placeholder="结束日期"
+                  style="width: 240px;"
+                />
               </el-form-item>
               <el-form-item>
                 <el-button type="primary" @click="queryInsurances">
@@ -584,7 +640,7 @@
             <el-table-column label="操作" width="220" fixed="right">
               <template #default="scope">
                 <el-button link type="primary" @click="viewInsuranceDetail(scope.row)">详情</el-button>
-                <el-button link type="success" @click="downloadPolicy(scope.row)">下载</el-button>
+                <el-button link type="success" @click="downloadPolicy(scope.row)">导出PDF</el-button>
                 <el-button
                   v-if="!isAdmin && scope.row.statusCode === 'DRAFT'"
                   link
@@ -635,7 +691,7 @@
               background
               layout="total, sizes, prev, pager, next"
               :total="insuranceTotal"
-              :page-size="10"
+              :page-size="insurancePageSize"
               :page-sizes="[10, 20, 50, 100]"
               @size-change="handleInsuranceSizeChange"
               @current-change="handleInsurancePageChange"
@@ -928,6 +984,113 @@
       </template>
     </el-dialog>
 
+    <el-dialog
+      v-model="productInsuranceBatchDialogVisible"
+      :title="productInsuranceBatchDialogTitle"
+      width="560px"
+      :close-on-click-modal="false"
+      destroy-on-close
+      @close="closeProductInsuranceBatchDialog"
+    >
+      <div class="product-batch-dialog">
+        <div class="product-batch-summary" v-if="productInsuranceBatchProduct">
+          <div class="product-batch-name">{{ productInsuranceBatchProduct.name }}</div>
+          <div class="product-batch-subtitle">
+            请先下载当前产品模板，填写后再上传。系统会按行读取投保信息。
+          </div>
+        </div>
+        <el-upload
+          ref="productInsuranceBatchUploadRef"
+          class="product-batch-upload"
+          drag
+          action="#"
+          :auto-upload="false"
+          :limit="1"
+          :show-file-list="true"
+          accept=".xls,.xlsx"
+          :before-upload="beforeProductInsuranceBatchUpload"
+          :on-change="handleProductInsuranceBatchFileChange"
+          :on-remove="handleProductInsuranceBatchFileRemove"
+        >
+          <el-icon class="el-icon--upload"><Upload /></el-icon>
+          <div class="el-upload__text">拖拽 .xls / .xlsx 文件到这里，或 <em>点击选择文件</em></div>
+          <template #tip>
+            <div class="el-upload__tip">仅支持 Excel .xls / .xlsx 文件，大小不超过 10MB</div>
+          </template>
+        </el-upload>
+        <div v-if="productInsuranceBatchPreviewLoading" class="product-batch-preview-tip">
+          正在预览导入条数...
+        </div>
+        <div v-else-if="productInsuranceBatchPreviewCount !== null" class="product-batch-preview-tip">
+          预计导入 {{ productInsuranceBatchPreviewCount }} 条投保信息
+        </div>
+        <div v-else class="product-batch-preview-tip product-batch-preview-tip--muted">
+          选择文件后将自动预览导入条数
+        </div>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="closeProductInsuranceBatchDialog">取消</el-button>
+          <el-button
+            type="primary"
+            :loading="productInsuranceBatchPreviewLoading"
+            :disabled="!productInsuranceBatchFile || productInsuranceBatchPreviewLoading || !productInsuranceBatchPreviewRows.length"
+            @click="openProductInsuranceBatchConfirmDialog"
+          >
+            查看确认页
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="productInsuranceBatchConfirmDialogVisible"
+      :title="`批量激活确认 - ${productInsuranceBatchProduct?.name || '产品'}`"
+      width="980px"
+      :close-on-click-modal="false"
+      destroy-on-close
+      @close="closeProductInsuranceBatchConfirmDialog"
+    >
+      <div class="product-batch-confirm">
+        <div class="product-batch-summary" v-if="productInsuranceBatchProduct">
+          <div class="product-batch-name">{{ productInsuranceBatchProduct.name }}</div>
+          <div class="product-batch-subtitle">
+            已读取 {{ productInsuranceBatchPreviewRows.length }} 条投保数据，请确认无误后再提交激活。
+          </div>
+        </div>
+        <el-table
+          class="product-batch-preview-table"
+          :data="productInsuranceBatchPreviewRows"
+          border
+          stripe
+          height="420"
+          empty-text="暂无可确认的数据"
+        >
+          <el-table-column prop="rowNumber" label="行号" width="80" />
+          <el-table-column prop="planName" label="方案名称" min-width="180" show-overflow-tooltip />
+          <el-table-column prop="beneficiaryName" label="被保人姓名" min-width="120" show-overflow-tooltip />
+          <el-table-column prop="beneficiaryId" label="证件号" min-width="180" show-overflow-tooltip />
+          <el-table-column prop="beneficiaryJob" label="职业" min-width="120" show-overflow-tooltip />
+          <el-table-column prop="count" label="份数" width="80" />
+          <el-table-column prop="address" label="地址" min-width="160" show-overflow-tooltip />
+          <el-table-column prop="agent" label="业务员" min-width="120" show-overflow-tooltip />
+        </el-table>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="closeProductInsuranceBatchConfirmDialog">返回修改</el-button>
+          <el-button
+            type="primary"
+            :loading="productInsuranceBatchSubmitting"
+            :disabled="!productInsuranceBatchPreviewRows.length"
+            @click="submitProductInsuranceBatch"
+          >
+            确认提交激活
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
+
     <!-- 产品类别管理对话框 -->
     <el-dialog v-model="categoryDialogVisible" title="产品类别管理" width="700px" :close-on-click-modal="false">
       <div class="category-management">
@@ -1024,10 +1187,12 @@
         <el-form-item label="方案名称" prop="planName">
           <el-select v-model="activeForm.planName" placeholder="请选择方案名称" style="width: 100%;">
             <el-option v-if="selectedProduct" :label="selectedProduct.name" :value="String(selectedProduct.id)"></el-option>
-            <el-option label="国寿财1-3类10+5+5+50（青柑）" value="guoshou-3"></el-option>
-            <el-option label="平安财意外10+1+50+10（含意保）" value="pingan-10"></el-option>
+            <el-option label="国寿财意外险（1-3类）" value="guoshou-3"></el-option>
+            <el-option label="平安财意外险" value="pingan-10"></el-option>
             <el-option label="少儿医疗险" value="child-med"></el-option>
             <el-option label="老年意外险" value="elder-acc"></el-option>
+            <el-option label="旅游险" value="travel"></el-option>
+            <el-option label="驾乘险" value="maternity"></el-option>
           </el-select>
         </el-form-item>
         <el-form-item label="被保人姓名" prop="beneficiaryName">
@@ -1365,6 +1530,64 @@
     </el-dialog>
 
     <el-dialog
+      v-model="noticePopupDialogVisible"
+      title="首页通知栏"
+      width="980px"
+      :close-on-click-modal="false"
+      class="notice-popup-dialog"
+    >
+      <div class="notice-popup-shell">
+        <aside class="notice-popup-list">
+          <div class="notice-popup-list-header">
+            <span>最新通知</span>
+            <el-tag type="info" effect="plain">{{ publishedNoticeList.length }}</el-tag>
+          </div>
+          <div v-if="publishedNoticeList.length" class="notice-popup-items">
+            <button
+              v-for="(item, index) in publishedNoticeList"
+              :key="item.id || index"
+              type="button"
+              class="notice-popup-item"
+              :class="{ active: index === noticePopupSelectedIndex }"
+              @click="selectNoticePopupItem(index)"
+            >
+              <div class="notice-popup-index">{{ index + 1 }}</div>
+              <div class="notice-popup-item-body">
+                <h4>{{ item.title }}</h4>
+                <p>{{ item.content }}</p>
+              </div>
+            </button>
+          </div>
+          <el-empty v-else description="暂无通知公告" :image-size="84" />
+        </aside>
+
+        <section class="notice-popup-detail" v-if="noticePopupCurrent">
+          <div class="notice-popup-eyebrow">首页弹窗公告</div>
+          <h3>{{ noticePopupCurrent.title }}</h3>
+          <div class="notice-popup-meta">
+            <el-icon><Clock /></el-icon>
+            <span>发布时间：{{ noticePopupCurrent.publishedAt ? new Date(noticePopupCurrent.publishedAt).toLocaleString('zh-CN', { hour12: false }) : '未知' }}</span>
+          </div>
+          <div class="notice-popup-content">
+            {{ noticePopupCurrent.content }}
+          </div>
+        </section>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="closeNoticePopup">关闭</el-button>
+          <el-button
+            type="primary"
+            :disabled="!noticePopupCurrent"
+            @click="openNoticeFromPopup"
+          >
+            查看详情
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <el-dialog
       v-model="noticePublishDialogVisible"
       title="发布通知"
       width="780px"
@@ -1480,12 +1703,23 @@ export default {
       productTotal: 0,
       productPageSize: 10,
       productCurrentPage: 1,
+      productImportLoading: false,
       companyFilter: 'all',
       categoryFilter: 'all',
       selectedCompanies: [],
       productDialogVisible: false,
       productDialogTitle: '编辑产品',
       productSubmitting: false,
+      productInsuranceBatchDialogVisible: false,
+      productInsuranceBatchDialogTitle: '批量激活',
+      productInsuranceBatchSubmitting: false,
+      productInsuranceBatchProduct: null,
+      productInsuranceBatchFile: null,
+      productInsuranceBatchPreviewLoading: false,
+      productInsuranceBatchPreviewCount: null,
+      productInsuranceBatchPreviewRows: [],
+      productInsuranceBatchConfirmDialogVisible: false,
+      productInsuranceBatchPreviewRequestId: 0,
       productForm: {
         id: null,
         productCode: '',
@@ -1507,22 +1741,24 @@ export default {
       expenseLoading: false,
       expenseList: [],
       expenseTotal: 0,
+      expensePageSize: 20,
       expenseCurrentPage: 1,
       expenseFilter: {
         plan: 'all',
         status: 'all',
         serial: '',
-        dateRange: null
+        dateRange: []
       },
       insuranceLoading: false,
       insuranceList: [],
       insuranceTotal: 0,
+      insurancePageSize: 20,
       insuranceCurrentPage: 1,
       insuranceFilter: {
         plan: 'all',
         status: 'all',
         serial: '',
-        dateRange: null,
+        dateRange: [],
         insuredName: '',
         insuredId: '',
         beneficiaryName: '',
@@ -1639,6 +1875,7 @@ export default {
       // 通知公告弹窗
       noticePopupDialogVisible: false,
       noticePopupData: null,
+      noticePopupSelectedIndex: 0,
       // 产品类别管理
       categoryDialogVisible: false,
       categoryForm: {
@@ -1683,6 +1920,9 @@ export default {
     },
     adminOrderTrendTotal() {
       return this.adminOrderTrend.reduce((sum, item) => sum + Number(item.orderCount || 0), 0)
+    },
+    noticePopupCurrent() {
+      return this.publishedNoticeList[this.noticePopupSelectedIndex] || this.publishedNoticeList[0] || null
     },
   },
   mounted() {
@@ -1805,7 +2045,45 @@ export default {
     },
 
     initializeNoticeCenter() {
-      this.refreshPublishedNotices()
+      this.refreshPublishedNotices().then(() => {
+        this.maybeOpenNoticePopup()
+      })
+    },
+
+    maybeOpenNoticePopup() {
+      if (!this.publishedNoticeList.length) {
+        return
+      }
+
+      const latestVersion = this.publishedNoticeList[0]?.publishedAt || ''
+      if (!latestVersion) {
+        return
+      }
+
+      const seenVersion = sessionStorage.getItem('noticePopupVersion')
+      if (seenVersion === latestVersion) {
+        return
+      }
+
+      this.noticePopupSelectedIndex = 0
+      this.noticePopupDialogVisible = true
+      sessionStorage.setItem('noticePopupVersion', latestVersion)
+    },
+
+    selectNoticePopupItem(index) {
+      this.noticePopupSelectedIndex = index
+    },
+
+    openNoticeFromPopup() {
+      if (!this.noticePopupCurrent) {
+        return
+      }
+      this.openNoticeDetail(this.noticePopupCurrent)
+      this.noticePopupDialogVisible = false
+    },
+
+    closeNoticePopup() {
+      this.noticePopupDialogVisible = false
     },
 
     async openNoticePublishDialog() {
@@ -1970,13 +2248,14 @@ export default {
       }
     },
 
-    handleMenuSelect(key) {
+    async handleMenuSelect(key) {
       this.activeMenu = key
 
       switch (key) {
         case 'home':
-          this.loadStats()
-          this.refreshPublishedNotices()
+          await this.loadStats()
+          await this.refreshPublishedNotices()
+          this.maybeOpenNoticePopup()
           break
         case 'product':
           this.loadProducts()
@@ -1996,8 +2275,9 @@ export default {
         case 'notice':
           // 通知公告页面，切换到首页显示通知列表
           this.activeMenu = 'home'
-          this.loadStats()
-          this.refreshPublishedNotices()
+          await this.loadStats()
+          await this.refreshPublishedNotices()
+          this.maybeOpenNoticePopup()
           break
         case 'userAdmin':
           this.loadUsers()
@@ -2354,6 +2634,239 @@ export default {
       }
     },
 
+    openProductInsuranceBatchDialog(product) {
+      if (!product || !product.id) {
+        this.$message.warning('请选择需要批量激活的产品')
+        return
+      }
+      if (product.saleStatus && product.saleStatus !== 'ON_SALE') {
+        this.$message.warning('下架产品不可批量激活')
+        return
+      }
+      if (!product.templateFileName) {
+        this.$message.warning('该产品暂无模板文件，请先在编辑产品中上传模板文件')
+        return
+      }
+      this.productInsuranceBatchProduct = { ...product }
+      this.productInsuranceBatchDialogTitle = `批量激活 - ${product.name || '产品'}`
+      this.productInsuranceBatchFile = null
+      this.productInsuranceBatchPreviewCount = null
+      this.productInsuranceBatchPreviewRows = []
+      this.productInsuranceBatchPreviewLoading = false
+      this.productInsuranceBatchConfirmDialogVisible = false
+      this.productInsuranceBatchPreviewRequestId += 1
+      this.productInsuranceBatchDialogVisible = true
+      this.$nextTick(() => {
+        this.$refs.productInsuranceBatchUploadRef?.clearFiles?.()
+      })
+    },
+
+    closeProductInsuranceBatchDialog() {
+      this.productInsuranceBatchDialogVisible = false
+      this.productInsuranceBatchConfirmDialogVisible = false
+      this.productInsuranceBatchFile = null
+      this.productInsuranceBatchProduct = null
+      this.productInsuranceBatchPreviewCount = null
+      this.productInsuranceBatchPreviewRows = []
+      this.productInsuranceBatchPreviewLoading = false
+      this.productInsuranceBatchPreviewRequestId += 1
+      this.$nextTick(() => {
+        this.$refs.productInsuranceBatchUploadRef?.clearFiles?.()
+      })
+    },
+
+    beforeProductInsuranceBatchUpload(file) {
+      const isXlsx = /\.(xls|xlsx)$/i.test(file.name)
+      const isLt10M = file.size / 1024 / 1024 < 10
+      if (!isXlsx) {
+        this.$message.error('只能上传 .xls 或 .xlsx 格式的Excel文件')
+        return false
+      }
+      if (!isLt10M) {
+        this.$message.error('文件大小不能超过 10MB')
+        return false
+      }
+      return true
+    },
+
+    handleProductInsuranceBatchFileChange(uploadFile) {
+      const rawFile = uploadFile?.raw || null
+      if (!rawFile) {
+        this.productInsuranceBatchFile = null
+        this.productInsuranceBatchPreviewCount = null
+        this.productInsuranceBatchPreviewRows = []
+        return
+      }
+      if (!this.validateProductInsuranceBatchFile(rawFile)) {
+        this.productInsuranceBatchFile = null
+        this.productInsuranceBatchPreviewCount = null
+        this.productInsuranceBatchPreviewRows = []
+        this.$nextTick(() => {
+          this.$refs.productInsuranceBatchUploadRef?.clearFiles?.()
+        })
+        return
+      }
+      this.productInsuranceBatchFile = rawFile
+      this.productInsuranceBatchPreviewRows = []
+      this.productInsuranceBatchConfirmDialogVisible = false
+      this.previewProductInsuranceBatchCount(rawFile)
+    },
+
+    handleProductInsuranceBatchFileRemove() {
+      this.productInsuranceBatchFile = null
+      this.productInsuranceBatchPreviewCount = null
+      this.productInsuranceBatchPreviewRows = []
+      this.productInsuranceBatchPreviewLoading = false
+      this.productInsuranceBatchConfirmDialogVisible = false
+      this.productInsuranceBatchPreviewRequestId += 1
+    },
+
+    validateProductInsuranceBatchFile(file) {
+      if (!file) {
+        return false
+      }
+      const isExcel = /\.(xls|xlsx)$/i.test(file.name)
+      const isLt10M = file.size / 1024 / 1024 < 10
+      if (!isExcel) {
+        this.$message.error('只能上传 .xls 或 .xlsx 格式的Excel文件')
+        return false
+      }
+      if (!isLt10M) {
+        this.$message.error('文件大小不能超过 10MB')
+        return false
+      }
+      return true
+    },
+
+    async previewProductInsuranceBatchCount(file) {
+      if (!this.productInsuranceBatchProduct?.id || !file) {
+        this.productInsuranceBatchPreviewCount = null
+        this.productInsuranceBatchPreviewRows = []
+        return
+      }
+
+      const requestId = ++this.productInsuranceBatchPreviewRequestId
+      this.productInsuranceBatchPreviewLoading = true
+      this.productInsuranceBatchPreviewCount = null
+      this.productInsuranceBatchPreviewRows = []
+
+      try {
+        const formData = new FormData()
+        formData.append('file', file)
+        const res = await this.$axios.post(
+          `/api/anxinxuan/products/${this.productInsuranceBatchProduct.id}/insurance-template/preview`,
+          formData,
+          { headers: { 'Content-Type': 'multipart/form-data' } }
+        )
+        if (requestId !== this.productInsuranceBatchPreviewRequestId) {
+          return
+        }
+        if (this.isSuccess(res)) {
+          this.productInsuranceBatchPreviewCount = res.data.data?.previewCount ?? 0
+          this.productInsuranceBatchPreviewRows = res.data.data?.previewRows || []
+        } else {
+          this.$message.error(res.data?.message || '预览导入条数失败')
+        }
+      } catch (error) {
+        if (requestId !== this.productInsuranceBatchPreviewRequestId) {
+          return
+        }
+        console.error('预览导入条数失败:', error)
+        this.$message.error(error.response?.data?.message || '预览导入条数失败')
+      } finally {
+        if (requestId === this.productInsuranceBatchPreviewRequestId) {
+          this.productInsuranceBatchPreviewLoading = false
+        }
+      }
+    },
+
+    openProductInsuranceBatchConfirmDialog() {
+      if (!this.productInsuranceBatchFile) {
+        this.$message.warning('请选择需要上传的Excel文件')
+        return
+      }
+      if (this.productInsuranceBatchPreviewLoading) {
+        this.$message.warning('正在预览文件，请稍后再操作')
+        return
+      }
+      if (!this.productInsuranceBatchPreviewRows.length) {
+        this.$message.warning('当前没有可确认的数据，请检查模板内容')
+        return
+      }
+      this.productInsuranceBatchConfirmDialogVisible = true
+    },
+
+    closeProductInsuranceBatchConfirmDialog() {
+      this.productInsuranceBatchConfirmDialogVisible = false
+    },
+
+    async submitProductInsuranceBatch() {
+      if (!this.productInsuranceBatchProduct?.id) {
+        this.$message.warning('请选择需要批量激活的产品')
+        return
+      }
+      if (!this.productInsuranceBatchFile) {
+        this.$message.warning('请选择需要上传的Excel文件')
+        return
+      }
+      if (this.productInsuranceBatchPreviewLoading) {
+        this.$message.warning('正在预览文件，请稍后再提交')
+        return
+      }
+      if (!this.productInsuranceBatchPreviewRows.length) {
+        this.$message.warning('请先查看确认页')
+        return
+      }
+
+      this.productInsuranceBatchSubmitting = true
+      try {
+        const formData = new FormData()
+        formData.append('file', this.productInsuranceBatchFile)
+        const res = await this.$axios.post(
+          `/api/anxinxuan/products/${this.productInsuranceBatchProduct.id}/insurance-template/import`,
+          formData,
+          { headers: { 'Content-Type': 'multipart/form-data' } }
+        )
+        if (this.isSuccess(res)) {
+          const count = res.data.data?.importedCount ?? 0
+          this.$message.success(res.data.data?.message || `已处理 ${count} 条投保信息`)
+          this.closeProductInsuranceBatchDialog()
+          this.loadExpenses()
+          this.loadInsurances()
+          this.loadStats()
+        } else {
+          this.$message.error(res.data?.message || '批量激活失败')
+        }
+      } catch (error) {
+        console.error('批量激活失败:', error)
+        this.$message.error(error.response?.data?.message || '批量激活失败，请检查模板后重试')
+      } finally {
+        this.productInsuranceBatchSubmitting = false
+      }
+    },
+
+    async downloadProductTemplate(product) {
+      if (!product?.id) {
+        this.$message.warning('请选择需要下载模板的产品')
+        return
+      }
+      if (!product.templateFileName) {
+        this.$message.warning('该产品暂无可下载的模板文件')
+        return
+      }
+
+      try {
+        await this.downloadFile(
+          `/api/images/template/${product.id}`,
+          product.templateFileName
+        )
+        this.$message.success('模板文件下载已开始')
+      } catch (error) {
+        console.error('下载产品模板失败:', error)
+        this.$message.error(error.response?.data?.message || '模板文件下载失败')
+      }
+    },
+
     openActivateDialog(product) {
       if (product.saleStatus && product.saleStatus !== 'ON_SALE') {
         this.$message.warning('下架产品不可激活')
@@ -2429,7 +2942,7 @@ export default {
         plan: 'all',
         status: 'all',
         serial: '',
-        dateRange: null
+        dateRange: []
       }
       this.expenseCurrentPage = 1
       this.loadExpenses()
@@ -2438,11 +2951,15 @@ export default {
     async loadExpenses() {
       this.expenseLoading = true
       try {
+        const [startDate, endDate] = Array.isArray(this.expenseFilter.dateRange) ? this.expenseFilter.dateRange : []
         const params = {
           page: this.expenseCurrentPage,
-          size: 20,
+          size: this.expensePageSize,
+          plan: this.expenseFilter.plan === 'all' ? '' : this.expenseFilter.plan,
           status: this.expenseFilter.status === 'all' ? '' : this.expenseFilter.status,
-          serialNo: this.expenseFilter.serial
+          serialNo: this.expenseFilter.serial,
+          startDate,
+          endDate
         }
         const endpoint = this.isAdmin ? '/api/admin/expenses' : '/api/anxinxuan/expenses'
         const res = await this.$axios.get(endpoint, { params })
@@ -2483,7 +3000,7 @@ export default {
         plan: 'all',
         status: 'all',
         serial: '',
-        dateRange: null,
+        dateRange: [],
         insuredName: '',
         insuredId: '',
         beneficiaryName: '',
@@ -2497,13 +3014,20 @@ export default {
     async loadInsurances() {
       this.insuranceLoading = true
       try {
+        const [startDate, endDate] = Array.isArray(this.insuranceFilter.dateRange) ? this.insuranceFilter.dateRange : []
         const params = {
           page: this.insuranceCurrentPage,
-          size: 20,
+          size: this.insurancePageSize,
+          plan: this.insuranceFilter.plan === 'all' ? '' : this.insuranceFilter.plan,
           status: this.insuranceFilter.status === 'all' ? '' : this.insuranceFilter.status,
           serialNo: this.insuranceFilter.serial,
+          startDate,
+          endDate,
           insuredName: this.insuranceFilter.insuredName,
-          beneficiaryName: this.insuranceFilter.beneficiaryName
+          insuredId: this.insuranceFilter.insuredId,
+          beneficiaryName: this.insuranceFilter.beneficiaryName,
+          beneficiaryId: this.insuranceFilter.beneficiaryId,
+          agent: this.insuranceFilter.agent
         }
         const endpoint = this.isAdmin ? '/api/admin/insurances' : '/api/anxinxuan/insurances'
         const res = await this.$axios.get(endpoint, { params })
@@ -2534,9 +3058,104 @@ export default {
       this.loadInsurances()
     },
 
-    handleInsuranceSizeChange() {
+    handleInsuranceSizeChange(size) {
+      this.insurancePageSize = size
       this.insuranceCurrentPage = 1
       this.loadInsurances()
+    },
+
+    buildQueryParams(source) {
+      const params = new URLSearchParams()
+      Object.entries(source || {}).forEach(([key, value]) => {
+        if (value === null || value === undefined || value === '' || value === 'all') {
+          return
+        }
+        params.append(key, value)
+      })
+      return params.toString()
+    },
+
+    async downloadFile(url, fallbackFileName = 'download.bin') {
+      try {
+        const response = await this.$axios.get(url, { responseType: 'blob' })
+        const blob = response.data instanceof Blob ? response.data : new Blob([response.data])
+        const disposition = response.headers?.['content-disposition'] || response.headers?.['Content-Disposition'] || ''
+        const fileName = this.resolveDownloadFileName(disposition, fallbackFileName)
+        const objectUrl = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = objectUrl
+        link.download = fileName
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.setTimeout(() => window.URL.revokeObjectURL(objectUrl), 1000)
+      } catch (error) {
+        console.error('文件下载失败:', error)
+        throw error
+      }
+    },
+
+    resolveDownloadFileName(disposition, fallbackFileName) {
+      if (!disposition) {
+        return fallbackFileName
+      }
+
+      const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i)
+      if (utf8Match?.[1]) {
+        try {
+          return decodeURIComponent(utf8Match[1])
+        } catch (error) {
+          return utf8Match[1]
+        }
+      }
+
+      const asciiMatch = disposition.match(/filename="?([^";]+)"?/i)
+      if (asciiMatch?.[1]) {
+        return asciiMatch[1]
+      }
+
+      return fallbackFileName
+    },
+
+    async downloadExpenseExport() {
+      const [startDate, endDate] = Array.isArray(this.expenseFilter.dateRange) ? this.expenseFilter.dateRange : []
+      const query = this.buildQueryParams({
+        plan: this.expenseFilter.plan,
+        status: this.expenseFilter.status,
+        serialNo: this.expenseFilter.serial,
+        startDate,
+        endDate
+      })
+
+      try {
+        await this.downloadFile(`/api/anxinxuan/expenses/export${query ? `?${query}` : ''}`, 'expense-export.xlsx')
+        this.$message.success('费用清单导出已开始')
+      } catch (error) {
+        this.$message.error(error.response?.data?.message || '费用清单导出失败')
+      }
+    },
+
+    async downloadInsuranceExport() {
+      const [startDate, endDate] = Array.isArray(this.insuranceFilter.dateRange) ? this.insuranceFilter.dateRange : []
+      const query = this.buildQueryParams({
+        plan: this.insuranceFilter.plan,
+        status: this.insuranceFilter.status,
+        serialNo: this.insuranceFilter.serial,
+        startDate,
+        endDate,
+        insuredName: this.insuranceFilter.insuredName,
+        insuredId: this.insuranceFilter.insuredId,
+        beneficiaryName: this.insuranceFilter.beneficiaryName,
+        beneficiaryId: this.insuranceFilter.beneficiaryId,
+        agent: this.insuranceFilter.agent
+      })
+
+      try {
+        await this.downloadFile(`/api/anxinxuan/insurances/export${query ? `?${query}` : ''}`, 'insurance-export.pdf')
+        this.$message.success('保险清单导出已开始')
+      } catch (error) {
+        this.$message.error(error.response?.data?.message || '保险清单导出失败')
+      }
     },
 
     handleSelectionChange(selection) {
@@ -2695,12 +3314,17 @@ export default {
       }
     },
 
-    downloadPolicy(row) {
-      if (!row.policyNo) {
-        this.$message.warning('该保单尚未生效，暂无正式保单号')
+    async downloadPolicy(row) {
+      if (!row || !row.id) {
+        this.$message.warning('请选择需要导出的保险记录')
         return
       }
-      this.$message.success(`开始下载保单：${row.policyNo}`)
+      try {
+        await this.downloadFile(`/api/anxinxuan/insurances/${row.id}/pdf`, `insurance-${row.id}.pdf`)
+        this.$message.success('已开始导出PDF')
+      } catch (error) {
+        this.$message.error(error.response?.data?.message || 'PDF导出失败')
+      }
     },
 
     async submitInsuranceDraft(row) {
@@ -3089,16 +3713,6 @@ export default {
       this.previewImageDialogVisible = true
     },
 
-    // 下载产品模板
-    downloadProductTemplate(product) {
-      const link = document.createElement('a')
-      link.href = `/api/images/template/${product.id}`
-      link.download = product.templateFileName || 'template.xlsx'
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-    },
-
     // 图片上传前验证
     beforeImageUpload(file) {
       if (!this.productForm.id) {
@@ -3198,13 +3812,21 @@ export default {
     },
 
     // 下载模板文件
-    downloadTemplate() {
-      const link = document.createElement('a')
-      link.href = `/api/images/product/${this.productForm.id}/template`
-      link.download = this.productForm.templateFileName
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
+    async downloadTemplate() {
+      if (!this.productForm.id) {
+        this.$message.warning('请先保存产品后再下载模板文件')
+        return
+      }
+
+      try {
+        await this.downloadFile(
+          `/api/images/product/${this.productForm.id}/template`,
+          this.productForm.templateFileName || 'template'
+        )
+        this.$message.success('模板文件下载已开始')
+      } catch (error) {
+        this.$message.error(error.response?.data?.message || '模板文件下载失败')
+      }
     },
 
     // 删除模板文件
@@ -4048,11 +4670,18 @@ body {
 
 .product-footer {
   display: flex;
-  align-items: center;
-  gap: 24px;
-  padding: 8px 0;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 0 0;
   border-top: 1px solid #f0f0f0;
   margin-top: auto;
+}
+
+.product-stats-row {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
 }
 
 .price-info, .stock-info {
@@ -4086,11 +4715,77 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-left: auto;
+  flex-wrap: wrap;
 }
 
 .product-actions .el-button {
   padding: 6px 12px;
+}
+
+.product-actions .el-button {
+  flex: 0 0 auto;
+}
+
+.product-batch-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.product-batch-summary {
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(230, 0, 18, 0.08), rgba(255, 255, 255, 0.96));
+  border: 1px solid rgba(230, 0, 18, 0.12);
+}
+
+.product-batch-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 6px;
+}
+
+.product-batch-subtitle {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #6b7280;
+}
+
+.product-batch-upload {
+  width: 100%;
+}
+
+.product-batch-upload .el-upload {
+  width: 100%;
+}
+
+.product-batch-upload .el-upload-dragger {
+  width: 100%;
+  border-radius: 16px;
+  border: 1px dashed rgba(230, 0, 18, 0.28);
+  background: #fffdfd;
+}
+
+.product-batch-preview-tip {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #1f2937;
+  padding: 0 4px;
+}
+
+.product-batch-preview-tip--muted {
+  color: #6b7280;
+}
+
+.product-batch-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.product-batch-preview-table {
+  width: 100%;
 }
 
 @media screen and (max-width: 1200px) {
@@ -4180,6 +4875,153 @@ body {
 
 .notice-publish-dialog .el-dialog__body {
   padding-top: 8px;
+}
+
+.notice-popup-dialog .el-dialog {
+  border-radius: 22px;
+  overflow: hidden;
+}
+
+.notice-popup-dialog .el-dialog__body {
+  padding-top: 12px;
+}
+
+.notice-popup-shell {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: 18px;
+}
+
+.notice-popup-list,
+.notice-popup-detail {
+  border-radius: 18px;
+  border: 1px solid #eef1f6;
+  background: #fff;
+}
+
+.notice-popup-list {
+  padding: 16px;
+  max-height: 60vh;
+  overflow: auto;
+}
+
+.notice-popup-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.notice-popup-items {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.notice-popup-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #eef1f6;
+  border-radius: 14px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  appearance: none;
+  font: inherit;
+  color: inherit;
+}
+
+.notice-popup-item:hover,
+.notice-popup-item.active {
+  border-color: #e60012;
+  box-shadow: 0 8px 20px rgba(230, 0, 18, 0.08);
+  transform: translateY(-1px);
+}
+
+.notice-popup-index {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: #fff1f0;
+  color: #e60012;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.notice-popup-item-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.notice-popup-item-body h4 {
+  margin-bottom: 6px;
+  font-size: 15px;
+  color: #111827;
+  line-height: 1.4;
+}
+
+.notice-popup-item-body p {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #6b7280;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.notice-popup-detail {
+  padding: 22px;
+  background: linear-gradient(180deg, #fff7f7 0%, #ffffff 100%);
+}
+
+.notice-popup-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #fff1f0;
+  color: #e60012;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.notice-popup-detail h3 {
+  margin: 14px 0 12px;
+  font-size: 24px;
+  line-height: 1.35;
+  color: #111827;
+}
+
+.notice-popup-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #6b7280;
+  font-size: 13px;
+  margin-bottom: 18px;
+}
+
+.notice-popup-content {
+  min-height: 240px;
+  padding: 18px 20px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid #eef1f6;
+  color: #1f2937;
+  font-size: 15px;
+  line-height: 1.9;
+  white-space: pre-wrap;
 }
 
 /* 响应式设计 - 移动端优先 */
@@ -4279,10 +5121,12 @@ body {
     flex-wrap: wrap;
   }
 
+  .product-stats-row {
+    gap: 12px;
+  }
+
   .product-actions {
     width: 100%;
-    margin-left: 0;
-    margin-top: 12px;
     justify-content: flex-start;
   }
 
@@ -4328,6 +5172,10 @@ body {
     gap: 12px;
   }
 
+  .product-stats-row {
+    gap: 12px;
+  }
+
   .price-info, .stock-info {
     flex: 1;
     min-width: calc(50% - 6px);
@@ -4335,8 +5183,6 @@ body {
 
   .product-actions {
     width: 100%;
-    margin-left: 0;
-    margin-top: 8px;
     justify-content: flex-start;
     flex-wrap: wrap;
     gap: 6px;
