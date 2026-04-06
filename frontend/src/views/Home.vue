@@ -1,891 +1,133 @@
 <template>
   <div class="app-container">
-    <!-- 顶部导航栏 -->
-    <header class="header">
-      <div class="logo">
-        <span class="logo-text">优选通</span>
-        <span class="logo-sub">保险服务平台</span>
-      </div>
-      <nav class="nav">
-        <el-menu :default-active="activeMenu" class="el-menu-demo" mode="horizontal" @select="handleMenuSelect">
-          <el-menu-item index="home">
-            <el-icon><House /></el-icon>
-            <span class="nav-text">首页</span>
-          </el-menu-item>
-          <el-menu-item index="product">
-            <el-icon><Goods /></el-icon>
-            <span class="nav-text">产品中心</span>
-          </el-menu-item>
-          <el-menu-item index="expense">
-            <el-icon><Document /></el-icon>
-            <span class="nav-text">费用清单</span>
-          </el-menu-item>
-          <el-menu-item index="insurance">
-            <el-icon><Collection /></el-icon>
-            <span class="nav-text">保险清单</span>
-          </el-menu-item>
-          <el-menu-item index="recharge">
-            <el-icon><Wallet /></el-icon>
-            <span class="nav-text">消费明细</span>
-          </el-menu-item>
+    <AppHeader
+      :active-menu="activeMenu"
+      :is-admin="isAdmin"
+      :current-user="currentUser"
+      :balance="balance"
+      @select="handleMenuSelect"
+      @logout="handleUserCommand('logout')"
+    />
 
-          <el-menu-item index="userAdmin" v-if="isAdmin">
-            <el-icon><User /></el-icon>
-            <span class="nav-text">用户管理</span>
-          </el-menu-item>
-        </el-menu>
-      </nav>
-      <div class="header-right">
-        <div class="user-info-dropdown">
-          <el-dropdown trigger="click" @command="handleUserCommand">
-            <div class="user-info-trigger">
-              <el-icon><User /></el-icon>
-              <span class="user-name">{{ currentUser }}</span>
-              <el-icon class="dropdown-arrow"><ArrowDown /></el-icon>
-            </div>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <div class="dropdown-user-info">
-                  <div class="dropdown-balance">
-                    <el-icon><Coin /></el-icon>
-                    <span>余额：¥{{ balance.toFixed(2) }}</span>
-                  </div>
-                </div>
-                <el-dropdown-item command="logout" divided>
-                  <el-icon><SwitchButton /></el-icon>
-                  <span>退出登录</span>
-                </el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
-        </div>
-      </div>
-    </header>
-
-    <!-- 主体内容 -->
     <main class="main-content">
-      <!-- 左侧产品类别菜单 -->
-      <aside class="sidebar" v-if="activeMenu === 'product'">
-        <div class="sidebar-section">
-          <h3 class="sidebar-title">
-            <el-icon><Grid /></el-icon>
-            产品类别
-          </h3>
-          <el-menu :default-active="activeCategory" class="el-menu-vertical-demo" @select="handleCategorySelect">
-            <el-menu-item index="all">
-              <el-icon><Menu /></el-icon>
-              全部产品
-            </el-menu-item>
-            <el-menu-item index="1-3">
-              <el-icon><Sunny /></el-icon>
-              1-3类意外
-            </el-menu-item>
-            <el-menu-item index="1-4">
-              <el-icon><Sunny /></el-icon>
-              1-4类意外
-            </el-menu-item>
-            <el-menu-item index="1-5">
-              <el-icon><Sunny /></el-icon>
-              1-5类意外
-            </el-menu-item>
-            <el-menu-item index="1-6">
-              <el-icon><Sunny /></el-icon>
-              1-6类意外
-            </el-menu-item>
-            <el-menu-item index="child">
-              <el-icon><Star /></el-icon>
-              少儿医疗
-            </el-menu-item>
-            <el-menu-item index="elder">
-              <el-icon><Present /></el-icon>
-              老年意外
-            </el-menu-item>
-            <el-menu-item index="travel">
-              <el-icon><Present /></el-icon>
-              旅游险
-            </el-menu-item>
-            <el-menu-item index="maternity">
-              <el-icon><Present /></el-icon>
-              驾乘险
-            </el-menu-item>
-          </el-menu>
-        </div>
-      </aside>
+      <ProductCenterSection
+        v-if="activeMenu === 'product'"
+        :is-admin="isAdmin"
+        :active-category="activeCategory"
+        :category-list="categoryList"
+        :company-filter="companyFilter"
+        :company-list="companyList"
+        :filter-text="getFilterText()"
+        :products="products"
+        :product-loading="productLoading"
+        :product-total="productTotal"
+        :product-page-size="productPageSize"
+        :product-current-page="productCurrentPage"
+        @category-select="handleCategorySelect"
+        @company-change="handleCompanyChange"
+        @reset-filter="resetProductFilter"
+        @open-category-dialog="openCategoryDialog"
+        @open-company-dialog="openCompanyDialog"
+        @add-product="openProductDialog()"
+        @preview-image="previewImage"
+        @open-product-dialog="openProductDialog"
+        @toggle-product-status="toggleProductStatus"
+        @delete-product="deleteProduct"
+        @open-batch-dialog="openProductInsuranceBatchDialog"
+        @download-template="downloadProductTemplate"
+        @open-activate-dialog="openActivateDialog"
+        @page-change="handleProductPageChange"
+        @size-change="handleProductSizeChange"
+      />
 
-      <!-- 右侧主内容区域 -->
-      <section class="content">
-        <!-- 首页 -->
-        <div v-if="activeMenu === 'home'" class="page home-page">
-          <div class="welcome-card">
-            <div class="welcome-icon">
-              <el-icon :size="60"><CircleCheck /></el-icon>
-            </div>
-            <h1>欢迎使用优选通保险服务平台</h1>
-            <p>为您的家庭保驾护航，提供专业、稳健、有温度的风险保障方案</p>
-            <div class="quick-actions">
-              <el-button type="primary" size="large" @click="activeMenu = 'product'">
-                <el-icon><Goods /></el-icon>
-                浏览产品
-              </el-button>
-              <el-button type="success" size="large" @click="activeMenu = 'insurance'">
-                <el-icon><Document /></el-icon>
-                查看保单
-              </el-button>
-            </div>
-          </div>
-          <div class="stats-cards" v-if="!isAdmin">
-            <div class="stat-card">
-              <div class="stat-icon blue">
-                <el-icon><Goods /></el-icon>
-              </div>
-              <div class="stat-info">
-                <span class="stat-number">{{ stats.totalProducts }}</span>
-                <span class="stat-name">在售产品</span>
-              </div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-icon green">
-                <el-icon><Collection /></el-icon>
-              </div>
-              <div class="stat-info">
-                <span class="stat-number">{{ stats.totalPolicies }}</span>
-                <span class="stat-name">有效保单</span>
-              </div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-icon orange">
-                <el-icon><Coin /></el-icon>
-              </div>
-              <div class="stat-info">
-                <span class="stat-number">¥{{ Number(stats.totalExpenses || 0).toFixed(2) }}</span>
-                <span class="stat-name">累计消费</span>
-              </div>
-            </div>
-          </div>
-          
-          <div class="stats-cards" v-else>
-            <div class="stat-card">
-              <div class="stat-icon blue">
-                <el-icon><Calendar /></el-icon>
-              </div>
-              <div class="stat-info">
-                <span class="stat-number">{{ stats.todayNewOrders }}</span>
-                <span class="stat-name">今日新增订单</span>
-              </div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-icon green">
-                <el-icon><Timer /></el-icon>
-              </div>
-              <div class="stat-info">
-                <span class="stat-number">{{ stats.pendingOrders }}</span>
-                <span class="stat-name">待处理订单</span>
-              </div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-icon orange">
-                <el-icon><Notebook /></el-icon>
-              </div>
-              <div class="stat-info">
-                <span class="stat-number">{{ stats.monthOrders }}</span>
-                <span class="stat-name">本月订单数</span>
-              </div>
-            </div>
-          </div>
+      <section v-else class="content">
+        <HomeOverviewSection
+          v-if="activeMenu === 'home'"
+          :is-admin="isAdmin"
+          :stats="stats"
+          :admin-analysis-period-type="adminAnalysisPeriodType"
+          :admin-analysis-range-text="adminAnalysisRangeText"
+          :admin-order-trend-range-text="adminOrderTrendRangeText"
+          :admin-order-trend-mode-label="adminOrderTrendModeLabel"
+          :admin-sales-ranking="adminSalesRanking"
+          :admin-order-trend="adminOrderTrend"
+          :published-notice-time-text="publishedNoticeTimeText"
+          :published-notice-list="publishedNoticeList"
+          @goto-product="activeMenu = 'product'"
+          @goto-insurance="activeMenu = 'insurance'"
+          @apply-admin-analysis-preset="applyAdminAnalysisPreset"
+          @open-notice-publish="openNoticePublishDialog"
+          @open-notice-detail="openNoticeDetail"
+        />
 
-          <div v-if="isAdmin" class="admin-analysis-toolbar">
-            <div class="admin-analysis-filter">
-              <div class="admin-analysis-filter-meta">
-                <h3>经营分析</h3>
-                <p>可按时间范围查看销量排行与订单总量走势</p>
-              </div>
-              <div class="admin-analysis-filter-actions">
-                <el-button :type="adminAnalysisPeriodType === 'WEEK' ? 'primary' : 'default'" @click="applyAdminAnalysisPreset('WEEK')">本周</el-button>
-                <el-button :type="adminAnalysisPeriodType === 'MONTH' ? 'primary' : 'default'" @click="applyAdminAnalysisPreset('MONTH')">本月</el-button>
-                <el-button :type="adminAnalysisPeriodType === 'QUARTER' ? 'primary' : 'default'" @click="applyAdminAnalysisPreset('QUARTER')">季度</el-button>
-                <el-button :type="adminAnalysisPeriodType === 'YEAR' ? 'primary' : 'default'" @click="applyAdminAnalysisPreset('YEAR')">全年</el-button>
-              </div>
-            </div>
-          </div>
+        <ExpenseSection
+          v-else-if="activeMenu === 'expense'"
+          :is-admin="isAdmin"
+          :expense-filter="expenseFilter"
+          :expense-list="expenseList"
+          :expense-loading="expenseLoading"
+          :expense-total="expenseTotal"
+          :expense-page-size="expensePageSize"
+          @reset-filter="resetExpenseFilter"
+          @download-export="downloadExpenseExport"
+          @query="queryExpenses"
+          @page-change="handleExpensePageChange"
+          @view-detail="viewExpenseDetail"
+        />
 
-          <div v-if="isAdmin" class="admin-analysis-grid admin-analysis-stack">
-            <div class="admin-analysis-card">
-              <div class="admin-analysis-header">
-                <div>
-                  <h3>产品销量排行</h3>
-                  <p>{{ adminAnalysisRangeText }}</p>
-                </div>
-                <el-tag type="success" effect="plain">TOP 10</el-tag>
-              </div>
-              <el-table v-if="adminSalesRanking.length" :data="adminSalesRanking" size="small" stripe>
-                <el-table-column prop="rankNo" label="排名" width="70" align="center" />
-                <el-table-column prop="productName" label="产品名称" min-width="220" show-overflow-tooltip />
-                <el-table-column prop="orderCount" label="订单数" width="90" align="center" />
-                <el-table-column prop="salesQuantity" label="销量份数" width="100" align="center" />
-                <el-table-column label="销售金额" width="120" align="right">
-                  <template #default="scope">¥{{ Number(scope.row.salesAmount || 0).toFixed(2) }}</template>
-                </el-table-column>
-                <el-table-column prop="activePolicyCount" label="生效保单" width="100" align="center" />
-              </el-table>
-              <el-empty v-else description="当前时间范围暂无销量数据" :image-size="88">
-                <el-button type="primary" @click="applyAdminAnalysisPreset('MONTH')">查看本月</el-button>
-              </el-empty>
-            </div>
+        <InsuranceSection
+          v-else-if="activeMenu === 'insurance'"
+          :is-admin="isAdmin"
+          :insurance-filter="insuranceFilter"
+          :insurance-list="insuranceList"
+          :insurance-loading="insuranceLoading"
+          :insurance-total="insuranceTotal"
+          :insurance-page-size="insurancePageSize"
+          :selected-insurances="selectedInsurances"
+          @reset-filter="resetInsuranceFilter"
+          @download-export="downloadInsuranceExport"
+          @query="queryInsurances"
+          @selection-change="handleSelectionChange"
+          @batch-activate="openInsuranceActivationDialog"
+          @view-detail="viewInsuranceDetail"
+          @download-policy="downloadPolicy"
+          @submit-draft="submitInsuranceDraft"
+          @approve="openInsuranceReviewDialog($event, 'approve')"
+          @reject="openInsuranceReviewDialog($event, 'reject')"
+          @underwriting="startInsuranceUnderwriting"
+          @activate="activateInsuranceRecord"
+          @page-change="handleInsurancePageChange"
+          @size-change="handleInsuranceSizeChange"
+        />
 
-            <div class="admin-analysis-card">
-              <div class="admin-analysis-header">
-                <div>
-                  <h3>总订单量表</h3>
-                  <p>{{ adminOrderTrendRangeText }}</p>
-                </div>
-                <el-tag type="warning" effect="plain">{{ adminOrderTrendModeLabel }}</el-tag>
-              </div>
-              <el-table v-if="adminOrderTrend.length" :data="adminOrderTrend" size="small" stripe>
-                <el-table-column prop="dateLabel" label="时间段" min-width="180" align="center" />
-                <el-table-column prop="orderCount" label="订单量" min-width="120" align="center" />
-              </el-table>
-              <el-empty v-else description="当前时间范围暂无订单趋势数据" :image-size="88">
-                <el-button type="primary" @click="applyAdminAnalysisPreset('MONTH')">查看本月</el-button>
-              </el-empty>
-            </div>
-          </div>
+        <RechargeSection
+          v-else-if="activeMenu === 'recharge'"
+          :is-admin="isAdmin"
+          :recharge-filter="rechargeFilter"
+          :recharge-list="rechargeList"
+          :recharge-loading="rechargeLoading"
+          :recharge-total="rechargeTotal"
+          @reset-filter="resetRechargeFilter"
+          @query="queryRecharges"
+          @open-recharge-dialog="openRechargeDialog"
+          @page-change="handleRechargePageChange"
+        />
 
-          <div class="notice-board-card">
-            <div class="notice-board-header">
-              <div class="notice-board-meta">
-                <h3>通知公告</h3>
-                <p>管理员首页和用户首页展示同一份通知列表。</p>
-              </div>
-              <div class="notice-board-actions">
-                <el-tag type="info" effect="plain">{{ publishedNoticeTimeText }}</el-tag>
-                <el-button v-if="isAdmin" type="primary" @click="openNoticePublishDialog">
-                  <el-icon><Plus /></el-icon>
-                  发布通知
-                </el-button>
-              </div>
-            </div>
-
-            <div v-if="publishedNoticeList.length" class="notice-list notice-published-list">
-              <div v-for="(item, index) in publishedNoticeList" :key="item.id || index" 
-                   class="notice-list-item notice-published-item" 
-                   @click="openNoticeDetail(item)">
-                <div class="notice-list-order">{{ index + 1 }}</div>
-                <div class="notice-list-content">
-                  <h4>{{ item.title }}</h4>
-                  <p>{{ item.content }}</p>
-                </div>
-              </div>
-            </div>
-            <el-empty v-else description="暂无通知公告" :image-size="90" />
-          </div>
-        </div>
-
-        <!-- 产品中心 -->
-        <div v-else-if="activeMenu === 'product'" class="page">
-          <!-- 产品分类筛选 -->
-          <div class="product-filter">
-            <div class="filter-header">
-              <h3><el-icon><Filter /></el-icon> 产品筛选</h3>
-              <div class="filter-header-actions">
-                <el-button v-if="isAdmin" type="warning" plain @click="openCategoryDialog">
-                  <el-icon><Setting /></el-icon>
-                  管理类别
-                </el-button>
-                <el-button v-if="isAdmin" type="success" plain @click="openCompanyDialog">
-                  <el-icon><Setting /></el-icon>
-                  管理公司
-                </el-button>
-                <el-button text @click="resetProductFilter" v-if="companyFilter !== 'all' || activeCategory !== 'all'">
-                  <el-icon><Refresh /></el-icon>
-                  重置筛选
-                </el-button>
-                <el-button v-if="isAdmin" type="primary" @click="openProductDialog()">
-                  <el-icon><Plus /></el-icon>
-                  添加产品
-                </el-button>
-              </div>
-            </div>
-            <div class="filter-row">
-              <span class="filter-label">承保公司：</span>
-              <el-radio-group v-model="companyFilter" @change="handleCompanyChange" size="default" class="product-company-group">
-                <el-radio-button label="all">全部</el-radio-button>
-                <el-radio-button v-for="company in companyList" :key="company.code" :label="company.code">
-                  {{ company.name }}
-                </el-radio-button>
-              </el-radio-group>
-            </div>
-          </div>
-
-          <!-- 产品统计 -->
-          <div class="product-stats">
-            <span class="stats-text">共 <strong>{{ productTotal }}</strong> 个产品</span>
-            <span class="stats-divider" v-if="companyFilter !== 'all'">|</span>
-            <span class="filter-status" v-if="companyFilter !== 'all'">
-              当前筛选：{{ getFilterText() }}
-            </span>
-          </div>
-
-          <!-- 产品列表 -->
-          <div class="product-list" v-loading="productLoading">
-            <div class="product-item" v-for="product in products" :key="product.id">
-              <div class="product-card">
-                <div class="product-image-wrapper" @click="previewImage(product)">
-                  <img :src="getProductImage(product)" :alt="product.name" class="product-img">
-                  <div class="image-overlay">
-                    <el-icon><ZoomIn /></el-icon>
-                    <span>点击放大</span>
-                  </div>
-                  <div class="product-badges">
-                    <span class="badge new" v-if="product.isNew">新品</span>
-                    <span class="badge hot" v-if="product.isHot">热门</span>
-                  </div>
-                </div>
-                <div class="product-content">
-                  <div class="product-header">
-                    <h3 class="product-name">{{ product.name }}</h3>
-                    <span
-                      v-if="isAdmin"
-                      class="status-badge"
-                      :class="product.saleStatus === 'ON_SALE' ? 'on-sale' : 'off-sale'"
-                    >
-                      {{ product.saleStatus === 'ON_SALE' ? '已上架' : '已下架' }}
-                    </span>
-                  </div>
-                  <div class="product-desc">
-                    <p class="desc-text">{{ product.description }}</p>
-                    <p class="features-text" v-if="product.features">
-                      <el-icon><Star /></el-icon>
-                      {{ product.features }}
-                    </p>
-                  </div>
-                  <div class="product-footer">
-                    <div class="product-stats-row">
-                      <div class="price-info">
-                        <span class="price-label">价格：</span>
-                        <span class="price-value">¥{{ product.price }}</span>
-                      </div>
-                      <div class="stock-info">
-                        <span class="stock-label">库存：</span>
-                        <span class="stock-value" :class="{ 'low-stock': product.stock < 10 }">
-                          {{ product.stock > 0 ? product.stock : '充足' }}
-                        </span>
-                      </div>
-                    </div>
-                    <div class="product-actions">
-                      <el-button v-if="isAdmin" type="primary" size="small" @click="openProductDialog(product)">
-                        <el-icon><Edit /></el-icon>
-                        编辑
-                      </el-button>
-                      <el-button
-                        v-if="isAdmin"
-                        :type="product.saleStatus === 'ON_SALE' ? 'danger' : 'success'"
-                        size="small"
-                        @click="toggleProductStatus(product)"
-                      >
-                        <el-icon><Switch /></el-icon>
-                        {{ product.saleStatus === 'ON_SALE' ? '下架' : '上架' }}
-                      </el-button>
-                      <el-button v-if="isAdmin" type="danger" plain size="small" @click="deleteProduct(product)">
-                        <el-icon><Delete /></el-icon>
-                        删除
-                      </el-button>
-                      <el-button
-                        type="warning"
-                        plain
-                        size="small"
-                        :disabled="!product.templateFileName"
-                        @click="openProductInsuranceBatchDialog(product)"
-                      >
-                        <el-icon><Upload /></el-icon>
-                        批量激活
-                      </el-button>
-                      <el-button
-                        type="primary"
-                        plain
-                        size="small"
-                        :disabled="!product.templateFileName"
-                        @click="downloadProductTemplate(product)"
-                      >
-                        <el-icon><Download /></el-icon>
-                        下载模板
-                      </el-button>
-                      <el-button
-                        type="warning"
-                        size="small"
-                        :disabled="product.saleStatus && product.saleStatus !== 'ON_SALE'"
-                        @click="openActivateDialog(product)"
-                      >
-                        <el-icon><Lightning /></el-icon>
-                        激活
-                      </el-button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <!-- 空状态 -->
-            <el-empty v-if="products.length === 0 && !productLoading" description="暂无产品数据" />
-          </div>
-
-          <!-- 分页 -->
-          <div class="pagination" v-if="products.length > 0">
-            <el-pagination
-              background
-              layout="total, sizes, prev, pager, next, jumper"
-              :total="productTotal"
-              :page-size="productPageSize"
-              :current-page="productCurrentPage"
-              :page-sizes="[5, 10, 20, 50]"
-              @size-change="handleProductSizeChange"
-              @current-change="handleProductPageChange"
-            />
-          </div>
-        </div>
-
-        <!-- 费用清单 -->
-        <div v-else-if="activeMenu === 'expense'" class="page">
-          <!-- 筛选条件 -->
-          <div class="filter-form">
-            <div class="filter-header">
-              <h3>{{ isAdmin ? '全部费用清单' : '费用筛选' }}</h3>
-              <div class="filter-header-actions">
-                <el-button text @click="resetExpenseFilter">
-                  <el-icon><Refresh /></el-icon>
-                  重置筛选
-                </el-button>
-                <el-button type="success" plain @click="downloadExpenseExport">
-                  <el-icon><Download /></el-icon>
-                  导出Excel
-                </el-button>
-              </div>
-            </div>
-            <el-form :inline="true" :model="expenseFilter" class="demo-form-inline">
-              <el-form-item label="方案">
-                <el-select v-model="expenseFilter.plan" placeholder="请选择" clearable style="width: 150px;">
-                  <el-option label="所有方案" value="all"></el-option>
-                  <el-option label="国寿财意外险（1-3类）" value="guoshou-3"></el-option>
-                  <el-option label="平安财意外险" value="pingan-10"></el-option>
-                  <el-option label="少儿医疗险" value="child-med"></el-option>
-                  <el-option label="老年意外险" value="elder-acc"></el-option>
-                  <el-option label="旅游险" value="travel"></el-option>
-                  <el-option label="驾乘险" value="maternity"></el-option>
-                </el-select>
-              </el-form-item>
-              <el-form-item label="状态">
-                <el-select v-model="expenseFilter.status" placeholder="请选择" clearable style="width: 150px;">
-                  <el-option label="全部" value="all"></el-option>
-                  <el-option label="待审核" value="PENDING_REVIEW"></el-option>
-                  <el-option label="审核通过" value="APPROVED"></el-option>
-                  <el-option label="审核驳回" value="REVIEW_REJECTED"></el-option>
-                  <el-option label="承保中" value="UNDERWRITING"></el-option>
-                  <el-option label="已生效" value="ACTIVE"></el-option>
-                  <el-option label="已取消" value="cancelled"></el-option>
-                </el-select>
-              </el-form-item>
-              <el-form-item label="序列号">
-                <el-input v-model="expenseFilter.serial" placeholder="请输入序列号" clearable style="width: 150px;"></el-input>
-              </el-form-item>
-              <el-form-item label="上传日期">
-                <el-date-picker
-                  v-model="expenseFilter.dateRange"
-                  type="daterange"
-                  value-format="YYYY-MM-DD"
-                  range-separator="至"
-                  start-placeholder="开始日期"
-                  end-placeholder="结束日期"
-                  style="width: 240px;"
-                />
-              </el-form-item>
-              <el-form-item>
-                <el-button type="primary" @click="queryExpenses">
-                  <el-icon><Search /></el-icon>
-                  查询
-                </el-button>
-              </el-form-item>
-            </el-form>
-          </div>
-
-          <!-- 费用清单表格 -->
-          <el-table :data="expenseList" style="width: 100%" v-loading="expenseLoading" stripe>
-            <el-table-column prop="serial" label="序列号" width="180"></el-table-column>
-            <el-table-column prop="product" label="产品名称" min-width="220"></el-table-column>
-            <el-table-column prop="contact" label="联系人" width="120"></el-table-column>
-            <el-table-column prop="createTime" label="创建时间" width="170"></el-table-column>
-            <el-table-column prop="status" label="状态" width="110">
-              <template #default="scope">
-                <el-tag :type="getStatusType(scope.row.status)">{{ scope.row.status }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="count" label="份数" width="90" align="center"></el-table-column>
-            <el-table-column prop="total" label="金额" width="120" align="right">
-              <template #default="scope">¥{{ scope.row.total }}</template>
-            </el-table-column>
-            <el-table-column label="操作" width="110" fixed="right">
-              <template #default="scope">
-                <el-button link type="primary" @click="viewExpenseDetail(scope.row)">详情</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-
-          <!-- 分页 -->
-          <div class="pagination">
-            <el-pagination
-              background
-              layout="total, prev, pager, next"
-              :total="expenseTotal"
-              :page-size="expensePageSize"
-              @current-change="handleExpensePageChange"
-            />
-          </div>
-        </div>
-
-        <!-- 保险清单 -->
-        <div v-else-if="activeMenu === 'insurance'" class="page">
-          <!-- 筛选条件 -->
-          <div class="filter-form">
-            <div class="filter-header">
-              <h3>{{ isAdmin ? '全部保险清单' : '保险筛选' }}</h3>
-              <div class="filter-header-actions">
-                <el-button text @click="resetInsuranceFilter">
-                  <el-icon><Refresh /></el-icon>
-                  重置筛选
-                </el-button>
-                <el-button type="success" plain @click="downloadInsuranceExport">
-                  <el-icon><Download /></el-icon>
-                  导出PDF
-                </el-button>
-              </div>
-            </div>
-            <el-form :inline="true" :model="insuranceFilter" class="demo-form-inline">
-              <el-form-item label="方案">
-                <el-select v-model="insuranceFilter.plan" placeholder="请选择" clearable style="width: 150px;">
-                  <el-option label="所有方案" value="all"></el-option>
-                  <el-option label="国寿财意外险（1-3类）" value="guoshou-3"></el-option>
-                  <el-option label="平安财意外险" value="pingan-10"></el-option>
-                  <el-option label="少儿医疗险" value="child-med"></el-option>
-                  <el-option label="老年意外险" value="elder-acc"></el-option>
-                  <el-option label="旅游险" value="travel"></el-option>
-                  <el-option label="驾乘险" value="maternity"></el-option>
-                </el-select>
-              </el-form-item>
-              <el-form-item label="状态">
-                <el-select v-model="insuranceFilter.status" placeholder="请选择" clearable style="width: 150px;">
-                  <el-option label="全部" value="all"></el-option>
-                  <el-option v-if="!isAdmin" label="待提交" value="DRAFT"></el-option>
-                  <el-option label="待审核" value="PENDING_REVIEW"></el-option>
-                  <el-option label="审核通过" value="APPROVED"></el-option>
-                  <el-option label="审核驳回" value="REVIEW_REJECTED"></el-option>
-                  <el-option label="承保中" value="UNDERWRITING"></el-option>
-                  <el-option label="已生效" value="ACTIVE"></el-option>
-                  <el-option label="已过期" value="EXPIRED"></el-option>
-                </el-select>
-              </el-form-item>
-              <el-form-item label="序列号">
-                <el-input v-model="insuranceFilter.serial" placeholder="请输入序列号" clearable style="width: 150px;"></el-input>
-              </el-form-item>
-              <el-form-item label="上传日期">
-                <el-date-picker
-                  v-model="insuranceFilter.dateRange"
-                  type="daterange"
-                  value-format="YYYY-MM-DD"
-                  range-separator="至"
-                  start-placeholder="开始日期"
-                  end-placeholder="结束日期"
-                  style="width: 240px;"
-                />
-              </el-form-item>
-              <el-form-item>
-                <el-button type="primary" @click="queryInsurances">
-                  <el-icon><Search /></el-icon>
-                  查询
-                </el-button>
-              </el-form-item>
-            </el-form>
-            <div class="filter-form-row">
-              <el-input v-model="insuranceFilter.insuredName" placeholder="投保人姓名" clearable style="width: 130px;"></el-input>
-              <el-input v-model="insuranceFilter.insuredId" placeholder="投保人证件号" clearable style="width: 130px;"></el-input>
-              <el-input v-model="insuranceFilter.beneficiaryName" placeholder="被保人姓名" clearable style="width: 130px;"></el-input>
-              <el-input v-model="insuranceFilter.beneficiaryId" placeholder="被保人证件号" clearable style="width: 130px;"></el-input>
-              <el-input v-model="insuranceFilter.agent" placeholder="业务员" clearable style="width: 130px;"></el-input>
-            </div>
-          </div>
-
-          <!-- 操作按钮 -->
-          <div v-if="isAdmin" class="table-actions">
-            <el-button
-              type="warning"
-              :disabled="!selectedInsurances.some(item => item.statusCode === 'UNDERWRITING')"
-              @click="openInsuranceActivationDialog(selectedInsurances.filter(item => item.statusCode === 'UNDERWRITING'))"
-            >
-              <el-icon><Lightning /></el-icon>
-              批量生效
-            </el-button>
-          </div>
-
-          <!-- 保险清单表格 -->
-          <el-table :data="insuranceList" style="width: 100%" v-loading="insuranceLoading" stripe @selection-change="handleSelectionChange">
-            <el-table-column v-if="isAdmin" type="selection" width="55"></el-table-column>
-            <el-table-column prop="product" label="产品名称" min-width="220"></el-table-column>
-            <el-table-column prop="insuredName" label="投保人" width="120"></el-table-column>
-            <el-table-column prop="beneficiaryName" label="被保人" width="120"></el-table-column>
-            <el-table-column prop="status" label="状态" width="110">
-              <template #default="scope">
-                <el-tag :type="getStatusType(scope.row.status)">{{ scope.row.status }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="policyNo" label="保单号" min-width="200" show-overflow-tooltip></el-table-column>
-            <el-table-column prop="startDate" label="起保日期" width="120"></el-table-column>
-            <el-table-column prop="endDate" label="结束日期" width="120"></el-table-column>
-            <el-table-column v-if="isAdmin" prop="agent" label="业务员" width="110"></el-table-column>
-            <el-table-column label="操作" width="220" fixed="right">
-              <template #default="scope">
-                <el-button link type="primary" @click="viewInsuranceDetail(scope.row)">详情</el-button>
-                <el-button link type="success" @click="downloadPolicy(scope.row)">导出PDF</el-button>
-                <el-button
-                  v-if="!isAdmin && scope.row.statusCode === 'DRAFT'"
-                  link
-                  type="primary"
-                  @click="submitInsuranceDraft(scope.row)"
-                >
-                  提交审核
-                </el-button>
-                <el-button
-                  v-if="isAdmin && scope.row.statusCode === 'PENDING_REVIEW'"
-                  link
-                  type="success"
-                  @click="openInsuranceReviewDialog(scope.row, 'approve')"
-                >
-                  通过
-                </el-button>
-                <el-button
-                  v-if="isAdmin && scope.row.statusCode === 'PENDING_REVIEW'"
-                  link
-                  type="danger"
-                  @click="openInsuranceReviewDialog(scope.row, 'reject')"
-                >
-                  驳回
-                </el-button>
-                <el-button
-                  v-if="isAdmin && scope.row.statusCode === 'APPROVED'"
-                  link
-                  type="warning"
-                  @click="startInsuranceUnderwriting(scope.row)"
-                >
-                  承保
-                </el-button>
-                <el-button
-                  v-if="isAdmin && scope.row.statusCode === 'UNDERWRITING'"
-                  link
-                  type="warning"
-                  @click="openInsuranceActivationDialog([scope.row])"
-                >
-                  生效
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-
-          <!-- 分页 -->
-          <div class="pagination">
-            <el-pagination
-              background
-              layout="total, sizes, prev, pager, next"
-              :total="insuranceTotal"
-              :page-size="insurancePageSize"
-              :page-sizes="[10, 20, 50, 100]"
-              @size-change="handleInsuranceSizeChange"
-              @current-change="handleInsurancePageChange"
-            />
-          </div>
-        </div>
-
-        <!-- 充值消费明细 -->
-        <div v-else-if="activeMenu === 'recharge'" class="page">
-          <!-- 筛选条件 -->
-          <div class="filter-form">
-            <div class="filter-header">
-              <h3>消费筛选</h3>
-              <el-button text @click="resetRechargeFilter">
-                <el-icon><Refresh /></el-icon>
-                重置筛选
-              </el-button>
-            </div>
-            <el-form :inline="true" :model="rechargeFilter" class="demo-form-inline">
-              <el-form-item label="日期">
-                <el-date-picker v-model="rechargeFilter.date" type="date" placeholder="请选择日期" style="width: 150px;"></el-date-picker>
-              </el-form-item>
-              <el-form-item label="类型">
-                <el-select v-model="rechargeFilter.type" placeholder="请选择" clearable style="width: 150px;">
-                  <el-option label="全部" value=""></el-option>
-                  <el-option label="充值" value="recharge"></el-option>
-                  <el-option label="消费" value="consume"></el-option>
-                </el-select>
-              </el-form-item>
-              <el-form-item label="说明">
-                <el-input v-model="rechargeFilter.description" placeholder="请输入说明" clearable style="width: 150px;"></el-input>
-              </el-form-item>
-              <el-form-item>
-                <el-button type="primary" @click="queryRecharges">
-                  <el-icon><Search /></el-icon>
-                  查询
-                </el-button>
-              </el-form-item>
-            </el-form>
-          </div>
-
-          <!-- 操作按钮 -->
-          <div class="table-actions" v-if="isAdmin">
-            <el-button type="primary" @click="openRechargeDialog">
-              <el-icon><Coin /></el-icon>
-              账户充值
-            </el-button>
-          </div>
-
-          <!-- 充值消费明细表格 -->
-          <el-table :data="rechargeList" style="width: 100%" v-loading="rechargeLoading" stripe>
-            <el-table-column prop="date" label="日期" width="120"></el-table-column>
-            <el-table-column prop="amount" label="金额" width="120" align="right">
-              <template #default="scope">
-                <span :class="{ 'amount-positive': scope.row.type === 'recharge', 'amount-negative': scope.row.type === 'consume' }">
-                  {{ scope.row.type === 'recharge' ? '+' : '-' }}¥{{ scope.row.amount }}
-                </span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="type" label="类型" width="100">
-              <template #default="scope">
-                <el-tag :type="scope.row.type === 'recharge' ? 'success' : 'warning'" size="small">
-                  {{ scope.row.type === 'recharge' ? '充值' : '消费' }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="description" label="说明" min-width="200"></el-table-column>
-            <el-table-column prop="serial" label="序列号" width="180"></el-table-column>
-            <el-table-column prop="balance" label="余额" width="120" align="right">
-              <template #default="scope">¥{{ scope.row.balance }}</template>
-            </el-table-column>
-          </el-table>
-
-          <!-- 分页 -->
-          <div class="pagination">
-            <el-pagination
-              background
-              layout="total, prev, pager, next"
-              :total="rechargeTotal"
-              :page-size="10"
-              @current-change="handleRechargePageChange"
-            />
-          </div>
-        </div>
-
-        <!-- 用户管理 (仅管理员可见) -->
-        <div v-else-if="activeMenu === 'userAdmin'" class="page">
-          <!-- 筛选条件 -->
-          <div class="filter-form">
-            <div class="filter-header">
-              <h3>用户管理</h3>
-              <div class="filter-header-actions">
-                <el-button text @click="resetUserQuery">
-                  <el-icon><Refresh /></el-icon>
-                  重置筛选
-                </el-button>
-                <el-button type="primary" @click="openUserDialog('create')">
-                  <el-icon><Plus /></el-icon>
-                  新增用户
-                </el-button>
-              </div>
-            </div>
-            <el-form :inline="true" :model="userQuery" class="demo-form-inline">
-              <el-form-item label="用户名">
-                <el-input v-model="userQuery.username" placeholder="请输入用户名" clearable style="width: 150px;"></el-input>
-              </el-form-item>
-              <el-form-item label="用户类型">
-                <el-select v-model="userQuery.userType" placeholder="请选择" clearable style="width: 120px;">
-                  <el-option label="全部" value=""></el-option>
-                  <el-option label="普通用户" value="USER"></el-option>
-                  <el-option label="管理员" value="ADMIN"></el-option>
-                </el-select>
-              </el-form-item>
-              <el-form-item label="状态">
-                <el-select v-model="userQuery.status" placeholder="请选择" clearable style="width: 100px;">
-                  <el-option label="全部" value=""></el-option>
-                  <el-option label="启用" value="ACTIVE"></el-option>
-                  <el-option label="禁用" value="DISABLED"></el-option>
-                </el-select>
-              </el-form-item>
-              <el-form-item>
-                <el-button type="primary" @click="loadUsers">
-                  <el-icon><Search /></el-icon>
-                  查询
-                </el-button>
-              </el-form-item>
-            </el-form>
-          </div>
-
-          <!-- 用户表格 -->
-          <div class="table-card">
-            <el-table :data="userList" v-loading="userLoading" stripe>
-              <el-table-column prop="id" label="ID" width="80" />
-              <el-table-column prop="username" label="用户名" width="120" />
-              <el-table-column prop="mobile" label="手机号" width="130" />
-              <el-table-column prop="userType" label="类型" width="100">
-                <template #default="scope">
-                  <el-tag :type="scope.row.userType === 'ADMIN' ? 'danger' : 'success'" size="small">
-                    {{ scope.row.userType === 'ADMIN' ? '管理员' : '普通用户' }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column prop="status" label="状态" width="80">
-                <template #default="scope">
-                  <el-tag :type="scope.row.status === 'ACTIVE' ? 'success' : 'danger'" size="small">
-                    {{ scope.row.status === 'ACTIVE' ? '启用' : '禁用' }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column prop="balance" label="余额" width="100" align="right">
-                <template #default="scope">¥{{ scope.row.balance }}</template>
-              </el-table-column>
-              <el-table-column prop="lastLoginTime" label="最后登录" width="160" />
-              <el-table-column label="操作" width="200" fixed="right">
-                <template #default="scope">
-                  <div class="action-buttons">
-                    <el-button type="primary" size="small" text @click="openUserDialog('edit', scope.row)">
-                      编辑
-                    </el-button>
-                    <el-button
-                      :type="scope.row.status === 'ACTIVE' ? 'warning' : 'success'"
-                      size="small"
-                      text
-                      @click="toggleUserStatus(scope.row)"
-                    >
-                      {{ scope.row.status === 'ACTIVE' ? '禁用' : '启用' }}
-                    </el-button>
-                    <el-button
-                      v-if="scope.row.userType !== 'ADMIN'"
-                      type="danger"
-                      size="small"
-                      text
-                      @click="deleteUser(scope.row.id)"
-                    >
-                      删除
-                    </el-button>
-                  </div>
-                </template>
-              </el-table-column>
-            </el-table>
-
-            <!-- 分页 -->
-            <div class="pagination">
-              <el-pagination
-                background
-                layout="total, prev, pager, next"
-                :total="userTotal"
-                :page-size="userPageSize"
-                :current-page="userCurrentPage"
-                @current-change="handleUserPageChange"
-              />
-            </div>
-          </div>
-        </div>
+        <UserAdminSection
+          v-else-if="activeMenu === 'userAdmin'"
+          :user-query="userQuery"
+          :user-list="userList"
+          :user-loading="userLoading"
+          :user-total="userTotal"
+          :user-page-size="userPageSize"
+          :user-current-page="userCurrentPage"
+          @reset-filter="resetUserQuery"
+          @open-user-dialog="openUserDialog"
+          @query="loadUsers"
+          @toggle-user-status="toggleUserStatus"
+          @delete-user="deleteUser"
+          @page-change="handleUserPageChange"
+        />
       </section>
     </main>
 
@@ -1661,22 +903,28 @@
 </template>
 
 <script>
+import AppHeader from '@/components/layout/AppHeader.vue'
+import HomeOverviewSection from '@/components/home/HomeOverviewSection.vue'
+import ProductCenterSection from '@/components/home/ProductCenterSection.vue'
+import ExpenseSection from '@/components/home/ExpenseSection.vue'
+import InsuranceSection from '@/components/home/InsuranceSection.vue'
+import RechargeSection from '@/components/home/RechargeSection.vue'
+import UserAdminSection from '@/components/home/UserAdminSection.vue'
 import {
-  House, Goods, Document, Collection, Wallet, User, Coin, SwitchButton,
-  Grid, Menu, Sunny, Star, Present, OfficeBuilding,
-  CircleCheck, Refresh, Search, Picture, Upload, Lightning, View, Download,
-  Clock, Link, Edit, Switch, ZoomIn, Calendar, Timer, Notebook, Plus, Filter,
-  ArrowDown, Delete, Bell, Setting
+  Document, Upload, Clock, Plus, Delete
 } from '@element-plus/icons-vue'
 
 export default {
   name: 'Home',
   components: {
-    House, Goods, Document, Collection, Wallet, User, Coin, SwitchButton,
-    Grid, Menu, Sunny, Star, Present, OfficeBuilding,
-    CircleCheck, Refresh, Search, Picture, Upload, Lightning, View, Download,
-    Clock, Link, Edit, Switch, ZoomIn, Calendar, Timer, Notebook, Plus, Filter,
-    ArrowDown, Delete, Bell, Setting
+    AppHeader,
+    HomeOverviewSection,
+    ProductCenterSection,
+    ExpenseSection,
+    InsuranceSection,
+    RechargeSection,
+    UserAdminSection,
+    Document, Upload, Clock, Plus, Delete
   },
   data() {
     return {
@@ -1703,10 +951,7 @@ export default {
       productTotal: 0,
       productPageSize: 10,
       productCurrentPage: 1,
-      productImportLoading: false,
       companyFilter: 'all',
-      categoryFilter: 'all',
-      selectedCompanies: [],
       productDialogVisible: false,
       productDialogTitle: '编辑产品',
       productSubmitting: false,
@@ -1779,7 +1024,6 @@ export default {
         type: '',
         description: ''
       },
-      rechargeTargetUser: null,
       allUsers: [],
       userLoading: false,
       userList: [],
@@ -1874,7 +1118,6 @@ export default {
       previewImageTitle: '',
       // 通知公告弹窗
       noticePopupDialogVisible: false,
-      noticePopupData: null,
       noticePopupSelectedIndex: 0,
       // 产品类别管理
       categoryDialogVisible: false,
@@ -2294,16 +1537,35 @@ export default {
     },
 
     handleCompanyChange(value) {
+      this.companyFilter = value
       this.productCurrentPage = 1
       this.loadProducts()
     },
 
     resetProductFilter() {
       this.companyFilter = 'all'
-      this.selectedCompanies = []
       this.activeCategory = 'all'
       this.productCurrentPage = 1
       this.loadProducts()
+    },
+
+    normalizeProductFilters() {
+      let shouldReload = false
+
+      if (this.activeCategory !== 'all' && !this.categoryList.some(cat => cat.code === this.activeCategory)) {
+        this.activeCategory = 'all'
+        shouldReload = true
+      }
+
+      if (this.companyFilter !== 'all' && !this.companyList.some(comp => comp.code === this.companyFilter)) {
+        this.companyFilter = 'all'
+        shouldReload = true
+      }
+
+      if (shouldReload) {
+        this.productCurrentPage = 1
+        this.loadProducts()
+      }
     },
 
     getFilterText() {
@@ -2404,6 +1666,7 @@ export default {
       }).then(() => {
         this.categoryList = this.categoryList.filter(cat => cat.code !== category.code)
         localStorage.setItem('productCategories', JSON.stringify(this.categoryList))
+        this.normalizeProductFilters()
         this.$message.success('删除成功')
       }).catch(() => {
         // 用户取消删除
@@ -2476,6 +1739,7 @@ export default {
       }).then(() => {
         this.companyList = this.companyList.filter(comp => comp.code !== company.code)
         localStorage.setItem('insuranceCompanies', JSON.stringify(this.companyList))
+        this.normalizeProductFilters()
         this.$message.success('删除成功')
       }).catch(() => {
         // 用户取消删除
@@ -3874,14 +3138,14 @@ body {
 
 /* 顶部导航栏 */
 .header {
-  background-color: #fff;
-  border-bottom: 3px solid #e60012;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 248, 247, 0.94) 100%);
+  border-bottom: 1px solid rgba(230, 0, 18, 0.14);
   padding: 0 24px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   height: 70px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -3909,24 +3173,38 @@ body {
 }
 
 .nav {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   justify-content: center;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.nav::-webkit-scrollbar {
+  display: none;
 }
 
 .nav .el-menu {
   border-bottom: none;
   display: flex;
-  justify-content: flex-start;
+  justify-content: center;
   background: transparent;
+  flex-wrap: nowrap;
+  min-width: 100%;
+  width: max-content;
 }
 
 .nav .el-menu-item {
   height: 68px;
   line-height: 68px;
   font-size: 14px;
-  padding: 0 15px;
-  min-width: 100px;
+  padding: 0 14px;
+  min-width: 90px;
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .nav .el-menu-item .el-icon {
@@ -5030,15 +4308,8 @@ body {
     height: auto;
     min-height: 60px;
     padding: 0 16px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 12px;
-    align-items: center;
-  }
-
-  .header-left {
-    flex: 1;
-    gap: 16px;
-    min-width: 0;
     align-items: center;
   }
 
@@ -5057,6 +4328,19 @@ body {
 
   .header-right {
     flex-shrink: 0;
+  }
+
+  .nav {
+    justify-content: flex-start;
+  }
+
+  .nav .el-menu {
+    justify-content: flex-start;
+  }
+
+  .nav .el-menu-item {
+    min-width: 84px;
+    padding: 0 12px;
   }
 
   .main-content {
@@ -5158,6 +4442,11 @@ body {
 }
 
 @media screen and (max-width: 768px) {
+  .header {
+    padding: 0 12px;
+    gap: 10px;
+  }
+
   .product-card {
     flex-direction: column;
   }
@@ -5199,6 +4488,12 @@ body {
 
   .logo-sub {
     font-size: 9px;
+  }
+
+  .nav .el-menu-item {
+    min-width: 74px;
+    padding: 0 10px;
+    font-size: 13px;
   }
 
   .welcome-card {
@@ -5323,6 +4618,16 @@ body {
 
   .logo-sub {
     display: none;
+  }
+
+  .nav .el-menu-item {
+    min-width: 68px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+
+  .nav-text {
+    letter-spacing: 0;
   }
 
   .main-content {
