@@ -6,6 +6,8 @@ import lombok.Data;
 public class ActivateRequest {
     private Long productId;
     private String planName;
+    private String policyHolderName;
+    private String policyHolderId;
     private String beneficiaryName;
     private String beneficiaryId;
     private String beneficiaryJob;

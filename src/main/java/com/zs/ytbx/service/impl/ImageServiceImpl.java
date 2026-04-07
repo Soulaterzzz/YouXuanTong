@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -21,6 +22,8 @@ import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.UUID;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 @Slf4j
 @Service
@@ -180,21 +183,63 @@ public class ImageServiceImpl implements ImageService {
         }
 
         String templatePath = product.getTemplateFilePath();
-        if (templatePath == null || templatePath.isEmpty()) {
-            throw new BusinessException(ResultCode.NOT_FOUND, "没有文件");
+        if (templatePath != null && !templatePath.isEmpty()) {
+            try {
+                Path filePath = Paths.get(templatePath);
+                if (Files.exists(filePath)) {
+                    byte[] data = Files.readAllBytes(filePath);
+                    String fileName = product.getTemplateFileName();
+                    return new TemplateFileVO(data, fileName);
+                }
+            } catch (IOException e) {
+                log.error("读取模板文件失败: productId={}, path={}", productId, templatePath, e);
+            }
         }
 
+        // 如果没有模板文件，生成默认的Excel模板
         try {
-            Path filePath = Paths.get(templatePath);
-            if (!Files.exists(filePath)) {
-                throw new BusinessException(ResultCode.NOT_FOUND, "文件不存在");
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            Workbook workbook = new XSSFWorkbook();
+            Sheet sheet = workbook.createSheet("批量导入模板");
+
+            // 创建表头
+            Row headerRow = sheet.createRow(0);
+            headerRow.createCell(0).setCellValue("序号");
+            headerRow.createCell(1).setCellValue("方案名称");
+            headerRow.createCell(2).setCellValue("被保人姓名");
+            headerRow.createCell(3).setCellValue("被保人证件号");
+            headerRow.createCell(4).setCellValue("被保人职业");
+            headerRow.createCell(5).setCellValue("数量");
+            headerRow.createCell(6).setCellValue("地址");
+            headerRow.createCell(7).setCellValue("代理人");
+
+            // 创建示例数据
+            Row dataRow = sheet.createRow(1);
+            dataRow.createCell(0).setCellValue(1);
+            dataRow.createCell(1).setCellValue(product.getProductName());
+            dataRow.createCell(2).setCellValue("张三");
+            dataRow.createCell(3).setCellValue("110101199001011234");
+            dataRow.createCell(4).setCellValue("办公室职员");
+            dataRow.createCell(5).setCellValue(1);
+            dataRow.createCell(6).setCellValue("北京市朝阳区");
+            dataRow.createCell(7).setCellValue("李四");
+
+            // 调整列宽
+            for (int i = 0; i < 8; i++) {
+                sheet.autoSizeColumn(i);
             }
-            byte[] data = Files.readAllBytes(filePath);
-            String fileName = product.getTemplateFileName();
+
+            workbook.write(outputStream);
+            workbook.close();
+
+            byte[] data = outputStream.toByteArray();
+            outputStream.close();
+
+            String fileName = "template_" + productId + ".xlsx";
             return new TemplateFileVO(data, fileName);
-        } catch (IOException e) {
-            log.error("读取模板文件失败: productId={}, path={}", productId, templatePath, e);
-            throw new BusinessException(ResultCode.SYSTEM_ERROR, "读取文件失败");
+        } catch (Exception e) {
+            log.error("生成默认模板失败: productId={}", productId, e);
+            throw new BusinessException(ResultCode.SYSTEM_ERROR, "生成模板失败");
         }
     }
 

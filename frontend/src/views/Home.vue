@@ -295,7 +295,7 @@
                   <el-icon><Setting /></el-icon>
                   管理公司
                 </el-button>
-                <el-button text @click="resetProductFilter" v-if="companyFilter !== 'all' || activeCategory !== 'all'">
+                <el-button text @click="resetProductFilter" v-if="companyFilter !== 'all' || activeCategory !== 'all' || productSearchKeyword">
                   <el-icon><Refresh /></el-icon>
                   重置筛选
                 </el-button>
@@ -304,6 +304,14 @@
                   添加产品
                 </el-button>
               </div>
+            </div>
+            <div class="filter-row">
+              <span class="filter-label">搜索：</span>
+              <el-input v-model="productSearchKeyword" placeholder="请输入产品名称或描述" style="width: 200px" clearable @keyup.enter="handleProductSearch" />
+              <el-button type="primary" @click="handleProductSearch" style="margin-left: 10px">
+                <el-icon><Search /></el-icon>
+                搜索
+              </el-button>
             </div>
             <div class="filter-row">
               <span class="filter-label">承保公司：</span>
@@ -357,11 +365,30 @@
                       <el-icon><Star /></el-icon>
                       {{ product.features }}
                     </p>
+                    <p class="alias-text" v-if="isAdmin && product.alias">
+                      <el-icon><Collection /></el-icon>
+                      别名：{{ product.alias }}
+                    </p>
                   </div>
                   <div class="product-footer">
                     <div class="price-info">
                       <span class="price-label">价格：</span>
-                      <span class="price-value">¥{{ product.price }}</span>
+                      <template v-if="product.editingPrice">
+                        <el-input-number v-model="product.editPrice" :min="0" :precision="2" style="width: 120px" />
+                        <el-button type="primary" size="small" @click="saveProductPrice(product)" style="margin-left: 5px">
+                          保存
+                        </el-button>
+                        <el-button size="small" @click="cancelEditPrice(product)" style="margin-left: 5px">
+                          取消
+                        </el-button>
+                      </template>
+                      <template v-else>
+                        <span class="price-value">¥{{ product.price }}</span>
+                        <el-button type="text" size="small" @click="startEditPrice(product)" style="margin-left: 5px">
+                          <el-icon><Edit /></el-icon>
+                          编辑
+                        </el-button>
+                      </template>
                     </div>
                     <div class="stock-info">
                       <span class="stock-label">库存：</span>
@@ -390,6 +417,15 @@
                       <el-button type="primary" plain size="small" @click="downloadProductTemplate(product)">
                         <el-icon><Download /></el-icon>
                         模板
+                      </el-button>
+                      <el-button
+                        type="info"
+                        size="small"
+                        :disabled="product.saleStatus && product.saleStatus !== 'ON_SALE'"
+                        @click="openBatchImportDialog(product)"
+                      >
+                        <el-icon><Upload /></el-icon>
+                        批量导入
                       </el-button>
                       <el-button
                         type="warning"
@@ -436,12 +472,8 @@
               </el-button>
             </div>
             <el-form :inline="true" :model="expenseFilter" class="demo-form-inline">
-              <el-form-item label="方案">
-                <el-select v-model="expenseFilter.plan" placeholder="请选择" clearable style="width: 150px;">
-                  <el-option label="所有方案" value="all"></el-option>
-                  <el-option label="国寿财1-3类" value="guoshou-3"></el-option>
-                  <el-option label="平安财意外" value="pingan"></el-option>
-                </el-select>
+              <el-form-item label="产品名称">
+                <el-input v-model="expenseFilter.productName" placeholder="请输入产品名称" clearable style="width: 150px;"></el-input>
               </el-form-item>
               <el-form-item label="状态">
                 <el-select v-model="expenseFilter.status" placeholder="请选择" clearable style="width: 150px;">
@@ -515,10 +547,8 @@
               </el-button>
             </div>
             <el-form :inline="true" :model="insuranceFilter" class="demo-form-inline">
-              <el-form-item label="方案">
-                <el-select v-model="insuranceFilter.plan" placeholder="请选择" clearable style="width: 150px;">
-                  <el-option label="所有方案" value="all"></el-option>
-                </el-select>
+              <el-form-item label="产品名称">
+                <el-input v-model="insuranceFilter.productName" placeholder="请输入产品名称" clearable style="width: 150px;"></el-input>
               </el-form-item>
               <el-form-item label="状态">
                 <el-select v-model="insuranceFilter.status" placeholder="请选择" clearable style="width: 150px;">
@@ -557,12 +587,12 @@
           <!-- 操作按钮 -->
           <div v-if="isAdmin" class="table-actions">
             <el-button
-              type="warning"
-              :disabled="!selectedInsurances.some(item => item.statusCode === 'UNDERWRITING')"
-              @click="openInsuranceActivationDialog(selectedInsurances.filter(item => item.statusCode === 'UNDERWRITING'))"
+              type="primary"
+              :disabled="!selectedInsurances.some(item => item.statusCode === 'PENDING_REVIEW' || item.statusCode === 'UNDERWRITING')"
+              @click="handleBatchAction"
             >
-              <el-icon><Lightning /></el-icon>
-              批量生效
+              <el-icon><Check /></el-icon>
+              批量处理
             </el-button>
           </div>
 
@@ -867,6 +897,9 @@
         <el-form-item label="产品特点">
           <el-input v-model="productForm.features" type="textarea" :rows="2" />
         </el-form-item>
+        <el-form-item label="产品别名">
+          <el-input v-model="productForm.alias" placeholder="请输入产品别名（仅管理员可见）" />
+        </el-form-item>
         <el-form-item label="产品图片">
           <el-upload
             class="product-image-uploader"
@@ -1002,7 +1035,111 @@
       </div>
     </el-dialog>
 
-    <!-- 激活弹窗 -->
+    <!-- 批量导入弹窗 -->
+    <el-dialog v-model="batchImportDialogVisible" title="数据上传" width="900px" :close-on-click-modal="false">
+      <div class="batch-import-container">
+        <div class="batch-import-header">
+          <div class="batch-import-info">
+            <div class="info-row">
+              <span class="info-label">方案：</span>
+              <span class="info-value">{{ batchImportProduct?.name }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">选项文件：</span>
+              <el-upload
+                class="file-uploader"
+                :auto-upload="false"
+                :show-file-list="false"
+                @change="handleFileChange"
+                ref="batchUploadRef"
+              >
+                <el-button type="primary" plain>
+                  选择文件
+                </el-button>
+                <span class="file-status" v-if="!batchImportFile">未选择任何文件</span>
+                <span class="file-status" v-else>{{ batchImportFile.name }}</span>
+              </el-upload>
+            </div>
+          </div>
+          <div class="batch-import-actions">
+            <el-button type="primary" plain @click="validateBatchImportFile">
+              验证数据文件
+            </el-button>
+            <el-button type="primary" @click="submitBatchImport">
+              上传数据
+            </el-button>
+          </div>
+        </div>
+        <div class="batch-import-preview">
+          <div class="preview-tabs">
+            <el-tabs v-model="activePreviewTab">
+              <el-tab-pane label="错误提示" name="error"></el-tab-pane>
+              <el-tab-pane label="警告提示" name="warning"></el-tab-pane>
+            </el-tabs>
+          </div>
+          <div class="excel-preview">
+            <table class="excel-table">
+              <thead>
+                <tr>
+                  <th>A</th>
+                  <th>B</th>
+                  <th>C</th>
+                  <th>D</th>
+                  <th>E</th>
+                  <th>F</th>
+                  <th>G</th>
+                  <th>H</th>
+                  <th>I</th>
+                  <th>J</th>
+                  <th>K</th>
+                  <th>L</th>
+                  <th>M</th>
+                  <th>N</th>
+                  <th>O</th>
+                  <th>P</th>
+                  <th>Q</th>
+                  <th>R</th>
+                  <th>S</th>
+                  <th>T</th>
+                  <th>U</th>
+                  <th>V</th>
+                  <th>W</th>
+                  <th>X</th>
+                  <th>Y</th>
+                  <th>Z</th>
+                  <th>AA</th>
+                  <th>AB</th>
+                  <th>AC</th>
+                  <th>AD</th>
+                  <th>AE</th>
+                  <th>AF</th>
+                  <th>AG</th>
+                  <th>AH</th>
+                  <th>AI</th>
+                  <th>AJ</th>
+                  <th>AK</th>
+                  <th>AL</th>
+                  <th>AM</th>
+                  <th>AN</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="i in 5" :key="i">
+                  <td v-for="j in 40" :key="j"></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="batchImportDialogVisible = false">取消</el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <!-- 激活产品弹窗 -->
     <el-dialog v-model="activeDialogVisible" title="产品激活" width="550px" :close-on-click-modal="false">
       <div v-if="selectedProduct" class="activate-product-info">
         <el-row :gutter="20">
@@ -1029,6 +1166,12 @@
             <el-option label="少儿医疗险" value="child-med"></el-option>
             <el-option label="老年意外险" value="elder-acc"></el-option>
           </el-select>
+        </el-form-item>
+        <el-form-item label="投保人姓名" prop="policyHolderName">
+          <el-input v-model="activeForm.policyHolderName" placeholder="请输入投保人姓名"></el-input>
+        </el-form-item>
+        <el-form-item label="投保人证件号" prop="policyHolderId">
+          <el-input v-model="activeForm.policyHolderId" placeholder="请输入投保人证件号"></el-input>
         </el-form-item>
         <el-form-item label="被保人姓名" prop="beneficiaryName">
           <el-input v-model="activeForm.beneficiaryName" placeholder="请输入被保人姓名"></el-input>
@@ -1220,6 +1363,58 @@
         <span class="dialog-footer">
           <el-button @click="insuranceReviewDialogVisible = false">取消</el-button>
           <el-button type="primary" :loading="insuranceReviewSubmitting" @click="submitInsuranceReview">确认</el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <!-- 批量审核对话框 -->
+    <el-dialog
+      v-model="batchReviewDialogVisible"
+      :title="batchReviewDialogTitle"
+      width="600px"
+      :close-on-click-modal="true"
+      destroy-on-close
+    >
+      <div class="batch-review-content">
+        <div class="batch-review-info" style="margin-bottom: 20px;">
+          <p>已选择 <strong>{{ batchReviewItems.length }}</strong> 条待审核保单</p>
+          <div class="batch-review-list" style="max-height: 200px; overflow-y: auto; border: 1px solid #f0f0f0; padding: 10px; margin-top: 10px;">
+            <div v-for="item in batchReviewItems" :key="item.id" class="batch-review-item" style="display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #f9f9f9;">
+              <span>{{ item.product }}</span>
+              <span>{{ item.beneficiaryName }}</span>
+            </div>
+          </div>
+        </div>
+        
+        <el-form :model="batchReviewForm" label-width="80px">
+          <el-form-item label="审核操作">
+            <el-radio-group v-model="batchReviewForm.action">
+              <el-radio label="approve">通过</el-radio>
+              <el-radio label="reject">驳回</el-radio>
+            </el-radio-group>
+          </el-form-item>
+          <el-form-item label="审核意见">
+            <el-input
+              v-model="batchReviewForm.reviewComment"
+              type="textarea"
+              :rows="3"
+              placeholder="请输入审核意见"
+            />
+          </el-form-item>
+          <el-form-item v-if="batchReviewForm.action === 'reject'" label="驳回原因">
+            <el-input
+              v-model="batchReviewForm.rejectReason"
+              type="textarea"
+              :rows="4"
+              placeholder="请输入驳回原因"
+            />
+          </el-form-item>
+        </el-form>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="batchReviewDialogVisible = false">取消</el-button>
+          <el-button type="primary" :loading="batchReviewSubmitting" @click="submitBatchReview">确认</el-button>
         </span>
       </template>
     </el-dialog>
@@ -1506,6 +1701,7 @@ export default {
       productCurrentPage: 1,
       companyFilter: 'all',
       categoryFilter: 'all',
+      productSearchKeyword: '',
       selectedCompanies: [],
       productDialogVisible: false,
       productDialogTitle: '编辑产品',
@@ -1519,6 +1715,7 @@ export default {
         companyName: '',
         description: '',
         features: '',
+        alias: '',
         price: 0.01,
         stock: 0,
         isNew: 0,
@@ -1533,7 +1730,7 @@ export default {
       expenseTotal: 0,
       expenseCurrentPage: 1,
       expenseFilter: {
-        plan: 'all',
+        productName: '',
         status: 'all',
         serial: '',
         dateRange: null
@@ -1543,7 +1740,7 @@ export default {
       insuranceTotal: 0,
       insuranceCurrentPage: 1,
       insuranceFilter: {
-        plan: 'all',
+        productName: '',
         status: 'all',
         serial: '',
         dateRange: null,
@@ -1613,10 +1810,14 @@ export default {
       },
       selectedProduct: null,
       activeDialogVisible: false,
+      batchImportDialogVisible: false,
+      batchImportProduct: null,
       activeSubmitting: false,
       draftSubmitting: false,
       activeForm: {
         planName: '',
+        policyHolderName: '',
+        policyHolderId: '',
         beneficiaryName: '',
         beneficiaryId: '',
         beneficiaryJob: '',
@@ -1626,6 +1827,8 @@ export default {
       },
       activeFormRules: {
         planName: [{ required: true, message: '请选择方案名称', trigger: 'change' }],
+        policyHolderName: [{ required: true, message: '请输入投保人姓名', trigger: 'blur' }],
+        policyHolderId: [{ required: true, message: '请输入投保人证件号', trigger: 'blur' }],
         beneficiaryName: [{ required: true, message: '请输入被保人姓名', trigger: 'blur' }],
         beneficiaryId: [{ required: true, message: '请输入被保人证件号', trigger: 'blur' }],
         beneficiaryJob: [{ required: true, message: '请选择被保人职业', trigger: 'change' }]
@@ -1642,6 +1845,17 @@ export default {
         effectiveDate: '',
         expiryDate: ''
       },
+      
+      // 批量审核
+      batchReviewDialogVisible: false,
+      batchReviewDialogTitle: '',
+      batchReviewItems: [],
+      batchReviewForm: {
+        action: 'approve',
+        reviewComment: '',
+        rejectReason: ''
+      },
+      batchReviewSubmitting: false,
       expenseDetailDialogVisible: false,
       expenseDetailRow: null,
       insuranceDetailDialogVisible: false,
@@ -1679,7 +1893,10 @@ export default {
         code: '',
         name: ''
       },
-      companyList: []
+      companyList: [],
+      // 批量导入相关
+      batchImportFile: null,
+      activePreviewTab: 'error'
     }
   },
   computed: {
@@ -2049,6 +2266,7 @@ export default {
       this.companyFilter = 'all'
       this.selectedCompanies = []
       this.activeCategory = 'all'
+      this.productSearchKeyword = ''
       this.productCurrentPage = 1
       this.loadProducts()
     },
@@ -2060,6 +2278,12 @@ export default {
       return ''
     },
 
+    // 处理产品搜索
+    handleProductSearch() {
+      this.productCurrentPage = 1
+      this.loadProducts()
+    },
+
     async loadProducts() {
       this.productLoading = true
       try {
@@ -2069,6 +2293,9 @@ export default {
           size: this.productPageSize,
           category: this.activeCategory === 'all' ? '' : this.activeCategory,
           company: company
+        }
+        if (this.productSearchKeyword) {
+          params.keyword = this.productSearchKeyword
         }
         const endpoint = this.isAdmin ? '/api/admin/products' : '/api/anxinxuan/products'
         const res = await this.$axios.get(endpoint, { params })
@@ -2263,6 +2490,7 @@ export default {
         companyName: '',
         description: '',
         features: '',
+        alias: '',
         price: 0.01,
         stock: 0,
         isNew: 0,
@@ -2285,6 +2513,7 @@ export default {
           companyName: product.companyName || '',
           description: product.description || '',
           features: product.features || '',
+          alias: product.alias || '',
           price: product.price || 0.01,
           stock: product.stock || 0,
           isNew: product.isNew ? 1 : 0,
@@ -2317,6 +2546,7 @@ export default {
         companyName: this.getCompanyName(this.productForm.companyCode),
         description: this.productForm.description,
         features: this.productForm.features,
+        alias: this.productForm.alias,
         price: this.productForm.price,
         stock: this.productForm.stock,
         isNew: this.productForm.isNew,
@@ -2390,6 +2620,8 @@ export default {
       this.activeForm = {
         productId: product.id,
         planName: '',
+        policyHolderName: '',
+        policyHolderId: '',
         beneficiaryName: '',
         beneficiaryId: '',
         beneficiaryJob: '',
@@ -2453,7 +2685,7 @@ export default {
 
     resetExpenseFilter() {
       this.expenseFilter = {
-        plan: 'all',
+        productName: '',
         status: 'all',
         serial: '',
         dateRange: null
@@ -2469,7 +2701,8 @@ export default {
           page: this.expenseCurrentPage,
           size: 20,
           status: this.expenseFilter.status === 'all' ? '' : this.expenseFilter.status,
-          serialNo: this.expenseFilter.serial
+          serialNo: this.expenseFilter.serial,
+          productName: this.expenseFilter.productName
         }
         const endpoint = this.isAdmin ? '/api/admin/expenses' : '/api/anxinxuan/expenses'
         const res = await this.$axios.get(endpoint, { params })
@@ -2507,7 +2740,7 @@ export default {
 
     resetInsuranceFilter() {
       this.insuranceFilter = {
-        plan: 'all',
+        productName: '',
         status: 'all',
         serial: '',
         dateRange: null,
@@ -2529,6 +2762,7 @@ export default {
           size: 20,
           status: this.insuranceFilter.status === 'all' ? '' : this.insuranceFilter.status,
           serialNo: this.insuranceFilter.serial,
+          productName: this.insuranceFilter.productName,
           insuredName: this.insuranceFilter.insuredName,
           beneficiaryName: this.insuranceFilter.beneficiaryName
         }
@@ -2666,6 +2900,21 @@ export default {
       this.openInsuranceActivationDialog(this.selectedInsurances)
     },
 
+    handleBatchAction() {
+      const pendingReviewRows = this.selectedInsurances.filter(item => item.statusCode === 'PENDING_REVIEW')
+      const underwritingRows = this.selectedInsurances.filter(item => item.statusCode === 'UNDERWRITING')
+
+      if (pendingReviewRows.length > 0) {
+        // 如果有待审核的保单，显示批量审核对话框
+        this.openBatchReviewDialog(pendingReviewRows)
+      } else if (underwritingRows.length > 0) {
+        // 如果有承保中的保单，显示批量生效对话框
+        this.openInsuranceActivationDialog(underwritingRows)
+      } else {
+        this.$message.warning('请选择待审核或承保中的保单')
+      }
+    },
+
     async submitInsuranceActivation() {
       if (!this.insuranceActivationItems.length) {
         this.$message.warning('暂无承保中的保单')
@@ -2765,6 +3014,69 @@ export default {
         expiryDate: ''
       }
       this.insuranceReviewDialogVisible = true
+    },
+
+    openBatchReviewDialog(rows) {
+      const pendingRows = (rows || []).filter(item => item.statusCode === 'PENDING_REVIEW')
+      if (!pendingRows.length) {
+        this.$message.warning('请选择待审核的保单')
+        return
+      }
+
+      this.batchReviewDialogTitle = `批量审核（${pendingRows.length} 条）`
+      this.batchReviewItems = pendingRows.map(item => ({
+        id: item.id,
+        product: item.product,
+        beneficiaryName: item.beneficiaryName
+      }))
+      this.batchReviewForm = {
+        action: 'approve',
+        reviewComment: '',
+        rejectReason: ''
+      }
+      this.batchReviewDialogVisible = true
+    },
+
+    async submitBatchReview() {
+      if (!this.batchReviewForm.reviewComment.trim()) {
+        this.$message.warning('请输入审核意见')
+        return
+      }
+      if (this.batchReviewForm.action === 'reject' && !this.batchReviewForm.rejectReason.trim()) {
+        this.$message.warning('请输入驳回原因')
+        return
+      }
+
+      this.batchReviewSubmitting = true
+      try {
+        const insuranceIds = this.batchReviewItems.map(item => item.id)
+        const url = this.batchReviewForm.action === 'approve' 
+          ? '/api/admin/insurances/batch-approve' 
+          : '/api/admin/insurances/batch-reject'
+
+        const data = {
+          insuranceIds: insuranceIds,
+          reviewComment: this.batchReviewForm.reviewComment,
+          rejectReason: this.batchReviewForm.rejectReason
+        }
+
+        const res = await this.$axios.post(url, data)
+        if (res.data.code === 200) {
+          this.$message.success('批量审核操作成功')
+          this.batchReviewDialogVisible = false
+          this.loadInsurances()
+          this.loadExpenses()
+          this.loadRecharges()
+          this.loadStats()
+        } else {
+          this.$message.error(res.data?.message || '批量审核操作失败')
+        }
+      } catch (error) {
+        console.error('批量审核操作失败:', error)
+        this.$message.error(error.response?.data?.message || '批量审核操作失败')
+      } finally {
+        this.batchReviewSubmitting = false
+      }
     },
 
     async submitInsuranceReview() {
@@ -3140,6 +3452,104 @@ export default {
       document.body.removeChild(link)
     },
 
+    // 打开批量导入对话框
+    openBatchImportDialog(product) {
+      this.batchImportProduct = product
+      this.batchImportDialogVisible = true
+    },
+
+    // 批量导入文件上传前验证
+    beforeBatchImportUpload(file) {
+      const isExcel = file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || file.type === 'application/vnd.ms-excel'
+      const isLt10M = file.size / 1024 / 1024 < 10
+
+      if (!isExcel) {
+        this.$message.error('只能上传 Excel 格式的文件!')
+        return false
+      }
+      if (!isLt10M) {
+        this.$message.error('文件大小不能超过 10MB!')
+        return false
+      }
+      return true
+    },
+
+    // 提交批量导入
+    submitBatchImport() {
+      if (!this.batchImportFile) {
+        this.$message.error('请先选择文件')
+        return
+      }
+
+      const formData = new FormData()
+      formData.append('file', this.batchImportFile)
+      formData.append('productId', this.batchImportProduct?.id)
+
+      this.$axios.post('/api/anxinxuan/products/batch-import', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      }).then(response => {
+        if (this.isSuccess(response)) {
+          this.$message.success('批量导入成功')
+          this.batchImportDialogVisible = false
+          this.loadInsurances()
+        } else {
+          this.$message.error(response.data.message || '批量导入失败')
+        }
+      }).catch(error => {
+        console.error('批量导入失败:', error)
+        this.$message.error(error.response?.data?.message || '批量导入失败，请稍后重试')
+      })
+    },
+
+    // 批量导入成功处理
+    handleBatchImportSuccess(response) {
+      if (this.isSuccess(response)) {
+        this.$message.success('批量导入成功')
+        this.batchImportDialogVisible = false
+        this.loadInsurances()
+      } else {
+        this.$message.error(response.data.message || '批量导入失败')
+      }
+    },
+
+    // 批量导入失败处理
+    handleBatchImportError(error) {
+      console.error('批量导入失败:', error)
+      this.$message.error(error.response?.data?.message || '批量导入失败，请稍后重试')
+    },
+
+    // 处理文件选择
+    handleFileChange(file, fileList) {
+      if (file && file.raw) {
+        this.batchImportFile = file.raw
+      }
+    },
+
+    // 验证数据文件
+    validateBatchImportFile() {
+      if (!this.batchImportFile) {
+        this.$message.error('请先选择文件')
+        return
+      }
+
+      // 验证文件类型
+      const isExcel = this.batchImportFile.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || this.batchImportFile.type === 'application/vnd.ms-excel'
+      const isLt10M = this.batchImportFile.size / 1024 / 1024 < 10
+
+      if (!isExcel) {
+        this.$message.error('只能上传 Excel 格式的文件!')
+        return
+      }
+      if (!isLt10M) {
+        this.$message.error('文件大小不能超过 10MB!')
+        return
+      }
+
+      this.$message.success('文件验证通过')
+    },
+
     // 图片上传前验证
     beforeImageUpload(file) {
       if (!this.productForm.id) {
@@ -3248,6 +3658,45 @@ export default {
       document.body.removeChild(link)
     },
 
+    // 开始编辑价格
+    startEditPrice(product) {
+      product.editingPrice = true
+      product.editPrice = product.price
+    },
+
+    // 保存价格
+    async saveProductPrice(product) {
+      try {
+        if (product.editPrice === undefined || product.editPrice < 0) {
+          this.$message.warning('请输入有效的价格')
+          return
+        }
+        console.log('开始更新价格:', product.id, product.editPrice)
+        const res = await this.$axios.put('/api/anxinxuan/products/price', {
+          id: product.id,
+          price: product.editPrice
+        })
+        console.log('API响应:', res)
+        if (this.isSuccess(res)) {
+          product.price = product.editPrice
+          product.editingPrice = false
+          this.$message.success('价格更新成功')
+        } else {
+          console.log('API响应失败:', res.data)
+          this.$message.error(res.data.message || '价格更新失败')
+        }
+      } catch (error) {
+        console.error('更新价格失败:', error)
+        this.$message.error(error.response?.data?.message || '价格更新失败，请稍后重试')
+      }
+    },
+
+    // 取消编辑价格
+    cancelEditPrice(product) {
+      product.editingPrice = false
+      delete product.editPrice
+    },
+
     // 删除模板文件
     async deleteTemplate() {
       try {
@@ -3276,6 +3725,99 @@ export default {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+}
+
+/* 批量导入样式 */
+.batch-import-container {
+  width: 100%;
+  padding: 20px;
+}
+
+.batch-import-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+.batch-import-info {
+  flex: 1;
+}
+
+.info-row {
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+}
+
+.info-label {
+  font-weight: bold;
+  margin-right: 10px;
+  width: 80px;
+}
+
+.info-value {
+  font-size: 16px;
+  color: #e60012;
+  font-weight: bold;
+}
+
+.file-uploader {
+  display: flex;
+  align-items: center;
+}
+
+.file-status {
+  margin-left: 10px;
+  font-size: 14px;
+  color: #606266;
+}
+
+.batch-import-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.batch-import-preview {
+  margin-top: 20px;
+}
+
+.preview-tabs {
+  margin-bottom: 15px;
+}
+
+.excel-preview {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+}
+
+.excel-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.excel-table th {
+  background-color: #f5f7fa;
+  border: 1px solid #e4e7ed;
+  padding: 8px;
+  text-align: center;
+  font-weight: bold;
+  min-width: 60px;
+}
+
+.excel-table td {
+  border: 1px solid #e4e7ed;
+  padding: 8px;
+  text-align: center;
+  min-width: 60px;
+}
+
+.excel-table tr:hover {
+  background-color: #f5f7fa;
 }
 
 body {
@@ -4087,6 +4629,23 @@ body {
   margin-top: 2px;
 }
 
+.alias-text {
+  font-size: 12px;
+  color: #666;
+  margin: 6px 0 0 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  background: #e8f4f8;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+.alias-text .el-icon {
+  color: #409eff;
+  margin-top: 2px;
+}
+
 .product-footer {
   display: flex;
   align-items: center;
@@ -4126,12 +4685,35 @@ body {
 .product-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   margin-left: auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  min-width: 200px;
 }
 
 .product-actions .el-button {
-  padding: 6px 12px;
+  padding: 6px 10px;
+  font-size: 12px;
+  height: 28px;
+  min-width: 70px;
+}
+
+/* 确保产品底部区域有足够的空间 */
+.product-footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
+  margin-top: 12px;
+}
+
+.price-info,
+.stock-info {
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 @media screen and (max-width: 1200px) {

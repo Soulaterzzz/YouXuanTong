@@ -13,9 +13,15 @@ import com.zs.ytbx.mapper.*;
 import com.zs.ytbx.service.AnXinXuanService;
 import com.zs.ytbx.vo.anxinxuan.*;
 import lombok.RequiredArgsConstructor;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.usermodel.DateUtil;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+import org.apache.commons.lang3.StringUtils;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -37,6 +43,13 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
     public PageResponse<ProductVO> listProducts(ProductQuery query) {
         LambdaQueryWrapper<AxxProductEntity> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(AxxProductEntity::getSaleStatus, "ON_SALE");
+
+        if (query.getKeyword() != null && !query.getKeyword().isEmpty()) {
+            wrapper.and(w -> w.like(AxxProductEntity::getProductName, query.getKeyword())
+                .or().like(AxxProductEntity::getDescription, query.getKeyword())
+                .or().like(AxxProductEntity::getFeatures, query.getKeyword())
+                .or().like(AxxProductEntity::getAlias, query.getKeyword()));
+        }
 
         if (query.getCategory() != null && !query.getCategory().isEmpty() && !"all".equals(query.getCategory())) {
             wrapper.eq(AxxProductEntity::getCategoryCode, query.getCategory());
@@ -173,6 +186,10 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
         wrapper.eq(ExpenseRecordEntity::getUserId, userId)
                 .ne(ExpenseRecordEntity::getExpenseStatus, InsuranceStatus.DRAFT.getCode());
 
+        if (query.getProductName() != null && !query.getProductName().isEmpty()) {
+            wrapper.like(ExpenseRecordEntity::getProductName, query.getProductName());
+        }
+
         if (query.getStatus() != null && !query.getStatus().isEmpty() && !"all".equals(query.getStatus())) {
             applyExpenseStatusFilter(wrapper, query.getStatus());
         }
@@ -203,6 +220,10 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
     public PageResponse<InsuranceVO> listInsurances(InsuranceQuery query, Long userId) {
         LambdaQueryWrapper<InsuranceRecordEntity> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(InsuranceRecordEntity::getUserId, userId);
+
+        if (query.getProductName() != null && !query.getProductName().isEmpty()) {
+            wrapper.like(InsuranceRecordEntity::getProductName, query.getProductName());
+        }
 
         if (query.getStatus() != null && !query.getStatus().isEmpty() && !"all".equals(query.getStatus())) {
             applyInsuranceStatusFilter(wrapper, query.getStatus());
@@ -296,6 +317,175 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
         transaction.setCreateTime(LocalDateTime.now());
         transaction.setUpdateTime(LocalDateTime.now());
         transactionRecordMapper.insert(transaction);
+    }
+
+    @Override
+    public void updateProductPrice(UpdateProductPriceRequest request, Long userId) {
+        AxxProductEntity product = axxProductMapper.selectById(request.getId());
+        if (product == null) {
+            throw new BusinessException(ResultCode.PRODUCT_NOT_FOUND);
+        }
+        product.setPrice(BigDecimal.valueOf(request.getPrice()));
+        product.setUpdateTime(LocalDateTime.now());
+        axxProductMapper.updateById(product);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void batchImportProducts(Long productId, MultipartFile file, Long userId) {
+        AxxProductEntity product = axxProductMapper.selectById(productId);
+        if (product == null) {
+            throw new BusinessException(ResultCode.PRODUCT_NOT_FOUND);
+        }
+        AccountBalanceEntity balance = accountBalanceMapper.selectOne(new LambdaQueryWrapper<AccountBalanceEntity>().eq(AccountBalanceEntity::getUserId, userId));
+        if (balance == null) {
+            balance = new AccountBalanceEntity();
+            balance.setUserId(userId);
+            balance.setBalance(BigDecimal.ZERO);
+            accountBalanceMapper.insert(balance);
+        }
+
+        try {
+            // 读取Excel文件
+            Workbook workbook = WorkbookFactory.create(file.getInputStream());
+            Sheet sheet = workbook.getSheetAt(0);
+            int rowCount = sheet.getPhysicalNumberOfRows();
+
+            if (rowCount < 2) {
+                throw new BusinessException(ResultCode.INVALID_PARAM, "Excel文件至少需要包含表头和一条数据");
+            }
+
+            // 解析数据并批量处理
+            for (int i = 1; i < rowCount; i++) {
+                Row row = sheet.getRow(i);
+                if (row == null) continue;
+
+                // 读取每一行数据
+                String planName = getCellValue(row.getCell(1));
+                String insuredName = getCellValue(row.getCell(2));
+                String insuredId = getCellValue(row.getCell(3));
+                String insuredJob = getCellValue(row.getCell(4));
+                Integer count = Integer.parseInt(getCellValue(row.getCell(5)));
+                String address = getCellValue(row.getCell(6));
+                String agent = getCellValue(row.getCell(7));
+
+                // 验证必填字段
+                if (StringUtils.isEmpty(insuredName) || StringUtils.isEmpty(insuredId)) {
+                    throw new BusinessException(ResultCode.INVALID_PARAM, "被保人姓名和证件号为必填项");
+                }
+
+                // 计算总金额
+                int quantity = count != null && count > 0 ? count : 1;
+                BigDecimal totalAmount = product.getPrice().multiply(BigDecimal.valueOf(quantity));
+
+                // 检查余额
+                if (balance.getBalance().compareTo(totalAmount) < 0) {
+                    throw new BusinessException(ResultCode.INVALID_PARAM, "余额不足，请先充值");
+                }
+
+                // 创建费用记录
+                ExpenseRecordEntity expense = new ExpenseRecordEntity();
+                expense.setSerialNo(generateSerialNo("EXP"));
+                expense.setUserId(userId);
+                expense.setProductId(productId);
+                expense.setProductName(product.getProductName());
+                expense.setContactName(insuredName);
+                expense.setExpenseStatus(InsuranceStatus.PENDING_REVIEW.getCode());
+                expense.setPolicyNo(null);
+                expense.setPremiumAmount(product.getPrice());
+                expense.setQuantity(quantity);
+                expense.setTotalAmount(totalAmount);
+                expense.setEffectiveDate(null);
+                expense.setExpiryDate(null);
+                expense.setExportTime(null);
+                expense.setCreateTime(LocalDateTime.now());
+                expense.setUpdateTime(LocalDateTime.now());
+                expenseRecordMapper.insert(expense);
+
+                // 创建保险记录
+                InsuranceRecordEntity insurance = new InsuranceRecordEntity();
+                insurance.setExpenseId(expense.getId());
+                insurance.setUserId(userId);
+                insurance.setProductName(product.getProductName());
+                insurance.setInsuredName(insuredName);
+                insurance.setInsuredIdNo(insuredId);
+                insurance.setBeneficiaryName(insuredName); // 批量导入时被保人即为受益人
+                insurance.setBeneficiaryIdNo(insuredId);
+                insurance.setBeneficiaryJob(insuredJob);
+                insurance.setBeneficiaryAddress(address);
+                insurance.setAgentName(agent);
+                insurance.setInsuranceStatus(InsuranceStatus.PENDING_REVIEW.getCode());
+                insurance.setReviewComment(null);
+                insurance.setReviewerId(null);
+                insurance.setReviewerName(null);
+                insurance.setReviewTime(null);
+                insurance.setRejectReason(null);
+                insurance.setSubmitTime(LocalDateTime.now());
+                insurance.setUnderwritingTime(null);
+                insurance.setActivateTime(null);
+                insurance.setPolicyNo(null);
+                insurance.setPremiumAmount(product.getPrice());
+                insurance.setQuantity(quantity);
+                insurance.setEffectiveDate(null);
+                insurance.setExpiryDate(null);
+                insurance.setExportTime(null);
+                insurance.setCreateTime(LocalDateTime.now());
+                insurance.setUpdateTime(LocalDateTime.now());
+                insuranceRecordMapper.insert(insurance);
+
+                // 扣除余额
+                balance.setBalance(balance.getBalance().subtract(totalAmount));
+                accountBalanceMapper.updateById(balance);
+
+                // 创建交易记录
+                TransactionRecordEntity transaction = new TransactionRecordEntity();
+                transaction.setSerialNo(generateSerialNo("TXN"));
+                transaction.setUserId(userId);
+                transaction.setTransType("CONSUME");
+                transaction.setAmount(totalAmount);
+                transaction.setBalanceBefore(balance.getBalance().add(totalAmount));
+                transaction.setBalanceAfter(balance.getBalance());
+                transaction.setDescription("批量导入投保：" + product.getProductName() + " x" + quantity);
+                transaction.setRefType("EXPENSE");
+                transaction.setRefId(expense.getId());
+                transaction.setPaymentMethod("BALANCE");
+                transaction.setPaymentStatus("SUCCESS");
+                transaction.setCreateTime(LocalDateTime.now());
+                transaction.setUpdateTime(LocalDateTime.now());
+                transactionRecordMapper.insert(transaction);
+            }
+
+            workbook.close();
+        } catch (Exception e) {
+            if (e instanceof BusinessException) {
+                throw (BusinessException) e;
+            }
+            throw new BusinessException(ResultCode.INVALID_PARAM, "Excel文件解析失败：" + e.getMessage());
+        }
+    }
+
+    private String getCellValue(Cell cell) {
+        if (cell == null) return "";
+        switch (cell.getCellType()) {
+            case STRING:
+                return cell.getStringCellValue();
+            case NUMERIC:
+                if (DateUtil.isCellDateFormatted(cell)) {
+                    return cell.getDateCellValue().toString();
+                } else {
+                    return String.valueOf((long) cell.getNumericCellValue());
+                }
+            case BOOLEAN:
+                return String.valueOf(cell.getBooleanCellValue());
+            case FORMULA:
+                try {
+                    return String.valueOf(cell.getNumericCellValue());
+                } catch (Exception e) {
+                    return cell.getStringCellValue();
+                }
+            default:
+                return "";
+        }
     }
 
     public BigDecimal getBalance(Long userId) {
@@ -399,8 +589,8 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
         insurance.setExpenseId(expenseId);
         insurance.setUserId(userId);
         insurance.setProductName(product.getProductName());
-        insurance.setInsuredName(request.getBeneficiaryName());
-        insurance.setInsuredIdNo(request.getBeneficiaryId());
+        insurance.setInsuredName(request.getPolicyHolderName());
+        insurance.setInsuredIdNo(request.getPolicyHolderId());
         insurance.setBeneficiaryName(request.getBeneficiaryName());
         insurance.setBeneficiaryIdNo(request.getBeneficiaryId());
         insurance.setBeneficiaryJob(request.getBeneficiaryJob());

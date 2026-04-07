@@ -162,6 +162,20 @@ public class AdminController {
         return ApiResponse.success(null);
     }
 
+    @PostMapping("/insurances/batch-approve")
+    public ApiResponse<Void> batchApproveInsurances(@Valid @RequestBody BatchInsuranceRequest request) {
+        SessionUser admin = requireAdmin();
+        adminService.batchApproveInsurances(request, admin.getUserId(), admin.getUsername());
+        return ApiResponse.success(null);
+    }
+
+    @PostMapping("/insurances/batch-reject")
+    public ApiResponse<Void> batchRejectInsurances(@Valid @RequestBody BatchInsuranceRequest request) {
+        SessionUser admin = requireAdmin();
+        adminService.batchRejectInsurances(request, admin.getUserId(), admin.getUsername());
+        return ApiResponse.success(null);
+    }
+
     @PutMapping("/insurances/{insuranceId}/underwriting")
     public ApiResponse<Void> startUnderwriting(@PathVariable("insuranceId") Long insuranceId) {
         requireAdmin();

@@ -15,7 +15,8 @@ import com.zs.ytbx.vo.anxinxuan.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -33,6 +34,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class AdminServiceImpl implements AdminService {
+
+    private static final Logger log = LoggerFactory.getLogger(AdminServiceImpl.class);
 
     private final AxxUserMapper axxUserMapper;
     private final AccountBalanceMapper accountBalanceMapper;
@@ -183,6 +186,13 @@ public class AdminServiceImpl implements AdminService {
     public PageResponse<ProductVO> listProducts(ProductQuery query) {
         LambdaQueryWrapper<AxxProductEntity> wrapper = new LambdaQueryWrapper<>();
 
+        if (query.getKeyword() != null && !query.getKeyword().isEmpty()) {
+            wrapper.and(w -> w.like(AxxProductEntity::getProductName, query.getKeyword())
+                .or().like(AxxProductEntity::getDescription, query.getKeyword())
+                .or().like(AxxProductEntity::getFeatures, query.getKeyword())
+                .or().like(AxxProductEntity::getAlias, query.getKeyword()));
+        }
+
         if (query.getCategory() != null && !query.getCategory().isEmpty() && !"all".equals(query.getCategory())) {
             wrapper.eq(AxxProductEntity::getCategoryCode, query.getCategory());
         }
@@ -241,6 +251,7 @@ public class AdminServiceImpl implements AdminService {
         product.setIsHot(request.getIsHot() != null ? request.getIsHot() : 0);
         product.setSaleStatus(request.getSaleStatus() != null ? request.getSaleStatus() : "ON_SALE");
         product.setSortNo(request.getSortNo() != null ? request.getSortNo() : 0);
+        product.setAlias(request.getAlias());
         product.setDeleted(0);
         product.setCreateTime(LocalDateTime.now());
         product.setUpdateTime(LocalDateTime.now());
@@ -303,6 +314,10 @@ public class AdminServiceImpl implements AdminService {
             product.setSortNo(request.getSortNo());
         }
         
+        if (request.getAlias() != null) {
+            product.setAlias(request.getAlias());
+        }
+        
         product.setUpdateTime(LocalDateTime.now());
         if (axxProductMapper.updateById(product) != 1) {
             throw new BusinessException(ResultCode.SYSTEM_ERROR, "更新产品失败");
@@ -351,6 +366,10 @@ public class AdminServiceImpl implements AdminService {
         LambdaQueryWrapper<ExpenseRecordEntity> wrapper = new LambdaQueryWrapper<>();
         wrapper.ne(ExpenseRecordEntity::getExpenseStatus, InsuranceStatus.DRAFT.getCode());
         
+        if (query.getProductName() != null && !query.getProductName().isEmpty()) {
+            wrapper.like(ExpenseRecordEntity::getProductName, query.getProductName());
+        }
+        
         if (query.getStatus() != null && !query.getStatus().isEmpty() && !"all".equals(query.getStatus())) {
             applyExpenseStatusFilter(wrapper, query.getStatus());
         }
@@ -380,11 +399,14 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public PageResponse<InsuranceVO> listAllInsurances(InsuranceQuery query) {
         LambdaQueryWrapper<InsuranceRecordEntity> wrapper = new LambdaQueryWrapper<>();
-        if (query.getStatus() == null || query.getStatus().isEmpty() || "all".equals(query.getStatus())) {
-            wrapper.ne(InsuranceRecordEntity::getInsuranceStatus, InsuranceStatus.DRAFT.getCode());
+        
+        if (query.getProductName() != null && !query.getProductName().isEmpty()) {
+            wrapper.like(InsuranceRecordEntity::getProductName, query.getProductName());
         }
         
-        if (query.getStatus() != null && !query.getStatus().isEmpty() && !"all".equals(query.getStatus())) {
+        if (query.getStatus() == null || query.getStatus().isEmpty() || "all".equals(query.getStatus())) {
+            // 当查询所有状态时，不排除任何状态，确保能查询到所有保险记录
+        } else {
             applyInsuranceStatusFilter(wrapper, query.getStatus());
         }
         
@@ -477,6 +499,64 @@ public class AdminServiceImpl implements AdminService {
 
         syncExpenseStatus(insurance.getExpenseId(), InsuranceStatus.REVIEW_REJECTED, null, null, null);
         refundRejectedInsurance(insurance);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void batchApproveInsurances(BatchInsuranceRequest request, Long reviewerId, String reviewerName) {
+        for (Long insuranceId : request.getInsuranceIds()) {
+            try {
+                InsuranceRecordEntity insurance = requireInsurance(insuranceId);
+                ensureTransition(insurance, InsuranceStatus.PENDING_REVIEW, InsuranceStatus.APPROVED);
+
+                insurance.setReviewComment(request.getReviewComment().trim());
+                insurance.setReviewerId(reviewerId);
+                insurance.setReviewerName(reviewerName);
+                insurance.setReviewTime(LocalDateTime.now());
+                insurance.setRejectReason(null);
+                insurance.setUpdateTime(LocalDateTime.now());
+
+                // 批量审核默认只更新状态，不直接生效
+                insurance.setInsuranceStatus(InsuranceStatus.APPROVED.getCode());
+                insuranceRecordMapper.updateById(insurance);
+
+                syncExpenseStatus(insurance.getExpenseId(), InsuranceStatus.APPROVED, null, null, null);
+            } catch (Exception e) {
+                // 记录错误但继续处理其他保单
+                log.error("批量审核通过失败: insuranceId={}, error={}", insuranceId, e.getMessage());
+            }
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void batchRejectInsurances(BatchInsuranceRequest request, Long reviewerId, String reviewerName) {
+        for (Long insuranceId : request.getInsuranceIds()) {
+            try {
+                InsuranceRecordEntity insurance = requireInsurance(insuranceId);
+                ensureTransition(insurance, InsuranceStatus.PENDING_REVIEW, InsuranceStatus.REVIEW_REJECTED);
+
+                insurance.setInsuranceStatus(InsuranceStatus.REVIEW_REJECTED.getCode());
+                insurance.setReviewComment(request.getReviewComment().trim());
+                insurance.setReviewerId(reviewerId);
+                insurance.setReviewerName(reviewerName);
+                insurance.setReviewTime(LocalDateTime.now());
+                insurance.setRejectReason(request.getRejectReason().trim());
+                insurance.setUnderwritingTime(null);
+                insurance.setActivateTime(null);
+                insurance.setPolicyNo(null);
+                insurance.setEffectiveDate(null);
+                insurance.setExpiryDate(null);
+                insurance.setUpdateTime(LocalDateTime.now());
+                insuranceRecordMapper.updateById(insurance);
+
+                syncExpenseStatus(insurance.getExpenseId(), InsuranceStatus.REVIEW_REJECTED, null, null, null);
+                refundRejectedInsurance(insurance);
+            } catch (Exception e) {
+                // 记录错误但继续处理其他保单
+                log.error("批量审核驳回失败: insuranceId={}, error={}", insuranceId, e.getMessage());
+            }
+        }
     }
 
     @Override
@@ -666,6 +746,7 @@ public class AdminServiceImpl implements AdminService {
                 .sortNo(entity.getSortNo())
                 .imageUrl(entity.getImageUrl())
                 .templateFileName(entity.getTemplateFileName())
+                .alias(entity.getAlias())
                 .build();
     }
 
@@ -681,6 +762,7 @@ public class AdminServiceImpl implements AdminService {
                 .isNew(entity.getIsNew() == 1)
                 .categoryCode(entity.getCategoryCode())
                 .companyName(entity.getCompanyName())
+                .alias(entity.getAlias())
                 .build();
     }
 

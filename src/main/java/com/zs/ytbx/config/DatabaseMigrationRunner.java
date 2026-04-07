@@ -18,6 +18,7 @@ public class DatabaseMigrationRunner implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         ensureNoticeTable();
         ensureProductTemplateColumns();
+        ensureProductAliasColumn();
         ensureProductCodeUniqueIndex();
         ensureInsuranceWorkflowColumns();
         migrateLegacyInsuranceWorkflowStatuses();
@@ -47,6 +48,11 @@ public class DatabaseMigrationRunner implements ApplicationRunner {
                 "ALTER TABLE axx_product ADD COLUMN template_file_name VARCHAR(255) DEFAULT NULL COMMENT '模板文件名'");
         ensureColumnExists("axx_product", "template_file_path",
                 "ALTER TABLE axx_product ADD COLUMN template_file_path VARCHAR(500) DEFAULT NULL COMMENT '模板文件路径'");
+    }
+
+    private void ensureProductAliasColumn() {
+        ensureColumnExists("axx_product", "alias",
+                "ALTER TABLE axx_product ADD COLUMN alias VARCHAR(255) DEFAULT NULL COMMENT '产品别名（仅管理员可见）'");
     }
 
     private void ensureProductCodeUniqueIndex() {

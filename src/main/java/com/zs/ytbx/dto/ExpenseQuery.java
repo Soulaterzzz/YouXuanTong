@@ -8,6 +8,7 @@ public class ExpenseQuery {
     private Integer page = 1;
     private Integer size = 10;
     private String plan;
+    private String productName;
     private String status;
     private String serialNo;
     private Date startDate;

@@ -46,4 +46,6 @@ public class AxxProductEntity extends BaseEntity {
     private String templateFileName;
 
     private String templateFilePath;
+
+    private String alias;
 }

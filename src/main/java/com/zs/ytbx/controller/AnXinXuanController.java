@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.util.HashMap;
@@ -106,6 +107,20 @@ public class AnXinXuanController {
     public ApiResponse<Void> createRecharge(@Valid @RequestBody CreateRechargeRequest request) {
         Long userId = getCurrentUserId();
         anxinXuanService.createRecharge(request, userId);
+        return ApiResponse.success(null);
+    }
+
+    @PutMapping("/products/price")
+    public ApiResponse<Void> updateProductPrice(@Valid @RequestBody UpdateProductPriceRequest request) {
+        Long userId = getCurrentUserId();
+        anxinXuanService.updateProductPrice(request, userId);
+        return ApiResponse.success(null);
+    }
+
+    @PostMapping("/products/batch-import")
+    public ApiResponse<Void> batchImportProducts(@RequestParam("productId") Long productId, @RequestParam("file") MultipartFile file) {
+        Long userId = getCurrentUserId();
+        anxinXuanService.batchImportProducts(productId, file, userId);
         return ApiResponse.success(null);
     }
 }

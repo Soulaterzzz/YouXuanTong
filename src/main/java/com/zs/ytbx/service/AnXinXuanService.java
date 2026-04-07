@@ -3,6 +3,7 @@ package com.zs.ytbx.service;
 import com.zs.ytbx.common.api.PageResponse;
 import com.zs.ytbx.dto.*;
 import com.zs.ytbx.vo.anxinxuan.*;
+import org.springframework.web.multipart.MultipartFile;
 
 public interface AnXinXuanService {
 
@@ -19,4 +20,6 @@ public interface AnXinXuanService {
 
     PageResponse<RechargeVO> listRecharges(RechargeQuery query, Long userId);
     void createRecharge(CreateRechargeRequest request, Long userId);
+    void updateProductPrice(UpdateProductPriceRequest request, Long userId);
+    void batchImportProducts(Long productId, MultipartFile file, Long userId);
 }

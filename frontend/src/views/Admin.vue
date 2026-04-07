@@ -162,6 +162,10 @@
           <div class="filter-card">
             <div class="filter-form">
               <div class="filter-item">
+                <label>搜索：</label>
+                <el-input v-model="productQuery.keyword" placeholder="请输入产品名称或描述" style="width: 200px" clearable />
+              </div>
+              <div class="filter-item">
                 <label>产品类别：</label>
                 <el-select v-model="productQuery.category" placeholder="全部" style="width: 150px" clearable>
                   <el-option label="1-3类意外" value="1-3" />
@@ -181,6 +185,7 @@
             <el-table :data="products" style="width: 100%" v-loading="productLoading">
               <el-table-column prop="id" label="ID" width="80" />
               <el-table-column prop="name" label="产品名称" min-width="150" />
+              <el-table-column prop="alias" label="别名" min-width="120" />
               <el-table-column prop="categoryCode" label="类别" width="100" />
               <el-table-column prop="companyName" label="承保公司" width="120" />
               <el-table-column prop="price" label="价格" width="100">
@@ -326,6 +331,9 @@
         </el-form-item>
         <el-form-item label="产品特点">
           <el-input v-model="productForm.features" type="textarea" :rows="2" />
+        </el-form-item>
+        <el-form-item label="产品别名">
+          <el-input v-model="productForm.alias" placeholder="仅管理员可见的别名" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -526,16 +534,16 @@ export default {
     const productLoading = ref(false)
     const productTotal = ref(0)
     const productCurrentPage = ref(1)
-    const productQuery = reactive({ category: '' })
+    const productQuery = reactive({ category: '', keyword: '' })
     const productDialogVisible = ref(false)
     const productDialogTitle = ref('新增产品')
     const productDialogLoading = ref(false)
-    const productForm = reactive({ id: null, productName: '', categoryCode: '1-3', companyName: '', price: 0, stock: 100, description: '', features: '' })
+    const productForm = reactive({ id: null, productName: '', categoryCode: '1-3', companyName: '', price: 0, stock: 100, description: '', features: '', alias: '' })
 
     const loadProducts = async () => {
       productLoading.value = true
       try {
-        const res = await axios.get('/api/admin/products', { params: { page: productCurrentPage.value, size: 10, category: productQuery.category } })
+        const res = await axios.get('/api/admin/products', { params: { page: productCurrentPage.value, size: 10, category: productQuery.category, keyword: productQuery.keyword } })
         if (res.data.code === '00000') {
           products.value = res.data.data.records
           productTotal.value = res.data.data.total
@@ -549,6 +557,7 @@ export default {
 
     const resetProductQuery = () => {
       productQuery.category = ''
+      productQuery.keyword = ''
       loadProducts()
     }
 
@@ -560,10 +569,10 @@ export default {
     const openProductDialog = (type, row = null) => {
       if (type === 'create') {
         productDialogTitle.value = '新增产品'
-        Object.assign(productForm, { id: null, productName: '', categoryCode: '1-3', companyName: '', price: 0, stock: 100, description: '', features: '' })
+        Object.assign(productForm, { id: null, productName: '', categoryCode: '1-3', companyName: '', price: 0, stock: 100, description: '', features: '', alias: '' })
       } else {
         productDialogTitle.value = '编辑产品'
-        Object.assign(productForm, { id: row.id, productName: row.name, categoryCode: row.categoryCode, companyName: row.companyName, price: row.price, stock: row.stock, description: row.description, features: row.features })
+        Object.assign(productForm, { id: row.id, productName: row.name, categoryCode: row.categoryCode, companyName: row.companyName, price: row.price, stock: row.stock, description: row.description, features: row.features, alias: row.alias || '' })
       }
       productDialogVisible.value = true
     }

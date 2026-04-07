@@ -17,4 +17,5 @@ public class ProductDetailVO {
     private boolean isNew;
     private String categoryCode;
     private String companyName;
+    private String alias;
 }

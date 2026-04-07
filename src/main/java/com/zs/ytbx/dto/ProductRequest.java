@@ -38,4 +38,6 @@ public class ProductRequest {
     private String saleStatus = "ON_SALE";
     
     private Integer sortNo = 0;
+
+    private String alias;
 }

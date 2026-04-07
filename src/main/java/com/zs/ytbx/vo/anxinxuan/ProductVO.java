@@ -23,4 +23,5 @@ public class ProductVO {
     private Integer sortNo;
     private String imageUrl;
     private String templateFileName;
+    private String alias;
 }
