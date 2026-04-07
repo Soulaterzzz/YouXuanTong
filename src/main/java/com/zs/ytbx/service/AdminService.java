@@ -4,6 +4,8 @@ import com.zs.ytbx.common.api.PageResponse;
 import com.zs.ytbx.dto.*;
 import com.zs.ytbx.vo.anxinxuan.*;
 
+import org.springframework.web.multipart.MultipartFile;
+
 import java.util.List;
 
 public interface AdminService {
@@ -27,8 +29,6 @@ public interface AdminService {
     PageResponse<InsuranceVO> listAllInsurances(InsuranceQuery query);
     void approveInsurance(Long insuranceId, InsuranceApproveRequest request, Long reviewerId, String reviewerName);
     void rejectInsurance(Long insuranceId, InsuranceRejectRequest request, Long reviewerId, String reviewerName);
-    void batchApproveInsurances(BatchInsuranceRequest request, Long reviewerId, String reviewerName);
-    void batchRejectInsurances(BatchInsuranceRequest request, Long reviewerId, String reviewerName);
     void startUnderwriting(Long insuranceId);
     void activateInsurance(Long insuranceId, ActivateInsuranceRequest request);
     void activateInsurances(List<BatchActivateInsuranceRequest.Item> items);
@@ -40,4 +40,7 @@ public interface AdminService {
     Long getMonthOrders();
     List<ProductSalesAnalysisVO> getProductSalesRanking(java.time.LocalDate startDate, java.time.LocalDate endDate);
     List<OrderTrendAnalysisVO> getOrderTrendAnalysis(java.time.LocalDate startDate, java.time.LocalDate endDate, String periodType);
+
+    byte[] downloadProductImportTemplate();
+    int importProducts(MultipartFile file);
 }

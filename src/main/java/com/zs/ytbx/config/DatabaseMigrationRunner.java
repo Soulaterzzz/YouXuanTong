@@ -4,11 +4,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 @Slf4j
 @Component
+@ConditionalOnProperty(name = "ytbx.mock.enabled", havingValue = "false", matchIfMissing = true)
 @RequiredArgsConstructor
 public class DatabaseMigrationRunner implements ApplicationRunner {
 
@@ -16,12 +19,15 @@ public class DatabaseMigrationRunner implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        ensureNoticeTable();
-        ensureProductTemplateColumns();
-        ensureProductAliasColumn();
-        ensureProductCodeUniqueIndex();
-        ensureInsuranceWorkflowColumns();
-        migrateLegacyInsuranceWorkflowStatuses();
+        try {
+            ensureNoticeTable();
+            ensureProductTemplateColumns();
+            ensureProductCodeUniqueIndex();
+            ensureInsuranceWorkflowColumns();
+            migrateLegacyInsuranceWorkflowStatuses();
+        } catch (DataAccessException ex) {
+            log.warn("数据库迁移未执行，当前数据库不可用或连接信息未配置完整：{}", ex.getMessage());
+        }
     }
 
     private void ensureNoticeTable() {
@@ -48,11 +54,6 @@ public class DatabaseMigrationRunner implements ApplicationRunner {
                 "ALTER TABLE axx_product ADD COLUMN template_file_name VARCHAR(255) DEFAULT NULL COMMENT '模板文件名'");
         ensureColumnExists("axx_product", "template_file_path",
                 "ALTER TABLE axx_product ADD COLUMN template_file_path VARCHAR(500) DEFAULT NULL COMMENT '模板文件路径'");
-    }
-
-    private void ensureProductAliasColumn() {
-        ensureColumnExists("axx_product", "alias",
-                "ALTER TABLE axx_product ADD COLUMN alias VARCHAR(255) DEFAULT NULL COMMENT '产品别名（仅管理员可见）'");
     }
 
     private void ensureProductCodeUniqueIndex() {

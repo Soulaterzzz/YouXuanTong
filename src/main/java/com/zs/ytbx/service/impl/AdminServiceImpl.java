@@ -3,10 +3,13 @@ package com.zs.ytbx.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.zs.ytbx.common.api.PageResponse;
 import com.zs.ytbx.common.enums.InsuranceStatus;
 import com.zs.ytbx.common.enums.ResultCode;
 import com.zs.ytbx.common.exception.BusinessException;
+import com.zs.ytbx.common.export.SimpleXlsxReader;
+import com.zs.ytbx.common.export.SimpleXlsxWriter;
 import com.zs.ytbx.dto.*;
 import com.zs.ytbx.entity.*;
 import com.zs.ytbx.mapper.*;
@@ -15,17 +18,20 @@ import com.zs.ytbx.vo.anxinxuan.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.springframework.web.multipart.MultipartFile;
+
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -34,8 +40,6 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class AdminServiceImpl implements AdminService {
-
-    private static final Logger log = LoggerFactory.getLogger(AdminServiceImpl.class);
 
     private final AxxUserMapper axxUserMapper;
     private final AccountBalanceMapper accountBalanceMapper;
@@ -186,13 +190,6 @@ public class AdminServiceImpl implements AdminService {
     public PageResponse<ProductVO> listProducts(ProductQuery query) {
         LambdaQueryWrapper<AxxProductEntity> wrapper = new LambdaQueryWrapper<>();
 
-        if (query.getKeyword() != null && !query.getKeyword().isEmpty()) {
-            wrapper.and(w -> w.like(AxxProductEntity::getProductName, query.getKeyword())
-                .or().like(AxxProductEntity::getDescription, query.getKeyword())
-                .or().like(AxxProductEntity::getFeatures, query.getKeyword())
-                .or().like(AxxProductEntity::getAlias, query.getKeyword()));
-        }
-
         if (query.getCategory() != null && !query.getCategory().isEmpty() && !"all".equals(query.getCategory())) {
             wrapper.eq(AxxProductEntity::getCategoryCode, query.getCategory());
         }
@@ -251,7 +248,6 @@ public class AdminServiceImpl implements AdminService {
         product.setIsHot(request.getIsHot() != null ? request.getIsHot() : 0);
         product.setSaleStatus(request.getSaleStatus() != null ? request.getSaleStatus() : "ON_SALE");
         product.setSortNo(request.getSortNo() != null ? request.getSortNo() : 0);
-        product.setAlias(request.getAlias());
         product.setDeleted(0);
         product.setCreateTime(LocalDateTime.now());
         product.setUpdateTime(LocalDateTime.now());
@@ -314,10 +310,6 @@ public class AdminServiceImpl implements AdminService {
             product.setSortNo(request.getSortNo());
         }
         
-        if (request.getAlias() != null) {
-            product.setAlias(request.getAlias());
-        }
-        
         product.setUpdateTime(LocalDateTime.now());
         if (axxProductMapper.updateById(product) != 1) {
             throw new BusinessException(ResultCode.SYSTEM_ERROR, "更新产品失败");
@@ -365,18 +357,7 @@ public class AdminServiceImpl implements AdminService {
     public PageResponse<ExpenseVO> listAllExpenses(ExpenseQuery query) {
         LambdaQueryWrapper<ExpenseRecordEntity> wrapper = new LambdaQueryWrapper<>();
         wrapper.ne(ExpenseRecordEntity::getExpenseStatus, InsuranceStatus.DRAFT.getCode());
-        
-        if (query.getProductName() != null && !query.getProductName().isEmpty()) {
-            wrapper.like(ExpenseRecordEntity::getProductName, query.getProductName());
-        }
-        
-        if (query.getStatus() != null && !query.getStatus().isEmpty() && !"all".equals(query.getStatus())) {
-            applyExpenseStatusFilter(wrapper, query.getStatus());
-        }
-        
-        if (query.getSerialNo() != null && !query.getSerialNo().isEmpty()) {
-            wrapper.like(ExpenseRecordEntity::getSerialNo, query.getSerialNo());
-        }
+        applyExpenseFilters(wrapper, query);
         
         wrapper.orderByDesc(ExpenseRecordEntity::getCreateTime);
         
@@ -399,29 +380,9 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public PageResponse<InsuranceVO> listAllInsurances(InsuranceQuery query) {
         LambdaQueryWrapper<InsuranceRecordEntity> wrapper = new LambdaQueryWrapper<>();
-        
-        if (query.getProductName() != null && !query.getProductName().isEmpty()) {
-            wrapper.like(InsuranceRecordEntity::getProductName, query.getProductName());
-        }
-        
-        if (query.getStatus() == null || query.getStatus().isEmpty() || "all".equals(query.getStatus())) {
-            // 当查询所有状态时，不排除任何状态，确保能查询到所有保险记录
-        } else {
-            applyInsuranceStatusFilter(wrapper, query.getStatus());
-        }
-        
-        if (query.getSerialNo() != null && !query.getSerialNo().isEmpty()) {
-            wrapper.like(InsuranceRecordEntity::getPolicyNo, query.getSerialNo());
-        }
-        
-        if (query.getInsuredName() != null && !query.getInsuredName().isEmpty()) {
-            wrapper.like(InsuranceRecordEntity::getInsuredName, query.getInsuredName());
-        }
-        
-        if (query.getBeneficiaryName() != null && !query.getBeneficiaryName().isEmpty()) {
-            wrapper.like(InsuranceRecordEntity::getBeneficiaryName, query.getBeneficiaryName());
-        }
-        
+        wrapper.ne(InsuranceRecordEntity::getInsuranceStatus, InsuranceStatus.DRAFT.getCode());
+        applyInsuranceFilters(wrapper, query);
+
         wrapper.orderByDesc(InsuranceRecordEntity::getCreateTime);
         
         IPage<InsuranceRecordEntity> page = insuranceRecordMapper.selectPage(
@@ -441,40 +402,85 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
+    public byte[] downloadProductImportTemplate() {
+        List<String> headers = productImportHeaders();
+        List<List<String>> rows = List.of(List.of(
+                "P-20240401-001",
+                "示例产品",
+                "1-3",
+                "示例承保公司",
+                "这里填写产品描述",
+                "这里填写产品特点",
+                "99.00",
+                "100",
+                "1",
+                "0",
+                "ON_SALE",
+                "1"
+        ));
+        return SimpleXlsxWriter.write("产品导入模板", headers, rows);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int importProducts(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "导入文件不能为空");
+        }
+        String filename = file.getOriginalFilename();
+        if (filename == null) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "导入文件不能为空");
+        }
+        String lowerFilename = filename.toLowerCase();
+        if (!lowerFilename.endsWith(".xls") && !lowerFilename.endsWith(".xlsx")) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "仅支持导入 .xls 或 .xlsx 文件");
+        }
+
+        List<List<String>> rows;
+        try {
+            rows = SimpleXlsxReader.readFirstSheet(file.getInputStream());
+        } catch (Exception e) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "Excel文件解析失败：" + e.getMessage());
+        }
+
+        if (rows.size() <= 1) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "Excel中没有可导入的数据");
+        }
+
+        List<String> headers = rows.get(0);
+        validateProductImportHeaders(headers);
+
+        int importedCount = 0;
+        for (int i = 1; i < rows.size(); i++) {
+            List<String> row = rows.get(i);
+            if (isBlankRow(row)) {
+                continue;
+            }
+            ProductRequest request = buildProductRequestFromRow(row, i + 1);
+            createProduct(request);
+            importedCount++;
+        }
+        return importedCount;
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public void approveInsurance(Long insuranceId, InsuranceApproveRequest request, Long reviewerId, String reviewerName) {
         InsuranceRecordEntity insurance = requireInsurance(insuranceId);
         ensureTransition(insurance, InsuranceStatus.PENDING_REVIEW, InsuranceStatus.APPROVED);
 
+        insurance.setInsuranceStatus(InsuranceStatus.APPROVED.getCode());
         insurance.setReviewComment(request.getReviewComment().trim());
         insurance.setReviewerId(reviewerId);
         insurance.setReviewerName(reviewerName);
         insurance.setReviewTime(LocalDateTime.now());
         insurance.setRejectReason(null);
+        insurance.setUnderwritingTime(null);
+        insurance.setActivateTime(null);
         insurance.setUpdateTime(LocalDateTime.now());
+        insuranceRecordMapper.updateById(insurance);
 
-        boolean hasPolicyInfo = request.getPolicyNo() != null && !request.getPolicyNo().isBlank()
-                && request.getEffectiveDate() != null && request.getExpiryDate() != null;
-
-        if (hasPolicyInfo) {
-            if (request.getExpiryDate().isBefore(request.getEffectiveDate())) {
-                throw new BusinessException(ResultCode.INVALID_PARAM, "结束日期不能早于起保日期");
-            }
-            insurance.setInsuranceStatus(InsuranceStatus.ACTIVE.getCode());
-            insurance.setPolicyNo(request.getPolicyNo().trim());
-            insurance.setEffectiveDate(request.getEffectiveDate());
-            insurance.setExpiryDate(request.getExpiryDate());
-            insurance.setUnderwritingTime(LocalDateTime.now());
-            insurance.setActivateTime(LocalDateTime.now());
-            insuranceRecordMapper.updateById(insurance);
-            syncExpenseStatus(insurance.getExpenseId(), InsuranceStatus.ACTIVE, insurance.getPolicyNo(), insurance.getEffectiveDate(), insurance.getExpiryDate());
-        } else {
-            insurance.setInsuranceStatus(InsuranceStatus.APPROVED.getCode());
-            insurance.setUnderwritingTime(null);
-            insurance.setActivateTime(null);
-            insuranceRecordMapper.updateById(insurance);
-            syncExpenseStatus(insurance.getExpenseId(), InsuranceStatus.APPROVED, insurance.getPolicyNo(), insurance.getEffectiveDate(), insurance.getExpiryDate());
-        }
+        syncExpenseStatus(insurance.getExpenseId(), InsuranceStatus.APPROVED, insurance.getPolicyNo(), insurance.getEffectiveDate(), insurance.getExpiryDate());
     }
 
     @Override
@@ -499,64 +505,6 @@ public class AdminServiceImpl implements AdminService {
 
         syncExpenseStatus(insurance.getExpenseId(), InsuranceStatus.REVIEW_REJECTED, null, null, null);
         refundRejectedInsurance(insurance);
-    }
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public void batchApproveInsurances(BatchInsuranceRequest request, Long reviewerId, String reviewerName) {
-        for (Long insuranceId : request.getInsuranceIds()) {
-            try {
-                InsuranceRecordEntity insurance = requireInsurance(insuranceId);
-                ensureTransition(insurance, InsuranceStatus.PENDING_REVIEW, InsuranceStatus.APPROVED);
-
-                insurance.setReviewComment(request.getReviewComment().trim());
-                insurance.setReviewerId(reviewerId);
-                insurance.setReviewerName(reviewerName);
-                insurance.setReviewTime(LocalDateTime.now());
-                insurance.setRejectReason(null);
-                insurance.setUpdateTime(LocalDateTime.now());
-
-                // 批量审核默认只更新状态，不直接生效
-                insurance.setInsuranceStatus(InsuranceStatus.APPROVED.getCode());
-                insuranceRecordMapper.updateById(insurance);
-
-                syncExpenseStatus(insurance.getExpenseId(), InsuranceStatus.APPROVED, null, null, null);
-            } catch (Exception e) {
-                // 记录错误但继续处理其他保单
-                log.error("批量审核通过失败: insuranceId={}, error={}", insuranceId, e.getMessage());
-            }
-        }
-    }
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public void batchRejectInsurances(BatchInsuranceRequest request, Long reviewerId, String reviewerName) {
-        for (Long insuranceId : request.getInsuranceIds()) {
-            try {
-                InsuranceRecordEntity insurance = requireInsurance(insuranceId);
-                ensureTransition(insurance, InsuranceStatus.PENDING_REVIEW, InsuranceStatus.REVIEW_REJECTED);
-
-                insurance.setInsuranceStatus(InsuranceStatus.REVIEW_REJECTED.getCode());
-                insurance.setReviewComment(request.getReviewComment().trim());
-                insurance.setReviewerId(reviewerId);
-                insurance.setReviewerName(reviewerName);
-                insurance.setReviewTime(LocalDateTime.now());
-                insurance.setRejectReason(request.getRejectReason().trim());
-                insurance.setUnderwritingTime(null);
-                insurance.setActivateTime(null);
-                insurance.setPolicyNo(null);
-                insurance.setEffectiveDate(null);
-                insurance.setExpiryDate(null);
-                insurance.setUpdateTime(LocalDateTime.now());
-                insuranceRecordMapper.updateById(insurance);
-
-                syncExpenseStatus(insurance.getExpenseId(), InsuranceStatus.REVIEW_REJECTED, null, null, null);
-                refundRejectedInsurance(insurance);
-            } catch (Exception e) {
-                // 记录错误但继续处理其他保单
-                log.error("批量审核驳回失败: insuranceId={}, error={}", insuranceId, e.getMessage());
-            }
-        }
     }
 
     @Override
@@ -746,7 +694,6 @@ public class AdminServiceImpl implements AdminService {
                 .sortNo(entity.getSortNo())
                 .imageUrl(entity.getImageUrl())
                 .templateFileName(entity.getTemplateFileName())
-                .alias(entity.getAlias())
                 .build();
     }
 
@@ -762,7 +709,6 @@ public class AdminServiceImpl implements AdminService {
                 .isNew(entity.getIsNew() == 1)
                 .categoryCode(entity.getCategoryCode())
                 .companyName(entity.getCompanyName())
-                .alias(entity.getAlias())
                 .build();
     }
 
@@ -1152,6 +1098,207 @@ public class AdminServiceImpl implements AdminService {
             cursor = cursor.plusDays(1);
         }
         return total;
+    }
+
+    private void applyExpenseFilters(LambdaQueryWrapper<ExpenseRecordEntity> wrapper, ExpenseQuery query) {
+        if (query == null) {
+            return;
+        }
+
+        if (query.getPlan() != null && !query.getPlan().isBlank() && !"all".equalsIgnoreCase(query.getPlan())) {
+            wrapper.like(ExpenseRecordEntity::getProductName, resolvePlanKeyword(query.getPlan()));
+        }
+        if (query.getStatus() != null && !query.getStatus().isBlank() && !"all".equalsIgnoreCase(query.getStatus())) {
+            applyExpenseStatusFilter(wrapper, query.getStatus());
+        }
+        if (query.getSerialNo() != null && !query.getSerialNo().isBlank()) {
+            wrapper.like(ExpenseRecordEntity::getSerialNo, query.getSerialNo().trim());
+        }
+        applyDateRange(wrapper, query.getStartDate(), query.getEndDate(), ExpenseRecordEntity::getCreateTime);
+    }
+
+    private void applyInsuranceFilters(LambdaQueryWrapper<InsuranceRecordEntity> wrapper, InsuranceQuery query) {
+        if (query == null) {
+            return;
+        }
+
+        if (query.getPlan() != null && !query.getPlan().isBlank() && !"all".equalsIgnoreCase(query.getPlan())) {
+            wrapper.like(InsuranceRecordEntity::getProductName, resolvePlanKeyword(query.getPlan()));
+        }
+        if (query.getStatus() != null && !query.getStatus().isBlank() && !"all".equalsIgnoreCase(query.getStatus())) {
+            applyInsuranceStatusFilter(wrapper, query.getStatus());
+        }
+        if (query.getSerialNo() != null && !query.getSerialNo().isBlank()) {
+            wrapper.like(InsuranceRecordEntity::getPolicyNo, query.getSerialNo().trim());
+        }
+        if (query.getInsuredName() != null && !query.getInsuredName().isBlank()) {
+            wrapper.like(InsuranceRecordEntity::getInsuredName, query.getInsuredName().trim());
+        }
+        if (query.getInsuredId() != null && !query.getInsuredId().isBlank()) {
+            wrapper.like(InsuranceRecordEntity::getInsuredIdNo, query.getInsuredId().trim());
+        }
+        if (query.getBeneficiaryName() != null && !query.getBeneficiaryName().isBlank()) {
+            wrapper.like(InsuranceRecordEntity::getBeneficiaryName, query.getBeneficiaryName().trim());
+        }
+        if (query.getBeneficiaryId() != null && !query.getBeneficiaryId().isBlank()) {
+            wrapper.like(InsuranceRecordEntity::getBeneficiaryIdNo, query.getBeneficiaryId().trim());
+        }
+        if (query.getAgent() != null && !query.getAgent().isBlank()) {
+            wrapper.like(InsuranceRecordEntity::getAgentName, query.getAgent().trim());
+        }
+        applyDateRange(wrapper, query.getStartDate(), query.getEndDate(), InsuranceRecordEntity::getCreateTime);
+    }
+
+    private <T> void applyDateRange(LambdaQueryWrapper<T> wrapper,
+                                    java.util.Date startDate,
+                                    java.util.Date endDate,
+                                    SFunction<T, LocalDateTime> columnGetter) {
+        if (startDate != null) {
+            wrapper.ge(columnGetter, toStartOfDay(startDate));
+        }
+        if (endDate != null) {
+            wrapper.le(columnGetter, toEndOfDay(endDate));
+        }
+    }
+
+    private LocalDateTime toStartOfDay(java.util.Date date) {
+        return Instant.ofEpochMilli(date.getTime()).atZone(ZoneId.systemDefault()).toLocalDate().atStartOfDay();
+    }
+
+    private LocalDateTime toEndOfDay(java.util.Date date) {
+        return Instant.ofEpochMilli(date.getTime()).atZone(ZoneId.systemDefault()).toLocalDate().atTime(LocalTime.MAX);
+    }
+
+    private List<String> productImportHeaders() {
+        return List.of("产品编码", "产品名称", "分类编码", "承保公司", "产品描述", "产品特点", "价格", "库存", "是否新品", "是否热销", "上架状态", "排序号");
+    }
+
+    private void validateProductImportHeaders(List<String> headers) {
+        List<String> expected = productImportHeaders();
+        if (headers == null || headers.size() < expected.size()) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "Excel模板表头不完整，请使用系统下载的模板");
+        }
+        for (int i = 0; i < expected.size(); i++) {
+            String actual = normalizeCell(headers.get(i));
+            if (!expected.get(i).equals(actual)) {
+                throw new BusinessException(ResultCode.INVALID_PARAM, "Excel模板表头不正确，请使用系统下载的模板");
+            }
+        }
+    }
+
+    private ProductRequest buildProductRequestFromRow(List<String> row, int rowNumber) {
+        ProductRequest request = new ProductRequest();
+        request.setProductCode(requireCell(row, 0, rowNumber, "产品编码"));
+        request.setProductName(requireCell(row, 1, rowNumber, "产品名称"));
+        request.setCategoryCode(requireCell(row, 2, rowNumber, "分类编码"));
+        request.setCompanyName(requireCell(row, 3, rowNumber, "承保公司"));
+        request.setDescription(getCell(row, 4));
+        request.setFeatures(getCell(row, 5));
+        request.setPrice(parseBigDecimal(requireCell(row, 6, rowNumber, "价格"), rowNumber, "价格"));
+        request.setStock(parseInteger(getCell(row, 7), rowNumber, "库存", 0));
+        request.setIsNew(parseInteger(getCell(row, 8), rowNumber, "是否新品", 0));
+        request.setIsHot(parseInteger(getCell(row, 9), rowNumber, "是否热销", 0));
+        request.setSaleStatus(normalizeSaleStatus(getCell(row, 10)));
+        request.setSortNo(parseInteger(getCell(row, 11), rowNumber, "排序号", 0));
+        return request;
+    }
+
+    private String normalizeSaleStatus(String value) {
+        String normalized = normalizeCell(value);
+        if (normalized.isEmpty()) {
+            return "ON_SALE";
+        }
+        String upper = normalized.toUpperCase();
+        if (!List.of("ON_SALE", "OFF_SALE").contains(upper)) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "上架状态仅支持 ON_SALE 或 OFF_SALE");
+        }
+        return upper;
+    }
+
+    private String requireCell(List<String> row, int index, int rowNumber, String fieldName) {
+        String value = getCell(row, index);
+        if (value.isBlank()) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "第" + rowNumber + "行【" + fieldName + "】不能为空");
+        }
+        return value;
+    }
+
+    private String getCell(List<String> row, int index) {
+        if (row == null || index < 0 || index >= row.size()) {
+            return "";
+        }
+        return normalizeCell(row.get(index));
+    }
+
+    private String normalizeCell(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private BigDecimal parseBigDecimal(String value, int rowNumber, String fieldName) {
+        try {
+            BigDecimal result = new BigDecimal(value.trim());
+            if (result.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new BusinessException(ResultCode.INVALID_PARAM, "第" + rowNumber + "行【" + fieldName + "】必须大于0");
+            }
+            return result;
+        } catch (NumberFormatException e) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "第" + rowNumber + "行【" + fieldName + "】格式不正确");
+        }
+    }
+
+    private Integer parseInteger(String value, int rowNumber, String fieldName, Integer defaultValue) {
+        if (value == null || value.isBlank()) {
+            return defaultValue;
+        }
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException e) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "第" + rowNumber + "行【" + fieldName + "】格式不正确");
+        }
+    }
+
+    private boolean isBlankRow(List<String> row) {
+        if (row == null || row.isEmpty()) {
+            return true;
+        }
+        for (String cell : row) {
+            if (cell != null && !cell.trim().isEmpty()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private String resolvePlanKeyword(String plan) {
+        String normalized = plan == null ? "" : plan.trim().toLowerCase();
+        if (normalized.contains("guoshou") || normalized.contains("国寿") || normalized.contains("1-3")) {
+            return "国寿";
+        }
+        if (normalized.contains("pingan") || normalized.contains("平安")) {
+            return "平安";
+        }
+        if (normalized.contains("child") || normalized.contains("少儿")) {
+            return "少儿";
+        }
+        if (normalized.contains("elder") || normalized.contains("老年")) {
+            return "老年";
+        }
+        if (normalized.contains("travel") || normalized.contains("旅游")) {
+            return "旅游";
+        }
+        if (normalized.contains("maternity") || normalized.contains("驾乘")) {
+            return "驾乘";
+        }
+        if (normalized.contains("zhonghua") || normalized.contains("中华")) {
+            return "中华";
+        }
+        if (normalized.contains("taiping") || normalized.contains("太平")) {
+            return "太平";
+        }
+        if (normalized.contains("renbao") || normalized.contains("人保")) {
+            return "人保";
+        }
+        return plan.trim();
     }
 
     private RechargeVO convertToRechargeVO(TransactionRecordEntity entity) {

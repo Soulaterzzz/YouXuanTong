@@ -1,865 +1,133 @@
 <template>
   <div class="app-container">
-    <!-- 顶部导航栏 -->
-    <header class="header">
-      <div class="logo">
-        <span class="logo-text">优选通</span>
-        <span class="logo-sub">保险服务平台</span>
-      </div>
-      <nav class="nav">
-        <el-menu :default-active="activeMenu" class="el-menu-demo" mode="horizontal" @select="handleMenuSelect">
-          <el-menu-item index="home">
-            <el-icon><House /></el-icon>
-            <span class="nav-text">首页</span>
-          </el-menu-item>
-          <el-menu-item index="product">
-            <el-icon><Goods /></el-icon>
-            <span class="nav-text">产品中心</span>
-          </el-menu-item>
-          <el-menu-item index="expense">
-            <el-icon><Document /></el-icon>
-            <span class="nav-text">费用清单</span>
-          </el-menu-item>
-          <el-menu-item index="insurance">
-            <el-icon><Collection /></el-icon>
-            <span class="nav-text">保险清单</span>
-          </el-menu-item>
-          <el-menu-item index="recharge">
-            <el-icon><Wallet /></el-icon>
-            <span class="nav-text">消费明细</span>
-          </el-menu-item>
+    <AppHeader
+      :active-menu="activeMenu"
+      :is-admin="isAdmin"
+      :current-user="currentUser"
+      :balance="balance"
+      @select="handleMenuSelect"
+      @logout="handleUserCommand('logout')"
+    />
 
-          <el-menu-item index="userAdmin" v-if="isAdmin">
-            <el-icon><User /></el-icon>
-            <span class="nav-text">用户管理</span>
-          </el-menu-item>
-        </el-menu>
-      </nav>
-      <div class="header-right">
-        <div class="user-info-dropdown">
-          <el-dropdown trigger="click" @command="handleUserCommand">
-            <div class="user-info-trigger">
-              <el-icon><User /></el-icon>
-              <span class="user-name">{{ currentUser }}</span>
-              <el-icon class="dropdown-arrow"><ArrowDown /></el-icon>
-            </div>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <div class="dropdown-user-info">
-                  <div class="dropdown-balance">
-                    <el-icon><Coin /></el-icon>
-                    <span>余额：¥{{ balance.toFixed(2) }}</span>
-                  </div>
-                </div>
-                <el-dropdown-item command="logout" divided>
-                  <el-icon><SwitchButton /></el-icon>
-                  <span>退出登录</span>
-                </el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
-        </div>
-      </div>
-    </header>
-
-    <!-- 主体内容 -->
     <main class="main-content">
-      <!-- 左侧产品类别菜单 -->
-      <aside class="sidebar" v-if="activeMenu === 'product'">
-        <div class="sidebar-section">
-          <h3 class="sidebar-title">
-            <el-icon><Grid /></el-icon>
-            产品类别
-          </h3>
-          <el-menu :default-active="activeCategory" class="el-menu-vertical-demo" @select="handleCategorySelect">
-            <el-menu-item index="all">
-              <el-icon><Menu /></el-icon>
-              全部产品
-            </el-menu-item>
-            <el-menu-item index="1-3">
-              <el-icon><Sunny /></el-icon>
-              1-3类意外
-            </el-menu-item>
-            <el-menu-item index="1-4">
-              <el-icon><Sunny /></el-icon>
-              1-4类意外
-            </el-menu-item>
-            <el-menu-item index="1-5">
-              <el-icon><Sunny /></el-icon>
-              1-5类意外
-            </el-menu-item>
-            <el-menu-item index="1-6">
-              <el-icon><Sunny /></el-icon>
-              1-6类意外
-            </el-menu-item>
-            <el-menu-item index="child">
-              <el-icon><Star /></el-icon>
-              少儿医疗
-            </el-menu-item>
-            <el-menu-item index="elder">
-              <el-icon><Present /></el-icon>
-              老年意外
-            </el-menu-item>
-            <el-menu-item index="travel">
-              <el-icon><Present /></el-icon>
-              旅游险
-            </el-menu-item>
-            <el-menu-item index="maternity">
-              <el-icon><Present /></el-icon>
-              驾乘险
-            </el-menu-item>
-          </el-menu>
-        </div>
-      </aside>
+      <ProductCenterSection
+        v-if="activeMenu === 'product'"
+        :is-admin="isAdmin"
+        :active-category="activeCategory"
+        :category-list="categoryList"
+        :company-filter="companyFilter"
+        :company-list="companyList"
+        :filter-text="getFilterText()"
+        :products="products"
+        :product-loading="productLoading"
+        :product-total="productTotal"
+        :product-page-size="productPageSize"
+        :product-current-page="productCurrentPage"
+        @category-select="handleCategorySelect"
+        @company-change="handleCompanyChange"
+        @reset-filter="resetProductFilter"
+        @open-category-dialog="openCategoryDialog"
+        @open-company-dialog="openCompanyDialog"
+        @add-product="openProductDialog()"
+        @preview-image="previewImage"
+        @open-product-dialog="openProductDialog"
+        @toggle-product-status="toggleProductStatus"
+        @delete-product="deleteProduct"
+        @open-batch-dialog="openProductInsuranceBatchDialog"
+        @download-template="downloadProductTemplate"
+        @open-activate-dialog="openActivateDialog"
+        @page-change="handleProductPageChange"
+        @size-change="handleProductSizeChange"
+      />
 
-      <!-- 右侧主内容区域 -->
-      <section class="content">
-        <!-- 首页 -->
-        <div v-if="activeMenu === 'home'" class="page home-page">
-          <div class="welcome-card">
-            <div class="welcome-icon">
-              <el-icon :size="60"><CircleCheck /></el-icon>
-            </div>
-            <h1>欢迎使用优选通保险服务平台</h1>
-            <p>为您的家庭保驾护航，提供专业、稳健、有温度的风险保障方案</p>
-            <div class="quick-actions">
-              <el-button type="primary" size="large" @click="activeMenu = 'product'">
-                <el-icon><Goods /></el-icon>
-                浏览产品
-              </el-button>
-              <el-button type="success" size="large" @click="activeMenu = 'insurance'">
-                <el-icon><Document /></el-icon>
-                查看保单
-              </el-button>
-            </div>
-          </div>
-          <div class="stats-cards" v-if="!isAdmin">
-            <div class="stat-card">
-              <div class="stat-icon blue">
-                <el-icon><Goods /></el-icon>
-              </div>
-              <div class="stat-info">
-                <span class="stat-number">{{ stats.totalProducts }}</span>
-                <span class="stat-name">在售产品</span>
-              </div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-icon green">
-                <el-icon><Collection /></el-icon>
-              </div>
-              <div class="stat-info">
-                <span class="stat-number">{{ stats.totalPolicies }}</span>
-                <span class="stat-name">有效保单</span>
-              </div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-icon orange">
-                <el-icon><Coin /></el-icon>
-              </div>
-              <div class="stat-info">
-                <span class="stat-number">¥{{ Number(stats.totalExpenses || 0).toFixed(2) }}</span>
-                <span class="stat-name">累计消费</span>
-              </div>
-            </div>
-          </div>
-          
-          <div class="stats-cards" v-else>
-            <div class="stat-card">
-              <div class="stat-icon blue">
-                <el-icon><Calendar /></el-icon>
-              </div>
-              <div class="stat-info">
-                <span class="stat-number">{{ stats.todayNewOrders }}</span>
-                <span class="stat-name">今日新增订单</span>
-              </div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-icon green">
-                <el-icon><Timer /></el-icon>
-              </div>
-              <div class="stat-info">
-                <span class="stat-number">{{ stats.pendingOrders }}</span>
-                <span class="stat-name">待处理订单</span>
-              </div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-icon orange">
-                <el-icon><Notebook /></el-icon>
-              </div>
-              <div class="stat-info">
-                <span class="stat-number">{{ stats.monthOrders }}</span>
-                <span class="stat-name">本月订单数</span>
-              </div>
-            </div>
-          </div>
+      <section v-else class="content">
+        <HomeOverviewSection
+          v-if="activeMenu === 'home'"
+          :is-admin="isAdmin"
+          :stats="stats"
+          :admin-analysis-period-type="adminAnalysisPeriodType"
+          :admin-analysis-range-text="adminAnalysisRangeText"
+          :admin-order-trend-range-text="adminOrderTrendRangeText"
+          :admin-order-trend-mode-label="adminOrderTrendModeLabel"
+          :admin-sales-ranking="adminSalesRanking"
+          :admin-order-trend="adminOrderTrend"
+          :published-notice-time-text="publishedNoticeTimeText"
+          :published-notice-list="publishedNoticeList"
+          @goto-product="activeMenu = 'product'"
+          @goto-insurance="activeMenu = 'insurance'"
+          @apply-admin-analysis-preset="applyAdminAnalysisPreset"
+          @open-notice-publish="openNoticePublishDialog"
+          @open-notice-detail="openNoticeDetail"
+        />
 
-          <div v-if="isAdmin" class="admin-analysis-toolbar">
-            <div class="admin-analysis-filter">
-              <div class="admin-analysis-filter-meta">
-                <h3>经营分析</h3>
-                <p>可按时间范围查看销量排行与订单总量走势</p>
-              </div>
-              <div class="admin-analysis-filter-actions">
-                <el-button :type="adminAnalysisPeriodType === 'WEEK' ? 'primary' : 'default'" @click="applyAdminAnalysisPreset('WEEK')">本周</el-button>
-                <el-button :type="adminAnalysisPeriodType === 'MONTH' ? 'primary' : 'default'" @click="applyAdminAnalysisPreset('MONTH')">本月</el-button>
-                <el-button :type="adminAnalysisPeriodType === 'QUARTER' ? 'primary' : 'default'" @click="applyAdminAnalysisPreset('QUARTER')">季度</el-button>
-                <el-button :type="adminAnalysisPeriodType === 'YEAR' ? 'primary' : 'default'" @click="applyAdminAnalysisPreset('YEAR')">全年</el-button>
-              </div>
-            </div>
-          </div>
+        <ExpenseSection
+          v-else-if="activeMenu === 'expense'"
+          :is-admin="isAdmin"
+          :expense-filter="expenseFilter"
+          :expense-list="expenseList"
+          :expense-loading="expenseLoading"
+          :expense-total="expenseTotal"
+          :expense-page-size="expensePageSize"
+          @reset-filter="resetExpenseFilter"
+          @download-export="downloadExpenseExport"
+          @query="queryExpenses"
+          @page-change="handleExpensePageChange"
+          @view-detail="viewExpenseDetail"
+        />
 
-          <div v-if="isAdmin" class="admin-analysis-grid admin-analysis-stack">
-            <div class="admin-analysis-card">
-              <div class="admin-analysis-header">
-                <div>
-                  <h3>产品销量排行</h3>
-                  <p>{{ adminAnalysisRangeText }}</p>
-                </div>
-                <el-tag type="success" effect="plain">TOP 10</el-tag>
-              </div>
-              <el-table v-if="adminSalesRanking.length" :data="adminSalesRanking" size="small" stripe>
-                <el-table-column prop="rankNo" label="排名" width="70" align="center" />
-                <el-table-column prop="productName" label="产品名称" min-width="220" show-overflow-tooltip />
-                <el-table-column prop="orderCount" label="订单数" width="90" align="center" />
-                <el-table-column prop="salesQuantity" label="销量份数" width="100" align="center" />
-                <el-table-column label="销售金额" width="120" align="right">
-                  <template #default="scope">¥{{ Number(scope.row.salesAmount || 0).toFixed(2) }}</template>
-                </el-table-column>
-                <el-table-column prop="activePolicyCount" label="生效保单" width="100" align="center" />
-              </el-table>
-              <el-empty v-else description="当前时间范围暂无销量数据" :image-size="88">
-                <el-button type="primary" @click="applyAdminAnalysisPreset('MONTH')">查看本月</el-button>
-              </el-empty>
-            </div>
+        <InsuranceSection
+          v-else-if="activeMenu === 'insurance'"
+          :is-admin="isAdmin"
+          :insurance-filter="insuranceFilter"
+          :insurance-list="insuranceList"
+          :insurance-loading="insuranceLoading"
+          :insurance-total="insuranceTotal"
+          :insurance-page-size="insurancePageSize"
+          :selected-insurances="selectedInsurances"
+          @reset-filter="resetInsuranceFilter"
+          @download-export="downloadInsuranceExport"
+          @query="queryInsurances"
+          @selection-change="handleSelectionChange"
+          @batch-activate="openInsuranceActivationDialog"
+          @view-detail="viewInsuranceDetail"
+          @download-policy="downloadPolicy"
+          @submit-draft="submitInsuranceDraft"
+          @approve="openInsuranceReviewDialog($event, 'approve')"
+          @reject="openInsuranceReviewDialog($event, 'reject')"
+          @underwriting="startInsuranceUnderwriting"
+          @activate="activateInsuranceRecord"
+          @page-change="handleInsurancePageChange"
+          @size-change="handleInsuranceSizeChange"
+        />
 
-            <div class="admin-analysis-card">
-              <div class="admin-analysis-header">
-                <div>
-                  <h3>总订单量表</h3>
-                  <p>{{ adminOrderTrendRangeText }}</p>
-                </div>
-                <el-tag type="warning" effect="plain">{{ adminOrderTrendModeLabel }}</el-tag>
-              </div>
-              <el-table v-if="adminOrderTrend.length" :data="adminOrderTrend" size="small" stripe>
-                <el-table-column prop="dateLabel" label="时间段" min-width="180" align="center" />
-                <el-table-column prop="orderCount" label="订单量" min-width="120" align="center" />
-              </el-table>
-              <el-empty v-else description="当前时间范围暂无订单趋势数据" :image-size="88">
-                <el-button type="primary" @click="applyAdminAnalysisPreset('MONTH')">查看本月</el-button>
-              </el-empty>
-            </div>
-          </div>
+        <RechargeSection
+          v-else-if="activeMenu === 'recharge'"
+          :is-admin="isAdmin"
+          :recharge-filter="rechargeFilter"
+          :recharge-list="rechargeList"
+          :recharge-loading="rechargeLoading"
+          :recharge-total="rechargeTotal"
+          @reset-filter="resetRechargeFilter"
+          @query="queryRecharges"
+          @open-recharge-dialog="openRechargeDialog"
+          @page-change="handleRechargePageChange"
+        />
 
-          <div class="notice-board-card">
-            <div class="notice-board-header">
-              <div class="notice-board-meta">
-                <h3>通知公告</h3>
-                <p>管理员首页和用户首页展示同一份通知列表。</p>
-              </div>
-              <div class="notice-board-actions">
-                <el-tag type="info" effect="plain">{{ publishedNoticeTimeText }}</el-tag>
-                <el-button v-if="isAdmin" type="primary" @click="openNoticePublishDialog">
-                  <el-icon><Plus /></el-icon>
-                  发布通知
-                </el-button>
-              </div>
-            </div>
-
-            <div v-if="publishedNoticeList.length" class="notice-list notice-published-list">
-              <div v-for="(item, index) in publishedNoticeList" :key="item.id || index" 
-                   class="notice-list-item notice-published-item" 
-                   @click="openNoticeDetail(item)">
-                <div class="notice-list-order">{{ index + 1 }}</div>
-                <div class="notice-list-content">
-                  <h4>{{ item.title }}</h4>
-                  <p>{{ item.content }}</p>
-                </div>
-              </div>
-            </div>
-            <el-empty v-else description="暂无通知公告" :image-size="90" />
-          </div>
-        </div>
-
-        <!-- 产品中心 -->
-        <div v-else-if="activeMenu === 'product'" class="page">
-          <!-- 产品分类筛选 -->
-          <div class="product-filter">
-            <div class="filter-header">
-              <h3><el-icon><Filter /></el-icon> 产品筛选</h3>
-              <div class="filter-header-actions">
-                <el-button v-if="isAdmin" type="warning" plain @click="openCategoryDialog">
-                  <el-icon><Setting /></el-icon>
-                  管理类别
-                </el-button>
-                <el-button v-if="isAdmin" type="success" plain @click="openCompanyDialog">
-                  <el-icon><Setting /></el-icon>
-                  管理公司
-                </el-button>
-                <el-button text @click="resetProductFilter" v-if="companyFilter !== 'all' || activeCategory !== 'all' || productSearchKeyword">
-                  <el-icon><Refresh /></el-icon>
-                  重置筛选
-                </el-button>
-                <el-button v-if="isAdmin" type="primary" @click="openProductDialog()">
-                  <el-icon><Plus /></el-icon>
-                  添加产品
-                </el-button>
-              </div>
-            </div>
-            <div class="filter-row">
-              <span class="filter-label">搜索：</span>
-              <el-input v-model="productSearchKeyword" placeholder="请输入产品名称或描述" style="width: 200px" clearable @keyup.enter="handleProductSearch" />
-              <el-button type="primary" @click="handleProductSearch" style="margin-left: 10px">
-                <el-icon><Search /></el-icon>
-                搜索
-              </el-button>
-            </div>
-            <div class="filter-row">
-              <span class="filter-label">承保公司：</span>
-              <el-radio-group v-model="companyFilter" @change="handleCompanyChange" size="default" class="product-company-group">
-                <el-radio-button label="all">全部</el-radio-button>
-                <el-radio-button v-for="company in companyList" :key="company.code" :label="company.code">
-                  {{ company.name }}
-                </el-radio-button>
-              </el-radio-group>
-            </div>
-          </div>
-
-          <!-- 产品统计 -->
-          <div class="product-stats">
-            <span class="stats-text">共 <strong>{{ productTotal }}</strong> 个产品</span>
-            <span class="stats-divider" v-if="companyFilter !== 'all'">|</span>
-            <span class="filter-status" v-if="companyFilter !== 'all'">
-              当前筛选：{{ getFilterText() }}
-            </span>
-          </div>
-
-          <!-- 产品列表 -->
-          <div class="product-list" v-loading="productLoading">
-            <div class="product-item" v-for="product in products" :key="product.id">
-              <div class="product-card">
-                <div class="product-image-wrapper" @click="previewImage(product)">
-                  <img :src="getProductImage(product)" :alt="product.name" class="product-img">
-                  <div class="image-overlay">
-                    <el-icon><ZoomIn /></el-icon>
-                    <span>点击放大</span>
-                  </div>
-                  <div class="product-badges">
-                    <span class="badge new" v-if="product.isNew">新品</span>
-                    <span class="badge hot" v-if="product.isHot">热门</span>
-                  </div>
-                </div>
-                <div class="product-content">
-                  <div class="product-header">
-                    <h3 class="product-name">{{ product.name }}</h3>
-                    <span
-                      v-if="isAdmin"
-                      class="status-badge"
-                      :class="product.saleStatus === 'ON_SALE' ? 'on-sale' : 'off-sale'"
-                    >
-                      {{ product.saleStatus === 'ON_SALE' ? '已上架' : '已下架' }}
-                    </span>
-                  </div>
-                  <div class="product-desc">
-                    <p class="desc-text">{{ product.description }}</p>
-                    <p class="features-text" v-if="product.features">
-                      <el-icon><Star /></el-icon>
-                      {{ product.features }}
-                    </p>
-                    <p class="alias-text" v-if="isAdmin && product.alias">
-                      <el-icon><Collection /></el-icon>
-                      别名：{{ product.alias }}
-                    </p>
-                  </div>
-                  <div class="product-footer">
-                    <div class="price-info">
-                      <span class="price-label">价格：</span>
-                      <template v-if="product.editingPrice">
-                        <el-input-number v-model="product.editPrice" :min="0" :precision="2" style="width: 120px" />
-                        <el-button type="primary" size="small" @click="saveProductPrice(product)" style="margin-left: 5px">
-                          保存
-                        </el-button>
-                        <el-button size="small" @click="cancelEditPrice(product)" style="margin-left: 5px">
-                          取消
-                        </el-button>
-                      </template>
-                      <template v-else>
-                        <span class="price-value">¥{{ product.price }}</span>
-                        <el-button type="text" size="small" @click="startEditPrice(product)" style="margin-left: 5px">
-                          <el-icon><Edit /></el-icon>
-                          编辑
-                        </el-button>
-                      </template>
-                    </div>
-                    <div class="stock-info">
-                      <span class="stock-label">库存：</span>
-                      <span class="stock-value" :class="{ 'low-stock': product.stock < 10 }">
-                        {{ product.stock > 0 ? product.stock : '充足' }}
-                      </span>
-                    </div>
-                    <div class="product-actions">
-                      <el-button v-if="isAdmin" type="primary" size="small" @click="openProductDialog(product)">
-                        <el-icon><Edit /></el-icon>
-                        编辑
-                      </el-button>
-                      <el-button
-                        v-if="isAdmin"
-                        :type="product.saleStatus === 'ON_SALE' ? 'danger' : 'success'"
-                        size="small"
-                        @click="toggleProductStatus(product)"
-                      >
-                        <el-icon><Switch /></el-icon>
-                        {{ product.saleStatus === 'ON_SALE' ? '下架' : '上架' }}
-                      </el-button>
-                      <el-button v-if="isAdmin" type="danger" plain size="small" @click="deleteProduct(product)">
-                        <el-icon><Delete /></el-icon>
-                        删除
-                      </el-button>
-                      <el-button type="primary" plain size="small" @click="downloadProductTemplate(product)">
-                        <el-icon><Download /></el-icon>
-                        模板
-                      </el-button>
-                      <el-button
-                        type="info"
-                        size="small"
-                        :disabled="product.saleStatus && product.saleStatus !== 'ON_SALE'"
-                        @click="openBatchImportDialog(product)"
-                      >
-                        <el-icon><Upload /></el-icon>
-                        批量导入
-                      </el-button>
-                      <el-button
-                        type="warning"
-                        size="small"
-                        :disabled="product.saleStatus && product.saleStatus !== 'ON_SALE'"
-                        @click="openActivateDialog(product)"
-                      >
-                        <el-icon><Lightning /></el-icon>
-                        激活
-                      </el-button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <!-- 空状态 -->
-            <el-empty v-if="products.length === 0 && !productLoading" description="暂无产品数据" />
-          </div>
-
-          <!-- 分页 -->
-          <div class="pagination" v-if="products.length > 0">
-            <el-pagination
-              background
-              layout="total, sizes, prev, pager, next, jumper"
-              :total="productTotal"
-              :page-size="productPageSize"
-              :current-page="productCurrentPage"
-              :page-sizes="[5, 10, 20, 50]"
-              @size-change="handleProductSizeChange"
-              @current-change="handleProductPageChange"
-            />
-          </div>
-        </div>
-
-        <!-- 费用清单 -->
-        <div v-else-if="activeMenu === 'expense'" class="page">
-          <!-- 筛选条件 -->
-          <div class="filter-form">
-            <div class="filter-header">
-              <h3>{{ isAdmin ? '全部费用清单' : '费用筛选' }}</h3>
-              <el-button text @click="resetExpenseFilter">
-                <el-icon><Refresh /></el-icon>
-                重置筛选
-              </el-button>
-            </div>
-            <el-form :inline="true" :model="expenseFilter" class="demo-form-inline">
-              <el-form-item label="产品名称">
-                <el-input v-model="expenseFilter.productName" placeholder="请输入产品名称" clearable style="width: 150px;"></el-input>
-              </el-form-item>
-              <el-form-item label="状态">
-                <el-select v-model="expenseFilter.status" placeholder="请选择" clearable style="width: 150px;">
-                  <el-option label="全部" value="all"></el-option>
-                  <el-option label="待审核" value="PENDING_REVIEW"></el-option>
-                  <el-option label="审核通过" value="APPROVED"></el-option>
-                  <el-option label="审核驳回" value="REVIEW_REJECTED"></el-option>
-                  <el-option label="承保中" value="UNDERWRITING"></el-option>
-                  <el-option label="已生效" value="ACTIVE"></el-option>
-                  <el-option label="已取消" value="cancelled"></el-option>
-                </el-select>
-              </el-form-item>
-              <el-form-item label="序列号">
-                <el-input v-model="expenseFilter.serial" placeholder="请输入序列号" clearable style="width: 150px;"></el-input>
-              </el-form-item>
-              <el-form-item label="上传日期">
-                <el-date-picker v-model="expenseFilter.dateRange" type="daterange" range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" style="width: 240px;"></el-date-picker>
-              </el-form-item>
-              <el-form-item>
-                <el-button type="primary" @click="queryExpenses">
-                  <el-icon><Search /></el-icon>
-                  查询
-                </el-button>
-              </el-form-item>
-            </el-form>
-          </div>
-
-          <!-- 费用清单表格 -->
-          <el-table :data="expenseList" style="width: 100%" v-loading="expenseLoading" stripe>
-            <el-table-column prop="serial" label="序列号" width="180"></el-table-column>
-            <el-table-column prop="product" label="产品名称" min-width="220"></el-table-column>
-            <el-table-column prop="contact" label="联系人" width="120"></el-table-column>
-            <el-table-column prop="createTime" label="创建时间" width="170"></el-table-column>
-            <el-table-column prop="status" label="状态" width="110">
-              <template #default="scope">
-                <el-tag :type="getStatusType(scope.row.status)">{{ scope.row.status }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="count" label="份数" width="90" align="center"></el-table-column>
-            <el-table-column prop="total" label="金额" width="120" align="right">
-              <template #default="scope">¥{{ scope.row.total }}</template>
-            </el-table-column>
-            <el-table-column label="操作" width="110" fixed="right">
-              <template #default="scope">
-                <el-button link type="primary" @click="viewExpenseDetail(scope.row)">详情</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-
-          <!-- 分页 -->
-          <div class="pagination">
-            <el-pagination
-              background
-              layout="total, prev, pager, next"
-              :total="expenseTotal"
-              :page-size="10"
-              @current-change="handleExpensePageChange"
-            />
-          </div>
-        </div>
-
-        <!-- 保险清单 -->
-        <div v-else-if="activeMenu === 'insurance'" class="page">
-          <!-- 筛选条件 -->
-          <div class="filter-form">
-            <div class="filter-header">
-              <h3>{{ isAdmin ? '全部保险清单' : '保险筛选' }}</h3>
-              <el-button text @click="resetInsuranceFilter">
-                <el-icon><Refresh /></el-icon>
-                重置筛选
-              </el-button>
-            </div>
-            <el-form :inline="true" :model="insuranceFilter" class="demo-form-inline">
-              <el-form-item label="产品名称">
-                <el-input v-model="insuranceFilter.productName" placeholder="请输入产品名称" clearable style="width: 150px;"></el-input>
-              </el-form-item>
-              <el-form-item label="状态">
-                <el-select v-model="insuranceFilter.status" placeholder="请选择" clearable style="width: 150px;">
-                  <el-option label="全部" value="all"></el-option>
-                  <el-option v-if="!isAdmin" label="待提交" value="DRAFT"></el-option>
-                  <el-option label="待审核" value="PENDING_REVIEW"></el-option>
-                  <el-option label="审核通过" value="APPROVED"></el-option>
-                  <el-option label="审核驳回" value="REVIEW_REJECTED"></el-option>
-                  <el-option label="承保中" value="UNDERWRITING"></el-option>
-                  <el-option label="已生效" value="ACTIVE"></el-option>
-                  <el-option label="已过期" value="EXPIRED"></el-option>
-                </el-select>
-              </el-form-item>
-              <el-form-item label="序列号">
-                <el-input v-model="insuranceFilter.serial" placeholder="请输入序列号" clearable style="width: 150px;"></el-input>
-              </el-form-item>
-              <el-form-item label="上传日期">
-                <el-date-picker v-model="insuranceFilter.dateRange" type="daterange" range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" style="width: 240px;"></el-date-picker>
-              </el-form-item>
-              <el-form-item>
-                <el-button type="primary" @click="queryInsurances">
-                  <el-icon><Search /></el-icon>
-                  查询
-                </el-button>
-              </el-form-item>
-            </el-form>
-            <div class="filter-form-row">
-              <el-input v-model="insuranceFilter.insuredName" placeholder="投保人姓名" clearable style="width: 130px;"></el-input>
-              <el-input v-model="insuranceFilter.insuredId" placeholder="投保人证件号" clearable style="width: 130px;"></el-input>
-              <el-input v-model="insuranceFilter.beneficiaryName" placeholder="被保人姓名" clearable style="width: 130px;"></el-input>
-              <el-input v-model="insuranceFilter.beneficiaryId" placeholder="被保人证件号" clearable style="width: 130px;"></el-input>
-              <el-input v-model="insuranceFilter.agent" placeholder="业务员" clearable style="width: 130px;"></el-input>
-            </div>
-          </div>
-
-          <!-- 操作按钮 -->
-          <div v-if="isAdmin" class="table-actions">
-            <el-button
-              type="primary"
-              :disabled="!selectedInsurances.some(item => item.statusCode === 'PENDING_REVIEW' || item.statusCode === 'UNDERWRITING')"
-              @click="handleBatchAction"
-            >
-              <el-icon><Check /></el-icon>
-              批量处理
-            </el-button>
-          </div>
-
-          <!-- 保险清单表格 -->
-          <el-table :data="insuranceList" style="width: 100%" v-loading="insuranceLoading" stripe @selection-change="handleSelectionChange">
-            <el-table-column v-if="isAdmin" type="selection" width="55"></el-table-column>
-            <el-table-column prop="product" label="产品名称" min-width="220"></el-table-column>
-            <el-table-column prop="insuredName" label="投保人" width="120"></el-table-column>
-            <el-table-column prop="beneficiaryName" label="被保人" width="120"></el-table-column>
-            <el-table-column prop="status" label="状态" width="110">
-              <template #default="scope">
-                <el-tag :type="getStatusType(scope.row.status)">{{ scope.row.status }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="policyNo" label="保单号" min-width="200" show-overflow-tooltip></el-table-column>
-            <el-table-column prop="startDate" label="起保日期" width="120"></el-table-column>
-            <el-table-column prop="endDate" label="结束日期" width="120"></el-table-column>
-            <el-table-column v-if="isAdmin" prop="agent" label="业务员" width="110"></el-table-column>
-            <el-table-column label="操作" width="220" fixed="right">
-              <template #default="scope">
-                <el-button link type="primary" @click="viewInsuranceDetail(scope.row)">详情</el-button>
-                <el-button link type="success" @click="downloadPolicy(scope.row)">下载</el-button>
-                <el-button
-                  v-if="!isAdmin && scope.row.statusCode === 'DRAFT'"
-                  link
-                  type="primary"
-                  @click="submitInsuranceDraft(scope.row)"
-                >
-                  提交审核
-                </el-button>
-                <el-button
-                  v-if="isAdmin && scope.row.statusCode === 'PENDING_REVIEW'"
-                  link
-                  type="success"
-                  @click="openInsuranceReviewDialog(scope.row, 'approve')"
-                >
-                  通过
-                </el-button>
-                <el-button
-                  v-if="isAdmin && scope.row.statusCode === 'PENDING_REVIEW'"
-                  link
-                  type="danger"
-                  @click="openInsuranceReviewDialog(scope.row, 'reject')"
-                >
-                  驳回
-                </el-button>
-                <el-button
-                  v-if="isAdmin && scope.row.statusCode === 'APPROVED'"
-                  link
-                  type="warning"
-                  @click="startInsuranceUnderwriting(scope.row)"
-                >
-                  承保
-                </el-button>
-                <el-button
-                  v-if="isAdmin && scope.row.statusCode === 'UNDERWRITING'"
-                  link
-                  type="warning"
-                  @click="openInsuranceActivationDialog([scope.row])"
-                >
-                  生效
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-
-          <!-- 分页 -->
-          <div class="pagination">
-            <el-pagination
-              background
-              layout="total, sizes, prev, pager, next"
-              :total="insuranceTotal"
-              :page-size="10"
-              :page-sizes="[10, 20, 50, 100]"
-              @size-change="handleInsuranceSizeChange"
-              @current-change="handleInsurancePageChange"
-            />
-          </div>
-        </div>
-
-        <!-- 充值消费明细 -->
-        <div v-else-if="activeMenu === 'recharge'" class="page">
-          <!-- 筛选条件 -->
-          <div class="filter-form">
-            <div class="filter-header">
-              <h3>消费筛选</h3>
-              <el-button text @click="resetRechargeFilter">
-                <el-icon><Refresh /></el-icon>
-                重置筛选
-              </el-button>
-            </div>
-            <el-form :inline="true" :model="rechargeFilter" class="demo-form-inline">
-              <el-form-item label="日期">
-                <el-date-picker v-model="rechargeFilter.date" type="date" placeholder="请选择日期" style="width: 150px;"></el-date-picker>
-              </el-form-item>
-              <el-form-item label="类型">
-                <el-select v-model="rechargeFilter.type" placeholder="请选择" clearable style="width: 150px;">
-                  <el-option label="全部" value=""></el-option>
-                  <el-option label="充值" value="recharge"></el-option>
-                  <el-option label="消费" value="consume"></el-option>
-                </el-select>
-              </el-form-item>
-              <el-form-item label="说明">
-                <el-input v-model="rechargeFilter.description" placeholder="请输入说明" clearable style="width: 150px;"></el-input>
-              </el-form-item>
-              <el-form-item>
-                <el-button type="primary" @click="queryRecharges">
-                  <el-icon><Search /></el-icon>
-                  查询
-                </el-button>
-              </el-form-item>
-            </el-form>
-          </div>
-
-          <!-- 操作按钮 -->
-          <div class="table-actions" v-if="isAdmin">
-            <el-button type="primary" @click="openRechargeDialog">
-              <el-icon><Coin /></el-icon>
-              账户充值
-            </el-button>
-          </div>
-
-          <!-- 充值消费明细表格 -->
-          <el-table :data="rechargeList" style="width: 100%" v-loading="rechargeLoading" stripe>
-            <el-table-column prop="date" label="日期" width="120"></el-table-column>
-            <el-table-column prop="amount" label="金额" width="120" align="right">
-              <template #default="scope">
-                <span :class="{ 'amount-positive': scope.row.type === 'recharge', 'amount-negative': scope.row.type === 'consume' }">
-                  {{ scope.row.type === 'recharge' ? '+' : '-' }}¥{{ scope.row.amount }}
-                </span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="type" label="类型" width="100">
-              <template #default="scope">
-                <el-tag :type="scope.row.type === 'recharge' ? 'success' : 'warning'" size="small">
-                  {{ scope.row.type === 'recharge' ? '充值' : '消费' }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="description" label="说明" min-width="200"></el-table-column>
-            <el-table-column prop="serial" label="序列号" width="180"></el-table-column>
-            <el-table-column prop="balance" label="余额" width="120" align="right">
-              <template #default="scope">¥{{ scope.row.balance }}</template>
-            </el-table-column>
-          </el-table>
-
-          <!-- 分页 -->
-          <div class="pagination">
-            <el-pagination
-              background
-              layout="total, prev, pager, next"
-              :total="rechargeTotal"
-              :page-size="10"
-              @current-change="handleRechargePageChange"
-            />
-          </div>
-        </div>
-
-        <!-- 用户管理 (仅管理员可见) -->
-        <div v-else-if="activeMenu === 'userAdmin'" class="page">
-          <!-- 筛选条件 -->
-          <div class="filter-form">
-            <div class="filter-header">
-              <h3>用户管理</h3>
-              <div class="filter-header-actions">
-                <el-button text @click="resetUserQuery">
-                  <el-icon><Refresh /></el-icon>
-                  重置筛选
-                </el-button>
-                <el-button type="primary" @click="openUserDialog('create')">
-                  <el-icon><Plus /></el-icon>
-                  新增用户
-                </el-button>
-              </div>
-            </div>
-            <el-form :inline="true" :model="userQuery" class="demo-form-inline">
-              <el-form-item label="用户名">
-                <el-input v-model="userQuery.username" placeholder="请输入用户名" clearable style="width: 150px;"></el-input>
-              </el-form-item>
-              <el-form-item label="用户类型">
-                <el-select v-model="userQuery.userType" placeholder="请选择" clearable style="width: 120px;">
-                  <el-option label="全部" value=""></el-option>
-                  <el-option label="普通用户" value="USER"></el-option>
-                  <el-option label="管理员" value="ADMIN"></el-option>
-                </el-select>
-              </el-form-item>
-              <el-form-item label="状态">
-                <el-select v-model="userQuery.status" placeholder="请选择" clearable style="width: 100px;">
-                  <el-option label="全部" value=""></el-option>
-                  <el-option label="启用" value="ACTIVE"></el-option>
-                  <el-option label="禁用" value="DISABLED"></el-option>
-                </el-select>
-              </el-form-item>
-              <el-form-item>
-                <el-button type="primary" @click="loadUsers">
-                  <el-icon><Search /></el-icon>
-                  查询
-                </el-button>
-              </el-form-item>
-            </el-form>
-          </div>
-
-          <!-- 用户表格 -->
-          <div class="table-card">
-            <el-table :data="userList" v-loading="userLoading" stripe>
-              <el-table-column prop="id" label="ID" width="80" />
-              <el-table-column prop="username" label="用户名" width="120" />
-              <el-table-column prop="mobile" label="手机号" width="130" />
-              <el-table-column prop="userType" label="类型" width="100">
-                <template #default="scope">
-                  <el-tag :type="scope.row.userType === 'ADMIN' ? 'danger' : 'success'" size="small">
-                    {{ scope.row.userType === 'ADMIN' ? '管理员' : '普通用户' }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column prop="status" label="状态" width="80">
-                <template #default="scope">
-                  <el-tag :type="scope.row.status === 'ACTIVE' ? 'success' : 'danger'" size="small">
-                    {{ scope.row.status === 'ACTIVE' ? '启用' : '禁用' }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column prop="balance" label="余额" width="100" align="right">
-                <template #default="scope">¥{{ scope.row.balance }}</template>
-              </el-table-column>
-              <el-table-column prop="lastLoginTime" label="最后登录" width="160" />
-              <el-table-column label="操作" width="200" fixed="right">
-                <template #default="scope">
-                  <div class="action-buttons">
-                    <el-button type="primary" size="small" text @click="openUserDialog('edit', scope.row)">
-                      编辑
-                    </el-button>
-                    <el-button
-                      :type="scope.row.status === 'ACTIVE' ? 'warning' : 'success'"
-                      size="small"
-                      text
-                      @click="toggleUserStatus(scope.row)"
-                    >
-                      {{ scope.row.status === 'ACTIVE' ? '禁用' : '启用' }}
-                    </el-button>
-                    <el-button
-                      v-if="scope.row.userType !== 'ADMIN'"
-                      type="danger"
-                      size="small"
-                      text
-                      @click="deleteUser(scope.row.id)"
-                    >
-                      删除
-                    </el-button>
-                  </div>
-                </template>
-              </el-table-column>
-            </el-table>
-
-            <!-- 分页 -->
-            <div class="pagination">
-              <el-pagination
-                background
-                layout="total, prev, pager, next"
-                :total="userTotal"
-                :page-size="userPageSize"
-                :current-page="userCurrentPage"
-                @current-change="handleUserPageChange"
-              />
-            </div>
-          </div>
-        </div>
+        <UserAdminSection
+          v-else-if="activeMenu === 'userAdmin'"
+          :user-query="userQuery"
+          :user-list="userList"
+          :user-loading="userLoading"
+          :user-total="userTotal"
+          :user-page-size="userPageSize"
+          :user-current-page="userCurrentPage"
+          @reset-filter="resetUserQuery"
+          @open-user-dialog="openUserDialog"
+          @query="loadUsers"
+          @toggle-user-status="toggleUserStatus"
+          @delete-user="deleteUser"
+          @page-change="handleUserPageChange"
+        />
       </section>
     </main>
 
@@ -896,9 +164,6 @@
         </el-form-item>
         <el-form-item label="产品特点">
           <el-input v-model="productForm.features" type="textarea" :rows="2" />
-        </el-form-item>
-        <el-form-item label="产品别名">
-          <el-input v-model="productForm.alias" placeholder="请输入产品别名（仅管理员可见）" />
         </el-form-item>
         <el-form-item label="产品图片">
           <el-upload
@@ -957,6 +222,113 @@
         <span class="dialog-footer">
           <el-button @click="productDialogVisible = false">取消</el-button>
           <el-button type="primary" :loading="productSubmitting" @click="saveProduct">保存</el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="productInsuranceBatchDialogVisible"
+      :title="productInsuranceBatchDialogTitle"
+      width="560px"
+      :close-on-click-modal="false"
+      destroy-on-close
+      @close="closeProductInsuranceBatchDialog"
+    >
+      <div class="product-batch-dialog">
+        <div class="product-batch-summary" v-if="productInsuranceBatchProduct">
+          <div class="product-batch-name">{{ productInsuranceBatchProduct.name }}</div>
+          <div class="product-batch-subtitle">
+            请先下载当前产品模板，填写后再上传。系统会按行读取投保信息。
+          </div>
+        </div>
+        <el-upload
+          ref="productInsuranceBatchUploadRef"
+          class="product-batch-upload"
+          drag
+          action="#"
+          :auto-upload="false"
+          :limit="1"
+          :show-file-list="true"
+          accept=".xls,.xlsx"
+          :before-upload="beforeProductInsuranceBatchUpload"
+          :on-change="handleProductInsuranceBatchFileChange"
+          :on-remove="handleProductInsuranceBatchFileRemove"
+        >
+          <el-icon class="el-icon--upload"><Upload /></el-icon>
+          <div class="el-upload__text">拖拽 .xls / .xlsx 文件到这里，或 <em>点击选择文件</em></div>
+          <template #tip>
+            <div class="el-upload__tip">仅支持 Excel .xls / .xlsx 文件，大小不超过 10MB</div>
+          </template>
+        </el-upload>
+        <div v-if="productInsuranceBatchPreviewLoading" class="product-batch-preview-tip">
+          正在预览导入条数...
+        </div>
+        <div v-else-if="productInsuranceBatchPreviewCount !== null" class="product-batch-preview-tip">
+          预计导入 {{ productInsuranceBatchPreviewCount }} 条投保信息
+        </div>
+        <div v-else class="product-batch-preview-tip product-batch-preview-tip--muted">
+          选择文件后将自动预览导入条数
+        </div>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="closeProductInsuranceBatchDialog">取消</el-button>
+          <el-button
+            type="primary"
+            :loading="productInsuranceBatchPreviewLoading"
+            :disabled="!productInsuranceBatchFile || productInsuranceBatchPreviewLoading || !productInsuranceBatchPreviewRows.length"
+            @click="openProductInsuranceBatchConfirmDialog"
+          >
+            查看确认页
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="productInsuranceBatchConfirmDialogVisible"
+      :title="`批量激活确认 - ${productInsuranceBatchProduct?.name || '产品'}`"
+      width="980px"
+      :close-on-click-modal="false"
+      destroy-on-close
+      @close="closeProductInsuranceBatchConfirmDialog"
+    >
+      <div class="product-batch-confirm">
+        <div class="product-batch-summary" v-if="productInsuranceBatchProduct">
+          <div class="product-batch-name">{{ productInsuranceBatchProduct.name }}</div>
+          <div class="product-batch-subtitle">
+            已读取 {{ productInsuranceBatchPreviewRows.length }} 条投保数据，请确认无误后再提交激活。
+          </div>
+        </div>
+        <el-table
+          class="product-batch-preview-table"
+          :data="productInsuranceBatchPreviewRows"
+          border
+          stripe
+          height="420"
+          empty-text="暂无可确认的数据"
+        >
+          <el-table-column prop="rowNumber" label="行号" width="80" />
+          <el-table-column prop="planName" label="方案名称" min-width="180" show-overflow-tooltip />
+          <el-table-column prop="beneficiaryName" label="被保人姓名" min-width="120" show-overflow-tooltip />
+          <el-table-column prop="beneficiaryId" label="证件号" min-width="180" show-overflow-tooltip />
+          <el-table-column prop="beneficiaryJob" label="职业" min-width="120" show-overflow-tooltip />
+          <el-table-column prop="count" label="份数" width="80" />
+          <el-table-column prop="address" label="地址" min-width="160" show-overflow-tooltip />
+          <el-table-column prop="agent" label="业务员" min-width="120" show-overflow-tooltip />
+        </el-table>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="closeProductInsuranceBatchConfirmDialog">返回修改</el-button>
+          <el-button
+            type="primary"
+            :loading="productInsuranceBatchSubmitting"
+            :disabled="!productInsuranceBatchPreviewRows.length"
+            @click="submitProductInsuranceBatch"
+          >
+            确认提交激活
+          </el-button>
         </span>
       </template>
     </el-dialog>
@@ -1035,111 +407,7 @@
       </div>
     </el-dialog>
 
-    <!-- 批量导入弹窗 -->
-    <el-dialog v-model="batchImportDialogVisible" title="数据上传" width="900px" :close-on-click-modal="false">
-      <div class="batch-import-container">
-        <div class="batch-import-header">
-          <div class="batch-import-info">
-            <div class="info-row">
-              <span class="info-label">方案：</span>
-              <span class="info-value">{{ batchImportProduct?.name }}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">选项文件：</span>
-              <el-upload
-                class="file-uploader"
-                :auto-upload="false"
-                :show-file-list="false"
-                @change="handleFileChange"
-                ref="batchUploadRef"
-              >
-                <el-button type="primary" plain>
-                  选择文件
-                </el-button>
-                <span class="file-status" v-if="!batchImportFile">未选择任何文件</span>
-                <span class="file-status" v-else>{{ batchImportFile.name }}</span>
-              </el-upload>
-            </div>
-          </div>
-          <div class="batch-import-actions">
-            <el-button type="primary" plain @click="validateBatchImportFile">
-              验证数据文件
-            </el-button>
-            <el-button type="primary" @click="submitBatchImport">
-              上传数据
-            </el-button>
-          </div>
-        </div>
-        <div class="batch-import-preview">
-          <div class="preview-tabs">
-            <el-tabs v-model="activePreviewTab">
-              <el-tab-pane label="错误提示" name="error"></el-tab-pane>
-              <el-tab-pane label="警告提示" name="warning"></el-tab-pane>
-            </el-tabs>
-          </div>
-          <div class="excel-preview">
-            <table class="excel-table">
-              <thead>
-                <tr>
-                  <th>A</th>
-                  <th>B</th>
-                  <th>C</th>
-                  <th>D</th>
-                  <th>E</th>
-                  <th>F</th>
-                  <th>G</th>
-                  <th>H</th>
-                  <th>I</th>
-                  <th>J</th>
-                  <th>K</th>
-                  <th>L</th>
-                  <th>M</th>
-                  <th>N</th>
-                  <th>O</th>
-                  <th>P</th>
-                  <th>Q</th>
-                  <th>R</th>
-                  <th>S</th>
-                  <th>T</th>
-                  <th>U</th>
-                  <th>V</th>
-                  <th>W</th>
-                  <th>X</th>
-                  <th>Y</th>
-                  <th>Z</th>
-                  <th>AA</th>
-                  <th>AB</th>
-                  <th>AC</th>
-                  <th>AD</th>
-                  <th>AE</th>
-                  <th>AF</th>
-                  <th>AG</th>
-                  <th>AH</th>
-                  <th>AI</th>
-                  <th>AJ</th>
-                  <th>AK</th>
-                  <th>AL</th>
-                  <th>AM</th>
-                  <th>AN</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="i in 5" :key="i">
-                  <td v-for="j in 40" :key="j"></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="batchImportDialogVisible = false">取消</el-button>
-        </span>
-      </template>
-    </el-dialog>
-
-    <!-- 激活产品弹窗 -->
+    <!-- 激活弹窗 -->
     <el-dialog v-model="activeDialogVisible" title="产品激活" width="550px" :close-on-click-modal="false">
       <div v-if="selectedProduct" class="activate-product-info">
         <el-row :gutter="20">
@@ -1161,17 +429,13 @@
         <el-form-item label="方案名称" prop="planName">
           <el-select v-model="activeForm.planName" placeholder="请选择方案名称" style="width: 100%;">
             <el-option v-if="selectedProduct" :label="selectedProduct.name" :value="String(selectedProduct.id)"></el-option>
-            <el-option label="国寿财1-3类10+5+5+50（青柑）" value="guoshou-3"></el-option>
-            <el-option label="平安财意外10+1+50+10（含意保）" value="pingan-10"></el-option>
+            <el-option label="国寿财意外险（1-3类）" value="guoshou-3"></el-option>
+            <el-option label="平安财意外险" value="pingan-10"></el-option>
             <el-option label="少儿医疗险" value="child-med"></el-option>
             <el-option label="老年意外险" value="elder-acc"></el-option>
+            <el-option label="旅游险" value="travel"></el-option>
+            <el-option label="驾乘险" value="maternity"></el-option>
           </el-select>
-        </el-form-item>
-        <el-form-item label="投保人姓名" prop="policyHolderName">
-          <el-input v-model="activeForm.policyHolderName" placeholder="请输入投保人姓名"></el-input>
-        </el-form-item>
-        <el-form-item label="投保人证件号" prop="policyHolderId">
-          <el-input v-model="activeForm.policyHolderId" placeholder="请输入投保人证件号"></el-input>
         </el-form-item>
         <el-form-item label="被保人姓名" prop="beneficiaryName">
           <el-input v-model="activeForm.beneficiaryName" placeholder="请输入被保人姓名"></el-input>
@@ -1326,30 +590,6 @@
             placeholder="请输入审核意见"
           />
         </el-form-item>
-        <el-form-item v-if="insuranceReviewAction === 'approve'" label="保单号">
-          <el-input
-            v-model="insuranceReviewForm.policyNo"
-            placeholder="请输入保单号（可选，填写后将直接生效）"
-          />
-        </el-form-item>
-        <el-form-item v-if="insuranceReviewAction === 'approve'" label="起保日期">
-          <el-date-picker
-            v-model="insuranceReviewForm.effectiveDate"
-            type="date"
-            value-format="YYYY-MM-DD"
-            placeholder="请选择起保日期"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item v-if="insuranceReviewAction === 'approve'" label="结束日期">
-          <el-date-picker
-            v-model="insuranceReviewForm.expiryDate"
-            type="date"
-            value-format="YYYY-MM-DD"
-            placeholder="请选择结束日期"
-            style="width: 100%"
-          />
-        </el-form-item>
         <el-form-item v-if="insuranceReviewAction === 'reject'" label="驳回原因">
           <el-input
             v-model="insuranceReviewForm.rejectReason"
@@ -1363,58 +603,6 @@
         <span class="dialog-footer">
           <el-button @click="insuranceReviewDialogVisible = false">取消</el-button>
           <el-button type="primary" :loading="insuranceReviewSubmitting" @click="submitInsuranceReview">确认</el-button>
-        </span>
-      </template>
-    </el-dialog>
-
-    <!-- 批量审核对话框 -->
-    <el-dialog
-      v-model="batchReviewDialogVisible"
-      :title="batchReviewDialogTitle"
-      width="600px"
-      :close-on-click-modal="true"
-      destroy-on-close
-    >
-      <div class="batch-review-content">
-        <div class="batch-review-info" style="margin-bottom: 20px;">
-          <p>已选择 <strong>{{ batchReviewItems.length }}</strong> 条待审核保单</p>
-          <div class="batch-review-list" style="max-height: 200px; overflow-y: auto; border: 1px solid #f0f0f0; padding: 10px; margin-top: 10px;">
-            <div v-for="item in batchReviewItems" :key="item.id" class="batch-review-item" style="display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #f9f9f9;">
-              <span>{{ item.product }}</span>
-              <span>{{ item.beneficiaryName }}</span>
-            </div>
-          </div>
-        </div>
-        
-        <el-form :model="batchReviewForm" label-width="80px">
-          <el-form-item label="审核操作">
-            <el-radio-group v-model="batchReviewForm.action">
-              <el-radio label="approve">通过</el-radio>
-              <el-radio label="reject">驳回</el-radio>
-            </el-radio-group>
-          </el-form-item>
-          <el-form-item label="审核意见">
-            <el-input
-              v-model="batchReviewForm.reviewComment"
-              type="textarea"
-              :rows="3"
-              placeholder="请输入审核意见"
-            />
-          </el-form-item>
-          <el-form-item v-if="batchReviewForm.action === 'reject'" label="驳回原因">
-            <el-input
-              v-model="batchReviewForm.rejectReason"
-              type="textarea"
-              :rows="4"
-              placeholder="请输入驳回原因"
-            />
-          </el-form-item>
-        </el-form>
-      </div>
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="batchReviewDialogVisible = false">取消</el-button>
-          <el-button type="primary" :loading="batchReviewSubmitting" @click="submitBatchReview">确认</el-button>
         </span>
       </template>
     </el-dialog>
@@ -1584,6 +772,64 @@
     </el-dialog>
 
     <el-dialog
+      v-model="noticePopupDialogVisible"
+      title="首页通知栏"
+      width="980px"
+      :close-on-click-modal="false"
+      class="notice-popup-dialog"
+    >
+      <div class="notice-popup-shell">
+        <aside class="notice-popup-list">
+          <div class="notice-popup-list-header">
+            <span>最新通知</span>
+            <el-tag type="info" effect="plain">{{ publishedNoticeList.length }}</el-tag>
+          </div>
+          <div v-if="publishedNoticeList.length" class="notice-popup-items">
+            <button
+              v-for="(item, index) in publishedNoticeList"
+              :key="item.id || index"
+              type="button"
+              class="notice-popup-item"
+              :class="{ active: index === noticePopupSelectedIndex }"
+              @click="selectNoticePopupItem(index)"
+            >
+              <div class="notice-popup-index">{{ index + 1 }}</div>
+              <div class="notice-popup-item-body">
+                <h4>{{ item.title }}</h4>
+                <p>{{ item.content }}</p>
+              </div>
+            </button>
+          </div>
+          <el-empty v-else description="暂无通知公告" :image-size="84" />
+        </aside>
+
+        <section class="notice-popup-detail" v-if="noticePopupCurrent">
+          <div class="notice-popup-eyebrow">首页弹窗公告</div>
+          <h3>{{ noticePopupCurrent.title }}</h3>
+          <div class="notice-popup-meta">
+            <el-icon><Clock /></el-icon>
+            <span>发布时间：{{ noticePopupCurrent.publishedAt ? new Date(noticePopupCurrent.publishedAt).toLocaleString('zh-CN', { hour12: false }) : '未知' }}</span>
+          </div>
+          <div class="notice-popup-content">
+            {{ noticePopupCurrent.content }}
+          </div>
+        </section>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="closeNoticePopup">关闭</el-button>
+          <el-button
+            type="primary"
+            :disabled="!noticePopupCurrent"
+            @click="openNoticeFromPopup"
+          >
+            查看详情
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <el-dialog
       v-model="noticePublishDialogVisible"
       title="发布通知"
       width="780px"
@@ -1657,22 +903,28 @@
 </template>
 
 <script>
+import AppHeader from '@/components/layout/AppHeader.vue'
+import HomeOverviewSection from '@/components/home/HomeOverviewSection.vue'
+import ProductCenterSection from '@/components/home/ProductCenterSection.vue'
+import ExpenseSection from '@/components/home/ExpenseSection.vue'
+import InsuranceSection from '@/components/home/InsuranceSection.vue'
+import RechargeSection from '@/components/home/RechargeSection.vue'
+import UserAdminSection from '@/components/home/UserAdminSection.vue'
 import {
-  House, Goods, Document, Collection, Wallet, User, Coin, SwitchButton,
-  Grid, Menu, Sunny, Star, Present, OfficeBuilding,
-  CircleCheck, Refresh, Search, Picture, Upload, Lightning, View, Download,
-  Clock, Link, Edit, Switch, ZoomIn, Calendar, Timer, Notebook, Plus, Filter,
-  ArrowDown, Delete, Bell, Setting
+  Document, Upload, Clock, Plus, Delete
 } from '@element-plus/icons-vue'
 
 export default {
   name: 'Home',
   components: {
-    House, Goods, Document, Collection, Wallet, User, Coin, SwitchButton,
-    Grid, Menu, Sunny, Star, Present, OfficeBuilding,
-    CircleCheck, Refresh, Search, Picture, Upload, Lightning, View, Download,
-    Clock, Link, Edit, Switch, ZoomIn, Calendar, Timer, Notebook, Plus, Filter,
-    ArrowDown, Delete, Bell, Setting
+    AppHeader,
+    HomeOverviewSection,
+    ProductCenterSection,
+    ExpenseSection,
+    InsuranceSection,
+    RechargeSection,
+    UserAdminSection,
+    Document, Upload, Clock, Plus, Delete
   },
   data() {
     return {
@@ -1700,12 +952,19 @@ export default {
       productPageSize: 10,
       productCurrentPage: 1,
       companyFilter: 'all',
-      categoryFilter: 'all',
-      productSearchKeyword: '',
-      selectedCompanies: [],
       productDialogVisible: false,
       productDialogTitle: '编辑产品',
       productSubmitting: false,
+      productInsuranceBatchDialogVisible: false,
+      productInsuranceBatchDialogTitle: '批量激活',
+      productInsuranceBatchSubmitting: false,
+      productInsuranceBatchProduct: null,
+      productInsuranceBatchFile: null,
+      productInsuranceBatchPreviewLoading: false,
+      productInsuranceBatchPreviewCount: null,
+      productInsuranceBatchPreviewRows: [],
+      productInsuranceBatchConfirmDialogVisible: false,
+      productInsuranceBatchPreviewRequestId: 0,
       productForm: {
         id: null,
         productCode: '',
@@ -1715,7 +974,6 @@ export default {
         companyName: '',
         description: '',
         features: '',
-        alias: '',
         price: 0.01,
         stock: 0,
         isNew: 0,
@@ -1728,22 +986,24 @@ export default {
       expenseLoading: false,
       expenseList: [],
       expenseTotal: 0,
+      expensePageSize: 20,
       expenseCurrentPage: 1,
       expenseFilter: {
-        productName: '',
+        plan: 'all',
         status: 'all',
         serial: '',
-        dateRange: null
+        dateRange: []
       },
       insuranceLoading: false,
       insuranceList: [],
       insuranceTotal: 0,
+      insurancePageSize: 20,
       insuranceCurrentPage: 1,
       insuranceFilter: {
-        productName: '',
+        plan: 'all',
         status: 'all',
         serial: '',
-        dateRange: null,
+        dateRange: [],
         insuredName: '',
         insuredId: '',
         beneficiaryName: '',
@@ -1764,7 +1024,6 @@ export default {
         type: '',
         description: ''
       },
-      rechargeTargetUser: null,
       allUsers: [],
       userLoading: false,
       userList: [],
@@ -1810,14 +1069,10 @@ export default {
       },
       selectedProduct: null,
       activeDialogVisible: false,
-      batchImportDialogVisible: false,
-      batchImportProduct: null,
       activeSubmitting: false,
       draftSubmitting: false,
       activeForm: {
         planName: '',
-        policyHolderName: '',
-        policyHolderId: '',
         beneficiaryName: '',
         beneficiaryId: '',
         beneficiaryJob: '',
@@ -1827,8 +1082,6 @@ export default {
       },
       activeFormRules: {
         planName: [{ required: true, message: '请选择方案名称', trigger: 'change' }],
-        policyHolderName: [{ required: true, message: '请输入投保人姓名', trigger: 'blur' }],
-        policyHolderId: [{ required: true, message: '请输入投保人证件号', trigger: 'blur' }],
         beneficiaryName: [{ required: true, message: '请输入被保人姓名', trigger: 'blur' }],
         beneficiaryId: [{ required: true, message: '请输入被保人证件号', trigger: 'blur' }],
         beneficiaryJob: [{ required: true, message: '请选择被保人职业', trigger: 'change' }]
@@ -1840,22 +1093,8 @@ export default {
       insuranceReviewForm: {
         insuranceId: null,
         reviewComment: '',
-        rejectReason: '',
-        policyNo: '',
-        effectiveDate: '',
-        expiryDate: ''
-      },
-      
-      // 批量审核
-      batchReviewDialogVisible: false,
-      batchReviewDialogTitle: '',
-      batchReviewItems: [],
-      batchReviewForm: {
-        action: 'approve',
-        reviewComment: '',
         rejectReason: ''
       },
-      batchReviewSubmitting: false,
       expenseDetailDialogVisible: false,
       expenseDetailRow: null,
       insuranceDetailDialogVisible: false,
@@ -1879,7 +1118,7 @@ export default {
       previewImageTitle: '',
       // 通知公告弹窗
       noticePopupDialogVisible: false,
-      noticePopupData: null,
+      noticePopupSelectedIndex: 0,
       // 产品类别管理
       categoryDialogVisible: false,
       categoryForm: {
@@ -1893,10 +1132,7 @@ export default {
         code: '',
         name: ''
       },
-      companyList: [],
-      // 批量导入相关
-      batchImportFile: null,
-      activePreviewTab: 'error'
+      companyList: []
     }
   },
   computed: {
@@ -1927,6 +1163,9 @@ export default {
     },
     adminOrderTrendTotal() {
       return this.adminOrderTrend.reduce((sum, item) => sum + Number(item.orderCount || 0), 0)
+    },
+    noticePopupCurrent() {
+      return this.publishedNoticeList[this.noticePopupSelectedIndex] || this.publishedNoticeList[0] || null
     },
   },
   mounted() {
@@ -2049,7 +1288,45 @@ export default {
     },
 
     initializeNoticeCenter() {
-      this.refreshPublishedNotices()
+      this.refreshPublishedNotices().then(() => {
+        this.maybeOpenNoticePopup()
+      })
+    },
+
+    maybeOpenNoticePopup() {
+      if (!this.publishedNoticeList.length) {
+        return
+      }
+
+      const latestVersion = this.publishedNoticeList[0]?.publishedAt || ''
+      if (!latestVersion) {
+        return
+      }
+
+      const seenVersion = sessionStorage.getItem('noticePopupVersion')
+      if (seenVersion === latestVersion) {
+        return
+      }
+
+      this.noticePopupSelectedIndex = 0
+      this.noticePopupDialogVisible = true
+      sessionStorage.setItem('noticePopupVersion', latestVersion)
+    },
+
+    selectNoticePopupItem(index) {
+      this.noticePopupSelectedIndex = index
+    },
+
+    openNoticeFromPopup() {
+      if (!this.noticePopupCurrent) {
+        return
+      }
+      this.openNoticeDetail(this.noticePopupCurrent)
+      this.noticePopupDialogVisible = false
+    },
+
+    closeNoticePopup() {
+      this.noticePopupDialogVisible = false
     },
 
     async openNoticePublishDialog() {
@@ -2214,13 +1491,14 @@ export default {
       }
     },
 
-    handleMenuSelect(key) {
+    async handleMenuSelect(key) {
       this.activeMenu = key
 
       switch (key) {
         case 'home':
-          this.loadStats()
-          this.refreshPublishedNotices()
+          await this.loadStats()
+          await this.refreshPublishedNotices()
+          this.maybeOpenNoticePopup()
           break
         case 'product':
           this.loadProducts()
@@ -2240,8 +1518,9 @@ export default {
         case 'notice':
           // 通知公告页面，切换到首页显示通知列表
           this.activeMenu = 'home'
-          this.loadStats()
-          this.refreshPublishedNotices()
+          await this.loadStats()
+          await this.refreshPublishedNotices()
+          this.maybeOpenNoticePopup()
           break
         case 'userAdmin':
           this.loadUsers()
@@ -2258,17 +1537,35 @@ export default {
     },
 
     handleCompanyChange(value) {
+      this.companyFilter = value
       this.productCurrentPage = 1
       this.loadProducts()
     },
 
     resetProductFilter() {
       this.companyFilter = 'all'
-      this.selectedCompanies = []
       this.activeCategory = 'all'
-      this.productSearchKeyword = ''
       this.productCurrentPage = 1
       this.loadProducts()
+    },
+
+    normalizeProductFilters() {
+      let shouldReload = false
+
+      if (this.activeCategory !== 'all' && !this.categoryList.some(cat => cat.code === this.activeCategory)) {
+        this.activeCategory = 'all'
+        shouldReload = true
+      }
+
+      if (this.companyFilter !== 'all' && !this.companyList.some(comp => comp.code === this.companyFilter)) {
+        this.companyFilter = 'all'
+        shouldReload = true
+      }
+
+      if (shouldReload) {
+        this.productCurrentPage = 1
+        this.loadProducts()
+      }
     },
 
     getFilterText() {
@@ -2276,12 +1573,6 @@ export default {
         return this.getCompanyName(this.companyFilter) || this.companyFilter
       }
       return ''
-    },
-
-    // 处理产品搜索
-    handleProductSearch() {
-      this.productCurrentPage = 1
-      this.loadProducts()
     },
 
     async loadProducts() {
@@ -2293,9 +1584,6 @@ export default {
           size: this.productPageSize,
           category: this.activeCategory === 'all' ? '' : this.activeCategory,
           company: company
-        }
-        if (this.productSearchKeyword) {
-          params.keyword = this.productSearchKeyword
         }
         const endpoint = this.isAdmin ? '/api/admin/products' : '/api/anxinxuan/products'
         const res = await this.$axios.get(endpoint, { params })
@@ -2378,6 +1666,7 @@ export default {
       }).then(() => {
         this.categoryList = this.categoryList.filter(cat => cat.code !== category.code)
         localStorage.setItem('productCategories', JSON.stringify(this.categoryList))
+        this.normalizeProductFilters()
         this.$message.success('删除成功')
       }).catch(() => {
         // 用户取消删除
@@ -2450,6 +1739,7 @@ export default {
       }).then(() => {
         this.companyList = this.companyList.filter(comp => comp.code !== company.code)
         localStorage.setItem('insuranceCompanies', JSON.stringify(this.companyList))
+        this.normalizeProductFilters()
         this.$message.success('删除成功')
       }).catch(() => {
         // 用户取消删除
@@ -2490,7 +1780,6 @@ export default {
         companyName: '',
         description: '',
         features: '',
-        alias: '',
         price: 0.01,
         stock: 0,
         isNew: 0,
@@ -2513,7 +1802,6 @@ export default {
           companyName: product.companyName || '',
           description: product.description || '',
           features: product.features || '',
-          alias: product.alias || '',
           price: product.price || 0.01,
           stock: product.stock || 0,
           isNew: product.isNew ? 1 : 0,
@@ -2546,7 +1834,6 @@ export default {
         companyName: this.getCompanyName(this.productForm.companyCode),
         description: this.productForm.description,
         features: this.productForm.features,
-        alias: this.productForm.alias,
         price: this.productForm.price,
         stock: this.productForm.stock,
         isNew: this.productForm.isNew,
@@ -2611,6 +1898,239 @@ export default {
       }
     },
 
+    openProductInsuranceBatchDialog(product) {
+      if (!product || !product.id) {
+        this.$message.warning('请选择需要批量激活的产品')
+        return
+      }
+      if (product.saleStatus && product.saleStatus !== 'ON_SALE') {
+        this.$message.warning('下架产品不可批量激活')
+        return
+      }
+      if (!product.templateFileName) {
+        this.$message.warning('该产品暂无模板文件，请先在编辑产品中上传模板文件')
+        return
+      }
+      this.productInsuranceBatchProduct = { ...product }
+      this.productInsuranceBatchDialogTitle = `批量激活 - ${product.name || '产品'}`
+      this.productInsuranceBatchFile = null
+      this.productInsuranceBatchPreviewCount = null
+      this.productInsuranceBatchPreviewRows = []
+      this.productInsuranceBatchPreviewLoading = false
+      this.productInsuranceBatchConfirmDialogVisible = false
+      this.productInsuranceBatchPreviewRequestId += 1
+      this.productInsuranceBatchDialogVisible = true
+      this.$nextTick(() => {
+        this.$refs.productInsuranceBatchUploadRef?.clearFiles?.()
+      })
+    },
+
+    closeProductInsuranceBatchDialog() {
+      this.productInsuranceBatchDialogVisible = false
+      this.productInsuranceBatchConfirmDialogVisible = false
+      this.productInsuranceBatchFile = null
+      this.productInsuranceBatchProduct = null
+      this.productInsuranceBatchPreviewCount = null
+      this.productInsuranceBatchPreviewRows = []
+      this.productInsuranceBatchPreviewLoading = false
+      this.productInsuranceBatchPreviewRequestId += 1
+      this.$nextTick(() => {
+        this.$refs.productInsuranceBatchUploadRef?.clearFiles?.()
+      })
+    },
+
+    beforeProductInsuranceBatchUpload(file) {
+      const isXlsx = /\.(xls|xlsx)$/i.test(file.name)
+      const isLt10M = file.size / 1024 / 1024 < 10
+      if (!isXlsx) {
+        this.$message.error('只能上传 .xls 或 .xlsx 格式的Excel文件')
+        return false
+      }
+      if (!isLt10M) {
+        this.$message.error('文件大小不能超过 10MB')
+        return false
+      }
+      return true
+    },
+
+    handleProductInsuranceBatchFileChange(uploadFile) {
+      const rawFile = uploadFile?.raw || null
+      if (!rawFile) {
+        this.productInsuranceBatchFile = null
+        this.productInsuranceBatchPreviewCount = null
+        this.productInsuranceBatchPreviewRows = []
+        return
+      }
+      if (!this.validateProductInsuranceBatchFile(rawFile)) {
+        this.productInsuranceBatchFile = null
+        this.productInsuranceBatchPreviewCount = null
+        this.productInsuranceBatchPreviewRows = []
+        this.$nextTick(() => {
+          this.$refs.productInsuranceBatchUploadRef?.clearFiles?.()
+        })
+        return
+      }
+      this.productInsuranceBatchFile = rawFile
+      this.productInsuranceBatchPreviewRows = []
+      this.productInsuranceBatchConfirmDialogVisible = false
+      this.previewProductInsuranceBatchCount(rawFile)
+    },
+
+    handleProductInsuranceBatchFileRemove() {
+      this.productInsuranceBatchFile = null
+      this.productInsuranceBatchPreviewCount = null
+      this.productInsuranceBatchPreviewRows = []
+      this.productInsuranceBatchPreviewLoading = false
+      this.productInsuranceBatchConfirmDialogVisible = false
+      this.productInsuranceBatchPreviewRequestId += 1
+    },
+
+    validateProductInsuranceBatchFile(file) {
+      if (!file) {
+        return false
+      }
+      const isExcel = /\.(xls|xlsx)$/i.test(file.name)
+      const isLt10M = file.size / 1024 / 1024 < 10
+      if (!isExcel) {
+        this.$message.error('只能上传 .xls 或 .xlsx 格式的Excel文件')
+        return false
+      }
+      if (!isLt10M) {
+        this.$message.error('文件大小不能超过 10MB')
+        return false
+      }
+      return true
+    },
+
+    async previewProductInsuranceBatchCount(file) {
+      if (!this.productInsuranceBatchProduct?.id || !file) {
+        this.productInsuranceBatchPreviewCount = null
+        this.productInsuranceBatchPreviewRows = []
+        return
+      }
+
+      const requestId = ++this.productInsuranceBatchPreviewRequestId
+      this.productInsuranceBatchPreviewLoading = true
+      this.productInsuranceBatchPreviewCount = null
+      this.productInsuranceBatchPreviewRows = []
+
+      try {
+        const formData = new FormData()
+        formData.append('file', file)
+        const res = await this.$axios.post(
+          `/api/anxinxuan/products/${this.productInsuranceBatchProduct.id}/insurance-template/preview`,
+          formData,
+          { headers: { 'Content-Type': 'multipart/form-data' } }
+        )
+        if (requestId !== this.productInsuranceBatchPreviewRequestId) {
+          return
+        }
+        if (this.isSuccess(res)) {
+          this.productInsuranceBatchPreviewCount = res.data.data?.previewCount ?? 0
+          this.productInsuranceBatchPreviewRows = res.data.data?.previewRows || []
+        } else {
+          this.$message.error(res.data?.message || '预览导入条数失败')
+        }
+      } catch (error) {
+        if (requestId !== this.productInsuranceBatchPreviewRequestId) {
+          return
+        }
+        console.error('预览导入条数失败:', error)
+        this.$message.error(error.response?.data?.message || '预览导入条数失败')
+      } finally {
+        if (requestId === this.productInsuranceBatchPreviewRequestId) {
+          this.productInsuranceBatchPreviewLoading = false
+        }
+      }
+    },
+
+    openProductInsuranceBatchConfirmDialog() {
+      if (!this.productInsuranceBatchFile) {
+        this.$message.warning('请选择需要上传的Excel文件')
+        return
+      }
+      if (this.productInsuranceBatchPreviewLoading) {
+        this.$message.warning('正在预览文件，请稍后再操作')
+        return
+      }
+      if (!this.productInsuranceBatchPreviewRows.length) {
+        this.$message.warning('当前没有可确认的数据，请检查模板内容')
+        return
+      }
+      this.productInsuranceBatchConfirmDialogVisible = true
+    },
+
+    closeProductInsuranceBatchConfirmDialog() {
+      this.productInsuranceBatchConfirmDialogVisible = false
+    },
+
+    async submitProductInsuranceBatch() {
+      if (!this.productInsuranceBatchProduct?.id) {
+        this.$message.warning('请选择需要批量激活的产品')
+        return
+      }
+      if (!this.productInsuranceBatchFile) {
+        this.$message.warning('请选择需要上传的Excel文件')
+        return
+      }
+      if (this.productInsuranceBatchPreviewLoading) {
+        this.$message.warning('正在预览文件，请稍后再提交')
+        return
+      }
+      if (!this.productInsuranceBatchPreviewRows.length) {
+        this.$message.warning('请先查看确认页')
+        return
+      }
+
+      this.productInsuranceBatchSubmitting = true
+      try {
+        const formData = new FormData()
+        formData.append('file', this.productInsuranceBatchFile)
+        const res = await this.$axios.post(
+          `/api/anxinxuan/products/${this.productInsuranceBatchProduct.id}/insurance-template/import`,
+          formData,
+          { headers: { 'Content-Type': 'multipart/form-data' } }
+        )
+        if (this.isSuccess(res)) {
+          const count = res.data.data?.importedCount ?? 0
+          this.$message.success(res.data.data?.message || `已处理 ${count} 条投保信息`)
+          this.closeProductInsuranceBatchDialog()
+          this.loadExpenses()
+          this.loadInsurances()
+          this.loadStats()
+        } else {
+          this.$message.error(res.data?.message || '批量激活失败')
+        }
+      } catch (error) {
+        console.error('批量激活失败:', error)
+        this.$message.error(error.response?.data?.message || '批量激活失败，请检查模板后重试')
+      } finally {
+        this.productInsuranceBatchSubmitting = false
+      }
+    },
+
+    async downloadProductTemplate(product) {
+      if (!product?.id) {
+        this.$message.warning('请选择需要下载模板的产品')
+        return
+      }
+      if (!product.templateFileName) {
+        this.$message.warning('该产品暂无可下载的模板文件')
+        return
+      }
+
+      try {
+        await this.downloadFile(
+          `/api/images/template/${product.id}`,
+          product.templateFileName
+        )
+        this.$message.success('模板文件下载已开始')
+      } catch (error) {
+        console.error('下载产品模板失败:', error)
+        this.$message.error(error.response?.data?.message || '模板文件下载失败')
+      }
+    },
+
     openActivateDialog(product) {
       if (product.saleStatus && product.saleStatus !== 'ON_SALE') {
         this.$message.warning('下架产品不可激活')
@@ -2620,8 +2140,6 @@ export default {
       this.activeForm = {
         productId: product.id,
         planName: '',
-        policyHolderName: '',
-        policyHolderId: '',
         beneficiaryName: '',
         beneficiaryId: '',
         beneficiaryJob: '',
@@ -2685,10 +2203,10 @@ export default {
 
     resetExpenseFilter() {
       this.expenseFilter = {
-        productName: '',
+        plan: 'all',
         status: 'all',
         serial: '',
-        dateRange: null
+        dateRange: []
       }
       this.expenseCurrentPage = 1
       this.loadExpenses()
@@ -2697,12 +2215,15 @@ export default {
     async loadExpenses() {
       this.expenseLoading = true
       try {
+        const [startDate, endDate] = Array.isArray(this.expenseFilter.dateRange) ? this.expenseFilter.dateRange : []
         const params = {
           page: this.expenseCurrentPage,
-          size: 20,
+          size: this.expensePageSize,
+          plan: this.expenseFilter.plan === 'all' ? '' : this.expenseFilter.plan,
           status: this.expenseFilter.status === 'all' ? '' : this.expenseFilter.status,
           serialNo: this.expenseFilter.serial,
-          productName: this.expenseFilter.productName
+          startDate,
+          endDate
         }
         const endpoint = this.isAdmin ? '/api/admin/expenses' : '/api/anxinxuan/expenses'
         const res = await this.$axios.get(endpoint, { params })
@@ -2740,10 +2261,10 @@ export default {
 
     resetInsuranceFilter() {
       this.insuranceFilter = {
-        productName: '',
+        plan: 'all',
         status: 'all',
         serial: '',
-        dateRange: null,
+        dateRange: [],
         insuredName: '',
         insuredId: '',
         beneficiaryName: '',
@@ -2757,14 +2278,20 @@ export default {
     async loadInsurances() {
       this.insuranceLoading = true
       try {
+        const [startDate, endDate] = Array.isArray(this.insuranceFilter.dateRange) ? this.insuranceFilter.dateRange : []
         const params = {
           page: this.insuranceCurrentPage,
-          size: 20,
+          size: this.insurancePageSize,
+          plan: this.insuranceFilter.plan === 'all' ? '' : this.insuranceFilter.plan,
           status: this.insuranceFilter.status === 'all' ? '' : this.insuranceFilter.status,
           serialNo: this.insuranceFilter.serial,
-          productName: this.insuranceFilter.productName,
+          startDate,
+          endDate,
           insuredName: this.insuranceFilter.insuredName,
-          beneficiaryName: this.insuranceFilter.beneficiaryName
+          insuredId: this.insuranceFilter.insuredId,
+          beneficiaryName: this.insuranceFilter.beneficiaryName,
+          beneficiaryId: this.insuranceFilter.beneficiaryId,
+          agent: this.insuranceFilter.agent
         }
         const endpoint = this.isAdmin ? '/api/admin/insurances' : '/api/anxinxuan/insurances'
         const res = await this.$axios.get(endpoint, { params })
@@ -2795,9 +2322,104 @@ export default {
       this.loadInsurances()
     },
 
-    handleInsuranceSizeChange() {
+    handleInsuranceSizeChange(size) {
+      this.insurancePageSize = size
       this.insuranceCurrentPage = 1
       this.loadInsurances()
+    },
+
+    buildQueryParams(source) {
+      const params = new URLSearchParams()
+      Object.entries(source || {}).forEach(([key, value]) => {
+        if (value === null || value === undefined || value === '' || value === 'all') {
+          return
+        }
+        params.append(key, value)
+      })
+      return params.toString()
+    },
+
+    async downloadFile(url, fallbackFileName = 'download.bin') {
+      try {
+        const response = await this.$axios.get(url, { responseType: 'blob' })
+        const blob = response.data instanceof Blob ? response.data : new Blob([response.data])
+        const disposition = response.headers?.['content-disposition'] || response.headers?.['Content-Disposition'] || ''
+        const fileName = this.resolveDownloadFileName(disposition, fallbackFileName)
+        const objectUrl = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = objectUrl
+        link.download = fileName
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.setTimeout(() => window.URL.revokeObjectURL(objectUrl), 1000)
+      } catch (error) {
+        console.error('文件下载失败:', error)
+        throw error
+      }
+    },
+
+    resolveDownloadFileName(disposition, fallbackFileName) {
+      if (!disposition) {
+        return fallbackFileName
+      }
+
+      const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i)
+      if (utf8Match?.[1]) {
+        try {
+          return decodeURIComponent(utf8Match[1])
+        } catch (error) {
+          return utf8Match[1]
+        }
+      }
+
+      const asciiMatch = disposition.match(/filename="?([^";]+)"?/i)
+      if (asciiMatch?.[1]) {
+        return asciiMatch[1]
+      }
+
+      return fallbackFileName
+    },
+
+    async downloadExpenseExport() {
+      const [startDate, endDate] = Array.isArray(this.expenseFilter.dateRange) ? this.expenseFilter.dateRange : []
+      const query = this.buildQueryParams({
+        plan: this.expenseFilter.plan,
+        status: this.expenseFilter.status,
+        serialNo: this.expenseFilter.serial,
+        startDate,
+        endDate
+      })
+
+      try {
+        await this.downloadFile(`/api/anxinxuan/expenses/export${query ? `?${query}` : ''}`, 'expense-export.xlsx')
+        this.$message.success('费用清单导出已开始')
+      } catch (error) {
+        this.$message.error(error.response?.data?.message || '费用清单导出失败')
+      }
+    },
+
+    async downloadInsuranceExport() {
+      const [startDate, endDate] = Array.isArray(this.insuranceFilter.dateRange) ? this.insuranceFilter.dateRange : []
+      const query = this.buildQueryParams({
+        plan: this.insuranceFilter.plan,
+        status: this.insuranceFilter.status,
+        serialNo: this.insuranceFilter.serial,
+        startDate,
+        endDate,
+        insuredName: this.insuranceFilter.insuredName,
+        insuredId: this.insuranceFilter.insuredId,
+        beneficiaryName: this.insuranceFilter.beneficiaryName,
+        beneficiaryId: this.insuranceFilter.beneficiaryId,
+        agent: this.insuranceFilter.agent
+      })
+
+      try {
+        await this.downloadFile(`/api/anxinxuan/insurances/export${query ? `?${query}` : ''}`, 'insurance-export.pdf')
+        this.$message.success('保险清单导出已开始')
+      } catch (error) {
+        this.$message.error(error.response?.data?.message || '保险清单导出失败')
+      }
     },
 
     handleSelectionChange(selection) {
@@ -2900,21 +2522,6 @@ export default {
       this.openInsuranceActivationDialog(this.selectedInsurances)
     },
 
-    handleBatchAction() {
-      const pendingReviewRows = this.selectedInsurances.filter(item => item.statusCode === 'PENDING_REVIEW')
-      const underwritingRows = this.selectedInsurances.filter(item => item.statusCode === 'UNDERWRITING')
-
-      if (pendingReviewRows.length > 0) {
-        // 如果有待审核的保单，显示批量审核对话框
-        this.openBatchReviewDialog(pendingReviewRows)
-      } else if (underwritingRows.length > 0) {
-        // 如果有承保中的保单，显示批量生效对话框
-        this.openInsuranceActivationDialog(underwritingRows)
-      } else {
-        this.$message.warning('请选择待审核或承保中的保单')
-      }
-    },
-
     async submitInsuranceActivation() {
       if (!this.insuranceActivationItems.length) {
         this.$message.warning('暂无承保中的保单')
@@ -2971,12 +2578,17 @@ export default {
       }
     },
 
-    downloadPolicy(row) {
-      if (!row.policyNo) {
-        this.$message.warning('该保单尚未生效，暂无正式保单号')
+    async downloadPolicy(row) {
+      if (!row || !row.id) {
+        this.$message.warning('请选择需要导出的保险记录')
         return
       }
-      this.$message.success(`开始下载保单：${row.policyNo}`)
+      try {
+        await this.downloadFile(`/api/anxinxuan/insurances/${row.id}/pdf`, `insurance-${row.id}.pdf`)
+        this.$message.success('已开始导出PDF')
+      } catch (error) {
+        this.$message.error(error.response?.data?.message || 'PDF导出失败')
+      }
     },
 
     async submitInsuranceDraft(row) {
@@ -3008,75 +2620,9 @@ export default {
       this.insuranceReviewForm = {
         insuranceId: row.id,
         reviewComment: row.reviewComment || '',
-        rejectReason: '',
-        policyNo: '',
-        effectiveDate: '',
-        expiryDate: ''
-      }
-      this.insuranceReviewDialogVisible = true
-    },
-
-    openBatchReviewDialog(rows) {
-      const pendingRows = (rows || []).filter(item => item.statusCode === 'PENDING_REVIEW')
-      if (!pendingRows.length) {
-        this.$message.warning('请选择待审核的保单')
-        return
-      }
-
-      this.batchReviewDialogTitle = `批量审核（${pendingRows.length} 条）`
-      this.batchReviewItems = pendingRows.map(item => ({
-        id: item.id,
-        product: item.product,
-        beneficiaryName: item.beneficiaryName
-      }))
-      this.batchReviewForm = {
-        action: 'approve',
-        reviewComment: '',
         rejectReason: ''
       }
-      this.batchReviewDialogVisible = true
-    },
-
-    async submitBatchReview() {
-      if (!this.batchReviewForm.reviewComment.trim()) {
-        this.$message.warning('请输入审核意见')
-        return
-      }
-      if (this.batchReviewForm.action === 'reject' && !this.batchReviewForm.rejectReason.trim()) {
-        this.$message.warning('请输入驳回原因')
-        return
-      }
-
-      this.batchReviewSubmitting = true
-      try {
-        const insuranceIds = this.batchReviewItems.map(item => item.id)
-        const url = this.batchReviewForm.action === 'approve' 
-          ? '/api/admin/insurances/batch-approve' 
-          : '/api/admin/insurances/batch-reject'
-
-        const data = {
-          insuranceIds: insuranceIds,
-          reviewComment: this.batchReviewForm.reviewComment,
-          rejectReason: this.batchReviewForm.rejectReason
-        }
-
-        const res = await this.$axios.post(url, data)
-        if (res.data.code === 200) {
-          this.$message.success('批量审核操作成功')
-          this.batchReviewDialogVisible = false
-          this.loadInsurances()
-          this.loadExpenses()
-          this.loadRecharges()
-          this.loadStats()
-        } else {
-          this.$message.error(res.data?.message || '批量审核操作失败')
-        }
-      } catch (error) {
-        console.error('批量审核操作失败:', error)
-        this.$message.error(error.response?.data?.message || '批量审核操作失败')
-      } finally {
-        this.batchReviewSubmitting = false
-      }
+      this.insuranceReviewDialogVisible = true
     },
 
     async submitInsuranceReview() {
@@ -3095,25 +2641,14 @@ export default {
           ? `/api/admin/insurances/${this.insuranceReviewForm.insuranceId}/approve`
           : `/api/admin/insurances/${this.insuranceReviewForm.insuranceId}/reject`
         const payload = this.insuranceReviewAction === 'approve'
-          ? {
-              reviewComment: this.insuranceReviewForm.reviewComment,
-              policyNo: this.insuranceReviewForm.policyNo || null,
-              effectiveDate: this.insuranceReviewForm.effectiveDate || null,
-              expiryDate: this.insuranceReviewForm.expiryDate || null
-            }
+          ? { reviewComment: this.insuranceReviewForm.reviewComment }
           : {
               reviewComment: this.insuranceReviewForm.reviewComment,
               rejectReason: this.insuranceReviewForm.rejectReason
             }
         const res = await this.$axios.put(url, payload)
         if (this.isSuccess(res)) {
-          const hasPolicy = this.insuranceReviewAction === 'approve'
-            && this.insuranceReviewForm.policyNo
-            && this.insuranceReviewForm.effectiveDate
-            && this.insuranceReviewForm.expiryDate
-          this.$message.success(this.insuranceReviewAction === 'approve'
-            ? (hasPolicy ? '审核通过并已生效' : '审核已通过')
-            : '已驳回并退款')
+          this.$message.success(this.insuranceReviewAction === 'approve' ? '审核已通过' : '已驳回并退款')
           this.insuranceReviewDialogVisible = false
           this.loadInsurances()
           this.loadExpenses()
@@ -3442,114 +2977,6 @@ export default {
       this.previewImageDialogVisible = true
     },
 
-    // 下载产品模板
-    downloadProductTemplate(product) {
-      const link = document.createElement('a')
-      link.href = `/api/images/template/${product.id}`
-      link.download = product.templateFileName || 'template.xlsx'
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-    },
-
-    // 打开批量导入对话框
-    openBatchImportDialog(product) {
-      this.batchImportProduct = product
-      this.batchImportDialogVisible = true
-    },
-
-    // 批量导入文件上传前验证
-    beforeBatchImportUpload(file) {
-      const isExcel = file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || file.type === 'application/vnd.ms-excel'
-      const isLt10M = file.size / 1024 / 1024 < 10
-
-      if (!isExcel) {
-        this.$message.error('只能上传 Excel 格式的文件!')
-        return false
-      }
-      if (!isLt10M) {
-        this.$message.error('文件大小不能超过 10MB!')
-        return false
-      }
-      return true
-    },
-
-    // 提交批量导入
-    submitBatchImport() {
-      if (!this.batchImportFile) {
-        this.$message.error('请先选择文件')
-        return
-      }
-
-      const formData = new FormData()
-      formData.append('file', this.batchImportFile)
-      formData.append('productId', this.batchImportProduct?.id)
-
-      this.$axios.post('/api/anxinxuan/products/batch-import', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      }).then(response => {
-        if (this.isSuccess(response)) {
-          this.$message.success('批量导入成功')
-          this.batchImportDialogVisible = false
-          this.loadInsurances()
-        } else {
-          this.$message.error(response.data.message || '批量导入失败')
-        }
-      }).catch(error => {
-        console.error('批量导入失败:', error)
-        this.$message.error(error.response?.data?.message || '批量导入失败，请稍后重试')
-      })
-    },
-
-    // 批量导入成功处理
-    handleBatchImportSuccess(response) {
-      if (this.isSuccess(response)) {
-        this.$message.success('批量导入成功')
-        this.batchImportDialogVisible = false
-        this.loadInsurances()
-      } else {
-        this.$message.error(response.data.message || '批量导入失败')
-      }
-    },
-
-    // 批量导入失败处理
-    handleBatchImportError(error) {
-      console.error('批量导入失败:', error)
-      this.$message.error(error.response?.data?.message || '批量导入失败，请稍后重试')
-    },
-
-    // 处理文件选择
-    handleFileChange(file, fileList) {
-      if (file && file.raw) {
-        this.batchImportFile = file.raw
-      }
-    },
-
-    // 验证数据文件
-    validateBatchImportFile() {
-      if (!this.batchImportFile) {
-        this.$message.error('请先选择文件')
-        return
-      }
-
-      // 验证文件类型
-      const isExcel = this.batchImportFile.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || this.batchImportFile.type === 'application/vnd.ms-excel'
-      const isLt10M = this.batchImportFile.size / 1024 / 1024 < 10
-
-      if (!isExcel) {
-        this.$message.error('只能上传 Excel 格式的文件!')
-        return
-      }
-      if (!isLt10M) {
-        this.$message.error('文件大小不能超过 10MB!')
-        return
-      }
-
-      this.$message.success('文件验证通过')
-    },
-
     // 图片上传前验证
     beforeImageUpload(file) {
       if (!this.productForm.id) {
@@ -3649,52 +3076,21 @@ export default {
     },
 
     // 下载模板文件
-    downloadTemplate() {
-      const link = document.createElement('a')
-      link.href = `/api/images/product/${this.productForm.id}/template`
-      link.download = this.productForm.templateFileName
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-    },
-
-    // 开始编辑价格
-    startEditPrice(product) {
-      product.editingPrice = true
-      product.editPrice = product.price
-    },
-
-    // 保存价格
-    async saveProductPrice(product) {
-      try {
-        if (product.editPrice === undefined || product.editPrice < 0) {
-          this.$message.warning('请输入有效的价格')
-          return
-        }
-        console.log('开始更新价格:', product.id, product.editPrice)
-        const res = await this.$axios.put('/api/anxinxuan/products/price', {
-          id: product.id,
-          price: product.editPrice
-        })
-        console.log('API响应:', res)
-        if (this.isSuccess(res)) {
-          product.price = product.editPrice
-          product.editingPrice = false
-          this.$message.success('价格更新成功')
-        } else {
-          console.log('API响应失败:', res.data)
-          this.$message.error(res.data.message || '价格更新失败')
-        }
-      } catch (error) {
-        console.error('更新价格失败:', error)
-        this.$message.error(error.response?.data?.message || '价格更新失败，请稍后重试')
+    async downloadTemplate() {
+      if (!this.productForm.id) {
+        this.$message.warning('请先保存产品后再下载模板文件')
+        return
       }
-    },
 
-    // 取消编辑价格
-    cancelEditPrice(product) {
-      product.editingPrice = false
-      delete product.editPrice
+      try {
+        await this.downloadFile(
+          `/api/images/product/${this.productForm.id}/template`,
+          this.productForm.templateFileName || 'template'
+        )
+        this.$message.success('模板文件下载已开始')
+      } catch (error) {
+        this.$message.error(error.response?.data?.message || '模板文件下载失败')
+      }
     },
 
     // 删除模板文件
@@ -3727,99 +3123,6 @@ export default {
   box-sizing: border-box;
 }
 
-/* 批量导入样式 */
-.batch-import-container {
-  width: 100%;
-  padding: 20px;
-}
-
-.batch-import-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 20px;
-  padding-bottom: 15px;
-  border-bottom: 1px solid #e4e7ed;
-}
-
-.batch-import-info {
-  flex: 1;
-}
-
-.info-row {
-  margin-bottom: 10px;
-  display: flex;
-  align-items: center;
-}
-
-.info-label {
-  font-weight: bold;
-  margin-right: 10px;
-  width: 80px;
-}
-
-.info-value {
-  font-size: 16px;
-  color: #e60012;
-  font-weight: bold;
-}
-
-.file-uploader {
-  display: flex;
-  align-items: center;
-}
-
-.file-status {
-  margin-left: 10px;
-  font-size: 14px;
-  color: #606266;
-}
-
-.batch-import-actions {
-  display: flex;
-  gap: 10px;
-}
-
-.batch-import-preview {
-  margin-top: 20px;
-}
-
-.preview-tabs {
-  margin-bottom: 15px;
-}
-
-.excel-preview {
-  width: 100%;
-  overflow-x: auto;
-  border: 1px solid #e4e7ed;
-  border-radius: 4px;
-}
-
-.excel-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.excel-table th {
-  background-color: #f5f7fa;
-  border: 1px solid #e4e7ed;
-  padding: 8px;
-  text-align: center;
-  font-weight: bold;
-  min-width: 60px;
-}
-
-.excel-table td {
-  border: 1px solid #e4e7ed;
-  padding: 8px;
-  text-align: center;
-  min-width: 60px;
-}
-
-.excel-table tr:hover {
-  background-color: #f5f7fa;
-}
-
 body {
   font-family: 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
   font-size: 14px;
@@ -3835,14 +3138,14 @@ body {
 
 /* 顶部导航栏 */
 .header {
-  background-color: #fff;
-  border-bottom: 3px solid #e60012;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 248, 247, 0.94) 100%);
+  border-bottom: 1px solid rgba(230, 0, 18, 0.14);
   padding: 0 24px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   height: 70px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -3870,24 +3173,38 @@ body {
 }
 
 .nav {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   justify-content: center;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.nav::-webkit-scrollbar {
+  display: none;
 }
 
 .nav .el-menu {
   border-bottom: none;
   display: flex;
-  justify-content: flex-start;
+  justify-content: center;
   background: transparent;
+  flex-wrap: nowrap;
+  min-width: 100%;
+  width: max-content;
 }
 
 .nav .el-menu-item {
   height: 68px;
   line-height: 68px;
   font-size: 14px;
-  padding: 0 15px;
-  min-width: 100px;
+  padding: 0 14px;
+  min-width: 90px;
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .nav .el-menu-item .el-icon {
@@ -4629,30 +3946,20 @@ body {
   margin-top: 2px;
 }
 
-.alias-text {
-  font-size: 12px;
-  color: #666;
-  margin: 6px 0 0 0;
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  background: #e8f4f8;
-  padding: 6px 10px;
-  border-radius: 6px;
-}
-
-.alias-text .el-icon {
-  color: #409eff;
-  margin-top: 2px;
-}
-
 .product-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 0 0;
+  border-top: 1px solid #f0f0f0;
+  margin-top: auto;
+}
+
+.product-stats-row {
   display: flex;
   align-items: center;
   gap: 24px;
-  padding: 8px 0;
-  border-top: 1px solid #f0f0f0;
-  margin-top: auto;
+  flex-wrap: wrap;
 }
 
 .price-info, .stock-info {
@@ -4685,35 +3992,78 @@ body {
 .product-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-left: auto;
+  gap: 8px;
   flex-wrap: wrap;
-  justify-content: flex-end;
-  min-width: 200px;
 }
 
 .product-actions .el-button {
-  padding: 6px 10px;
-  font-size: 12px;
-  height: 28px;
-  min-width: 70px;
+  padding: 6px 12px;
 }
 
-/* 确保产品底部区域有足够的空间 */
-.product-footer {
+.product-actions .el-button {
+  flex: 0 0 auto;
+}
+
+.product-batch-dialog {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding-top: 12px;
-  border-top: 1px solid #f0f0f0;
-  margin-top: 12px;
+  flex-direction: column;
+  gap: 18px;
 }
 
-.price-info,
-.stock-info {
-  white-space: nowrap;
-  flex-shrink: 0;
+.product-batch-summary {
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(230, 0, 18, 0.08), rgba(255, 255, 255, 0.96));
+  border: 1px solid rgba(230, 0, 18, 0.12);
+}
+
+.product-batch-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 6px;
+}
+
+.product-batch-subtitle {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #6b7280;
+}
+
+.product-batch-upload {
+  width: 100%;
+}
+
+.product-batch-upload .el-upload {
+  width: 100%;
+}
+
+.product-batch-upload .el-upload-dragger {
+  width: 100%;
+  border-radius: 16px;
+  border: 1px dashed rgba(230, 0, 18, 0.28);
+  background: #fffdfd;
+}
+
+.product-batch-preview-tip {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #1f2937;
+  padding: 0 4px;
+}
+
+.product-batch-preview-tip--muted {
+  color: #6b7280;
+}
+
+.product-batch-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.product-batch-preview-table {
+  width: 100%;
 }
 
 @media screen and (max-width: 1200px) {
@@ -4805,21 +4155,161 @@ body {
   padding-top: 8px;
 }
 
+.notice-popup-dialog .el-dialog {
+  border-radius: 22px;
+  overflow: hidden;
+}
+
+.notice-popup-dialog .el-dialog__body {
+  padding-top: 12px;
+}
+
+.notice-popup-shell {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: 18px;
+}
+
+.notice-popup-list,
+.notice-popup-detail {
+  border-radius: 18px;
+  border: 1px solid #eef1f6;
+  background: #fff;
+}
+
+.notice-popup-list {
+  padding: 16px;
+  max-height: 60vh;
+  overflow: auto;
+}
+
+.notice-popup-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.notice-popup-items {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.notice-popup-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #eef1f6;
+  border-radius: 14px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  appearance: none;
+  font: inherit;
+  color: inherit;
+}
+
+.notice-popup-item:hover,
+.notice-popup-item.active {
+  border-color: #e60012;
+  box-shadow: 0 8px 20px rgba(230, 0, 18, 0.08);
+  transform: translateY(-1px);
+}
+
+.notice-popup-index {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: #fff1f0;
+  color: #e60012;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.notice-popup-item-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.notice-popup-item-body h4 {
+  margin-bottom: 6px;
+  font-size: 15px;
+  color: #111827;
+  line-height: 1.4;
+}
+
+.notice-popup-item-body p {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #6b7280;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.notice-popup-detail {
+  padding: 22px;
+  background: linear-gradient(180deg, #fff7f7 0%, #ffffff 100%);
+}
+
+.notice-popup-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #fff1f0;
+  color: #e60012;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.notice-popup-detail h3 {
+  margin: 14px 0 12px;
+  font-size: 24px;
+  line-height: 1.35;
+  color: #111827;
+}
+
+.notice-popup-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #6b7280;
+  font-size: 13px;
+  margin-bottom: 18px;
+}
+
+.notice-popup-content {
+  min-height: 240px;
+  padding: 18px 20px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid #eef1f6;
+  color: #1f2937;
+  font-size: 15px;
+  line-height: 1.9;
+  white-space: pre-wrap;
+}
+
 /* 响应式设计 - 移动端优先 */
 @media screen and (max-width: 1024px) {
   .header {
     height: auto;
     min-height: 60px;
     padding: 0 16px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 12px;
-    align-items: center;
-  }
-
-  .header-left {
-    flex: 1;
-    gap: 16px;
-    min-width: 0;
     align-items: center;
   }
 
@@ -4838,6 +4328,19 @@ body {
 
   .header-right {
     flex-shrink: 0;
+  }
+
+  .nav {
+    justify-content: flex-start;
+  }
+
+  .nav .el-menu {
+    justify-content: flex-start;
+  }
+
+  .nav .el-menu-item {
+    min-width: 84px;
+    padding: 0 12px;
   }
 
   .main-content {
@@ -4902,10 +4405,12 @@ body {
     flex-wrap: wrap;
   }
 
+  .product-stats-row {
+    gap: 12px;
+  }
+
   .product-actions {
     width: 100%;
-    margin-left: 0;
-    margin-top: 12px;
     justify-content: flex-start;
   }
 
@@ -4937,6 +4442,11 @@ body {
 }
 
 @media screen and (max-width: 768px) {
+  .header {
+    padding: 0 12px;
+    gap: 10px;
+  }
+
   .product-card {
     flex-direction: column;
   }
@@ -4951,6 +4461,10 @@ body {
     gap: 12px;
   }
 
+  .product-stats-row {
+    gap: 12px;
+  }
+
   .price-info, .stock-info {
     flex: 1;
     min-width: calc(50% - 6px);
@@ -4958,8 +4472,6 @@ body {
 
   .product-actions {
     width: 100%;
-    margin-left: 0;
-    margin-top: 8px;
     justify-content: flex-start;
     flex-wrap: wrap;
     gap: 6px;
@@ -4976,6 +4488,12 @@ body {
 
   .logo-sub {
     font-size: 9px;
+  }
+
+  .nav .el-menu-item {
+    min-width: 74px;
+    padding: 0 10px;
+    font-size: 13px;
   }
 
   .welcome-card {
@@ -5100,6 +4618,16 @@ body {
 
   .logo-sub {
     display: none;
+  }
+
+  .nav .el-menu-item {
+    min-width: 68px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+
+  .nav-text {
+    letter-spacing: 0;
   }
 
   .main-content {

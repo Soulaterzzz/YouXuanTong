@@ -12,8 +12,16 @@ import com.zs.ytbx.service.NoticeService;
 import com.zs.ytbx.vo.anxinxuan.*;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
 
 @Validated
 @RestController
@@ -132,6 +140,29 @@ public class AdminController {
         requireAdmin();
         adminService.offSale(productId);
         return ApiResponse.success(null);
+    }
+
+    @GetMapping("/products/import-template")
+    public ResponseEntity<byte[]> downloadProductImportTemplate() {
+        requireAdmin();
+        byte[] data = adminService.downloadProductImportTemplate();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        headers.setContentLength(data.length);
+        headers.setContentDisposition(ContentDisposition.attachment()
+                .filename("product-import-template.xlsx", StandardCharsets.UTF_8)
+                .build());
+        return ResponseEntity.ok().headers(headers).body(data);
+    }
+
+    @PostMapping("/products/import")
+    public ApiResponse<Map<String, Object>> importProducts(@RequestParam("file") MultipartFile file) {
+        requireAdmin();
+        int importedCount = adminService.importProducts(file);
+        return ApiResponse.success(Map.of(
+                "importedCount", importedCount,
+                "message", "已导入 " + importedCount + " 条产品数据"
+        ));
     }
 
     @GetMapping("/expenses")
