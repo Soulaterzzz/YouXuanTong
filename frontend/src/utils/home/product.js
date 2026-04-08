@@ -1,5 +1,23 @@
-export function getProductImage(product) {
-  return `/api/images/product/${product.id}`
+export function getProductImage(product, noCache = true) {
+  const apiBaseUrl = getApiBaseUrl()
+  let url = `${apiBaseUrl}/api/images/product/${product.id}`
+  if (noCache) {
+    url += `?v=${Date.now()}`
+  }
+  return url
+}
+
+function getApiBaseUrl() {
+  const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL
+  if (configuredBaseUrl) {
+    return configuredBaseUrl.replace(/\/$/, '')
+  }
+
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin.replace(/\/$/, '')
+  }
+
+  return 'http://127.0.0.1:8081'
 }
 
 export function getCategoryLabel(categoryCode) {
@@ -37,18 +55,4 @@ export function formatMoney(value) {
   }
   const num = Number(value)
   return Number.isFinite(num) ? num.toFixed(2) : String(value)
-}
-
-export function formatStock(stock) {
-  if (stock === null || stock === undefined || stock === '') {
-    return '充足'
-  }
-  const num = Number(stock)
-  if (!Number.isFinite(num)) {
-    return String(stock)
-  }
-  if (num <= 0) {
-    return '充足'
-  }
-  return `${num} 份`
 }

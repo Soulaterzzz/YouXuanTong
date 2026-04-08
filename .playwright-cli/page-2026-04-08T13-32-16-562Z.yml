@@ -1,0 +1,157 @@
+- generic [ref=e3]:
+  - link "跳转到主要内容" [ref=e4] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner [ref=e5]:
+    - generic [ref=e6]:
+      - generic [ref=e7]: 优选通
+      - generic [ref=e8]: 保险服务平台
+    - navigation [ref=e9]:
+      - menubar [ref=e10]:
+        - menuitem "首页" [ref=e11] [cursor=pointer]:
+          - img [ref=e13]
+          - generic [ref=e15]: 首页
+        - menuitem "产品中心" [ref=e16] [cursor=pointer]:
+          - img [ref=e18]
+          - generic [ref=e20]: 产品中心
+        - menuitem "费用清单" [ref=e21] [cursor=pointer]:
+          - img [ref=e23]
+          - generic [ref=e25]: 费用清单
+        - menuitem "保险清单" [ref=e26] [cursor=pointer]:
+          - img [ref=e28]
+          - generic [ref=e31]: 保险清单
+        - menuitem "消费明细" [ref=e32] [cursor=pointer]:
+          - img [ref=e34]
+          - generic [ref=e38]: 消费明细
+        - menuitem "用户管理" [ref=e39] [cursor=pointer]:
+          - img [ref=e41]
+          - generic [ref=e43]: 用户管理
+    - button "用户菜单，当前用户 admin" [ref=e47] [cursor=pointer]:
+      - img [ref=e49]
+      - generic [ref=e51]: admin
+      - img [ref=e53]
+  - main [ref=e55]:
+    - generic [ref=e674]:
+      - generic [ref=e676]:
+        - generic [ref=e678]:
+          - generic [ref=e679]: 运营重点
+          - heading "今天优先处理这三类任务" [level=2] [ref=e680]
+        - generic [ref=e681]:
+          - article [ref=e682]:
+            - generic [ref=e683]:
+              - img [ref=e686]
+              - generic [ref=e688]: 产品维护
+            - generic [ref=e689]:
+              - heading "在售产品" [level=3] [ref=e690]
+              - generic [ref=e691]: "8"
+              - paragraph [ref=e692]: 编辑上架、下架和批量激活都从这里进入。
+            - generic [ref=e693]:
+              - generic [ref=e694]: 今日新增 0 单
+              - button "进入产品中心" [ref=e695] [cursor=pointer]:
+                - generic [ref=e696]: 进入产品中心
+          - article [ref=e697]:
+            - generic [ref=e698]:
+              - img [ref=e701]
+              - generic [ref=e704]: 保单待办
+            - generic [ref=e705]:
+              - heading "待处理订单" [level=3] [ref=e706]
+              - generic [ref=e707]: "3"
+              - paragraph [ref=e708]: 优先处理审核、承保和生效流程。
+            - generic [ref=e709]:
+              - generic [ref=e710]: 本月累计 5 单
+              - button "进入保险清单" [ref=e711] [cursor=pointer]:
+                - generic [ref=e712]: 进入保险清单
+          - article [ref=e713]:
+            - generic [ref=e714]:
+              - img [ref=e717]
+              - generic [ref=e721]: 资金流水
+            - generic [ref=e722]:
+              - heading "费用记录" [level=3] [ref=e723]
+              - generic [ref=e724]: "12"
+              - paragraph [ref=e725]: 查看充值和消费明细，核对资金流转。
+            - generic [ref=e726]:
+              - generic [ref=e727]: 适合运营和财务复核
+              - button "查看费用清单" [ref=e728] [cursor=pointer]:
+                - generic [ref=e729]: 查看费用清单
+      - complementary [ref=e730]:
+        - generic [ref=e731]:
+          - generic [ref=e732]: 通知公告
+          - generic [ref=e733]:
+            - generic [ref=e735]: 4 条
+            - generic [ref=e737]: 最新发布
+            - generic [ref=e739]: 最近发布：2026/4/6 21:19:53
+        - generic [ref=e740]:
+          - generic [ref=e741]:
+            - generic [ref=e743]: 最新标题
+            - button "欢迎使用优选通保险服务平台" [ref=e744] [cursor=pointer]
+            - paragraph [ref=e745]: 2026/2/7 21:19:53
+          - button "管理通知" [ref=e746] [cursor=pointer]:
+            - generic [ref=e747]: 管理通知
+        - generic [ref=e748]:
+          - button "1 欢迎使用优选通保险服务平台 2026/2/7 21:19:53" [ref=e749] [cursor=pointer]:
+            - generic [ref=e750]: "1"
+            - generic [ref=e752]:
+              - heading "欢迎使用优选通保险服务平台" [level=3] [ref=e753]
+              - generic [ref=e754]: 2026/2/7 21:19:53
+            - img [ref=e756]
+          - button "2 春节假期投保提醒 2026/3/9 21:19:53" [ref=e758] [cursor=pointer]:
+            - generic [ref=e759]: "2"
+            - generic [ref=e761]:
+              - heading "春节假期投保提醒" [level=3] [ref=e762]
+              - generic [ref=e763]: 2026/3/9 21:19:53
+            - img [ref=e765]
+          - button "3 新产品上线通知 2026/3/29 21:19:53" [ref=e767] [cursor=pointer]:
+            - generic [ref=e768]: "3"
+            - generic [ref=e770]:
+              - heading "新产品上线通知" [level=3] [ref=e771]
+              - generic [ref=e772]: 2026/3/29 21:19:53
+            - img [ref=e774]
+          - button "4 系统维护通知 2026/4/6 21:19:53" [ref=e776] [cursor=pointer]:
+            - generic [ref=e777]: "4"
+            - generic [ref=e779]:
+              - heading "系统维护通知" [level=3] [ref=e780]
+              - generic [ref=e781]: 2026/4/6 21:19:53
+            - img [ref=e783]
+  - text: "* *"
+  - dialog "通知公告浏览（4条）" [ref=e170]:
+    - generic [active] [ref=e785]:
+      - banner [ref=e786]:
+        - heading "通知公告浏览（4条）" [level=2] [ref=e787]
+        - button "Close this dialog" [ref=e788] [cursor=pointer]:
+          - img [ref=e790]
+      - generic [ref=e793]:
+        - generic [ref=e794]:
+          - generic [ref=e795]:
+            - generic [ref=e796]: 首页通知
+            - heading "欢迎使用优选通保险服务平台" [level=3] [ref=e797]
+            - paragraph [ref=e798]: 2026/2/7 21:19:53
+          - generic [ref=e800]: 1 / 4
+        - generic [ref=e801]:
+          - generic [ref=e802]:
+            - generic [ref=e804]: 第 1 条
+            - generic [ref=e805]: 4 条通知
+          - generic [ref=e806]: 优选通保险服务平台已正式上线，欢迎各位用户使用。如有任何问题，请联系管理员。
+        - generic [ref=e807]:
+          - button "1 欢迎使用优选通保险服务平台" [ref=e808] [cursor=pointer]:
+            - generic [ref=e809]: "1"
+            - generic [ref=e810]: 欢迎使用优选通保险服务平台
+            - img [ref=e812]
+          - button "2 春节假期投保提醒" [ref=e814] [cursor=pointer]:
+            - generic [ref=e815]: "2"
+            - generic [ref=e816]: 春节假期投保提醒
+            - img [ref=e818]
+          - button "3 新产品上线通知" [ref=e820] [cursor=pointer]:
+            - generic [ref=e821]: "3"
+            - generic [ref=e822]: 新产品上线通知
+            - img [ref=e824]
+          - button "4 系统维护通知" [ref=e826] [cursor=pointer]:
+            - generic [ref=e827]: "4"
+            - generic [ref=e828]: 系统维护通知
+            - img [ref=e830]
+      - contentinfo [ref=e832]:
+        - generic [ref=e833]:
+          - button "上一条" [disabled] [ref=e834]:
+            - generic [ref=e835]: 上一条
+          - button "下一条" [ref=e836] [cursor=pointer]:
+            - generic [ref=e837]: 下一条
+          - button "关闭" [ref=e838] [cursor=pointer]:
+            - generic [ref=e839]: 关闭

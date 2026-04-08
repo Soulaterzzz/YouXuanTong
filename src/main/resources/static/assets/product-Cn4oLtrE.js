@@ -1,0 +1,1 @@
+function e(e,n=!0){let r=`${t()}/api/images/product/${e.id}`;return n&&(r+=`?v=${Date.now()}`),r}function t(){return typeof window<`u`&&window.location?.origin?window.location.origin.replace(/\/$/,``):`http://127.0.0.1:8081`}function n(e){if(e==null||e===``)return`0.00`;let t=Number(e);return Number.isFinite(t)?t.toFixed(2):String(e)}export{e as n,n as t};

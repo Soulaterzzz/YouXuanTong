@@ -3,12 +3,14 @@ package com.zs.ytbx.common.auth;
 import com.zs.ytbx.common.enums.ResultCode;
 import com.zs.ytbx.common.exception.BusinessException;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.util.StringUtils;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -21,50 +23,23 @@ public class AuthContext {
         if (request == null) {
             return null;
         }
-
-        String authorization = request.getHeader(SessionConstants.AUTHORIZATION_HEADER);
-        if (!StringUtils.hasText(authorization) || !authorization.startsWith(SessionConstants.TOKEN_PREFIX)) {
-            return null;
-        }
-
-        return authorization.substring(SessionConstants.TOKEN_PREFIX.length()).trim();
+        List<String> tokenCandidates = getTokenCandidates(request);
+        return tokenCandidates.isEmpty() ? null : tokenCandidates.get(0);
     }
 
     public SessionUser getCurrentUser() {
-        String token = getCurrentToken();
-        SessionUser tokenUser = authTokenService.getUser(token);
-        if (tokenUser != null) {
-            return tokenUser;
-        }
-
         HttpServletRequest request = getCurrentRequest();
         if (request == null) {
             return null;
         }
 
-        HttpSession session = request.getSession(false);
-        if (session == null) {
-            return null;
+        for (String token : getTokenCandidates(request)) {
+            SessionUser tokenUser = authTokenService.getUser(token);
+            if (tokenUser != null) {
+                return tokenUser;
+            }
         }
-
-        Object sessionUser = session.getAttribute(SessionConstants.SESSION_USER);
-        if (sessionUser instanceof SessionUser user) {
-            return user;
-        }
-
-        Long userId = (Long) session.getAttribute(SessionConstants.SESSION_USER_ID);
-        String username = (String) session.getAttribute(SessionConstants.SESSION_USERNAME);
-        String userType = (String) session.getAttribute(SessionConstants.SESSION_USER_TYPE);
-        if (userId == null || !StringUtils.hasText(username)) {
-            return null;
-        }
-
-        return SessionUser.builder()
-                .userId(userId)
-                .customerId(userId)
-                .username(username)
-                .userType(userType)
-                .build();
+        return null;
     }
 
     public SessionUser requireCurrentUser() {
@@ -73,6 +48,37 @@ public class AuthContext {
             throw new BusinessException(ResultCode.UNAUTHORIZED);
         }
         return user;
+    }
+
+    private List<String> getTokenCandidates(HttpServletRequest request) {
+        List<String> tokens = new ArrayList<>(2);
+
+        String authorization = request.getHeader(SessionConstants.AUTHORIZATION_HEADER);
+        if (StringUtils.hasText(authorization) && authorization.startsWith(SessionConstants.TOKEN_PREFIX)) {
+            String token = authorization.substring(SessionConstants.TOKEN_PREFIX.length()).trim();
+            if (StringUtils.hasText(token)) {
+                tokens.add(token);
+            }
+        }
+
+        String cookieToken = getCookieToken(request);
+        if (StringUtils.hasText(cookieToken) && !tokens.contains(cookieToken)) {
+            tokens.add(cookieToken);
+        }
+
+        return tokens;
+    }
+
+    private String getCookieToken(HttpServletRequest request) {
+        if (request.getCookies() == null) {
+            return null;
+        }
+        for (var cookie : request.getCookies()) {
+            if (cookie != null && SessionConstants.AUTH_COOKIE_NAME.equals(cookie.getName())) {
+                return cookie.getValue();
+            }
+        }
+        return null;
     }
 
     private HttpServletRequest getCurrentRequest() {

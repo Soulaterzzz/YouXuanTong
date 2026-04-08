@@ -1,0 +1,338 @@
+- generic [ref=e3]:
+  - link "跳转到主要内容" [ref=e4] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner [ref=e5]:
+    - generic [ref=e6]:
+      - generic [ref=e7]: 优选通
+      - generic [ref=e8]: 保险服务平台
+    - navigation [ref=e9]:
+      - menubar [ref=e10]:
+        - menuitem "首页" [ref=e11] [cursor=pointer]:
+          - img [ref=e13]
+          - generic [ref=e15]: 首页
+        - menuitem "产品中心" [ref=e16] [cursor=pointer]:
+          - img [ref=e18]
+          - generic [ref=e20]: 产品中心
+        - menuitem "费用清单" [ref=e21] [cursor=pointer]:
+          - img [ref=e23]
+          - generic [ref=e25]: 费用清单
+        - menuitem "保险清单" [ref=e26] [cursor=pointer]:
+          - img [ref=e28]
+          - generic [ref=e31]: 保险清单
+        - menuitem "消费明细" [ref=e32] [cursor=pointer]:
+          - img [ref=e34]
+          - generic [ref=e38]: 消费明细
+        - menuitem "用户管理" [active] [ref=e39] [cursor=pointer]:
+          - img [ref=e41]
+          - generic [ref=e43]: 用户管理
+    - button "用户菜单，当前用户 admin" [ref=e47] [cursor=pointer]:
+      - img [ref=e49]
+      - generic [ref=e51]: admin
+      - img [ref=e53]
+  - main [ref=e55]:
+    - generic [ref=e240]:
+      - generic [ref=e241]:
+        - generic [ref=e242]:
+          - generic [ref=e243]: 系统管理
+          - heading "用户管理" [level=2] [ref=e244]
+        - generic [ref=e245]:
+          - button "重置筛选" [ref=e246] [cursor=pointer]:
+            - generic [ref=e247]:
+              - img [ref=e249]
+              - text: 重置筛选
+          - button "新增用户" [ref=e251] [cursor=pointer]:
+            - generic [ref=e252]:
+              - img [ref=e254]
+              - text: 新增用户
+          - button "账户充值" [ref=e256] [cursor=pointer]:
+            - generic [ref=e257]:
+              - img [ref=e259]
+              - text: 账户充值
+      - generic [ref=e263]:
+        - generic [ref=e264]:
+          - generic [ref=e265]: 用户名
+          - textbox "用户名" [ref=e269]:
+            - /placeholder: 请输入用户名
+        - generic [ref=e270]:
+          - generic [ref=e271]: 用户类型
+          - generic [ref=e274] [cursor=pointer]:
+            - generic:
+              - combobox "用户类型" [ref=e276]
+              - generic [ref=e277]: 请选择
+            - img [ref=e280]
+        - generic [ref=e282]:
+          - generic [ref=e283]: 状态
+          - generic [ref=e286] [cursor=pointer]:
+            - generic:
+              - combobox "状态" [ref=e288]
+              - generic [ref=e289]: 请选择
+            - img [ref=e292]
+      - button "查询" [ref=e295] [cursor=pointer]:
+        - generic [ref=e296]:
+          - img [ref=e298]
+          - text: 查询
+      - generic [ref=e301]:
+        - table [ref=e303]:
+          - rowgroup [ref=e313]:
+            - row "ID 用户名 手机号 类型 状态 余额 最后登录 操作" [ref=e314]:
+              - columnheader "ID" [ref=e315]:
+                - generic [ref=e316]: ID
+              - columnheader "用户名" [ref=e317]:
+                - generic [ref=e318]: 用户名
+              - columnheader "手机号" [ref=e319]:
+                - generic [ref=e320]: 手机号
+              - columnheader "类型" [ref=e321]:
+                - generic [ref=e322]: 类型
+              - columnheader "状态" [ref=e323]:
+                - generic [ref=e324]: 状态
+              - columnheader "余额" [ref=e325]:
+                - generic [ref=e326]: 余额
+              - columnheader "最后登录" [ref=e327]:
+                - generic [ref=e328]: 最后登录
+              - columnheader "操作" [ref=e329]:
+                - generic [ref=e330]: 操作
+        - table [ref=e335]:
+          - rowgroup [ref=e345]:
+            - row "11 zhenghua 13800010010 普通用户 启用 ¥9200 编辑 禁用 删除" [ref=e346]:
+              - cell "11" [ref=e347]:
+                - generic [ref=e348]: "11"
+              - cell "zhenghua" [ref=e349]:
+                - generic [ref=e350]: zhenghua
+              - cell "13800010010" [ref=e351]:
+                - generic [ref=e352]: "13800010010"
+              - cell "普通用户" [ref=e353]:
+                - generic [ref=e356]: 普通用户
+              - cell "启用" [ref=e357]:
+                - generic [ref=e360]: 启用
+              - cell "¥9200" [ref=e361]:
+                - generic [ref=e362]: ¥9200
+              - cell [ref=e363]
+              - cell "编辑 禁用 删除" [ref=e364]:
+                - generic [ref=e366]:
+                  - button "编辑" [ref=e367] [cursor=pointer]:
+                    - generic [ref=e368]: 编辑
+                  - button "禁用" [ref=e369] [cursor=pointer]:
+                    - generic [ref=e370]: 禁用
+                  - button "删除" [ref=e371] [cursor=pointer]:
+                    - generic [ref=e372]: 删除
+            - row "9 zhoujun 13800010008 普通用户 启用 ¥680 编辑 禁用 删除" [ref=e373]:
+              - cell "9" [ref=e374]:
+                - generic [ref=e375]: "9"
+              - cell "zhoujun" [ref=e376]:
+                - generic [ref=e377]: zhoujun
+              - cell "13800010008" [ref=e378]:
+                - generic [ref=e379]: "13800010008"
+              - cell "普通用户" [ref=e380]:
+                - generic [ref=e383]: 普通用户
+              - cell "启用" [ref=e384]:
+                - generic [ref=e387]: 启用
+              - cell "¥680" [ref=e388]:
+                - generic [ref=e389]: ¥680
+              - cell [ref=e390]
+              - cell "编辑 禁用 删除" [ref=e391]:
+                - generic [ref=e393]:
+                  - button "编辑" [ref=e394] [cursor=pointer]:
+                    - generic [ref=e395]: 编辑
+                  - button "禁用" [ref=e396] [cursor=pointer]:
+                    - generic [ref=e397]: 禁用
+                  - button "删除" [ref=e398] [cursor=pointer]:
+                    - generic [ref=e399]: 删除
+            - row "8 sunli 13800010007 普通用户 启用 ¥15000 编辑 禁用 删除" [ref=e400]:
+              - cell "8" [ref=e401]:
+                - generic [ref=e402]: "8"
+              - cell "sunli" [ref=e403]:
+                - generic [ref=e404]: sunli
+              - cell "13800010007" [ref=e405]:
+                - generic [ref=e406]: "13800010007"
+              - cell "普通用户" [ref=e407]:
+                - generic [ref=e410]: 普通用户
+              - cell "启用" [ref=e411]:
+                - generic [ref=e414]: 启用
+              - cell "¥15000" [ref=e415]:
+                - generic [ref=e416]: ¥15000
+              - cell [ref=e417]
+              - cell "编辑 禁用 删除" [ref=e418]:
+                - generic [ref=e420]:
+                  - button "编辑" [ref=e421] [cursor=pointer]:
+                    - generic [ref=e422]: 编辑
+                  - button "禁用" [ref=e423] [cursor=pointer]:
+                    - generic [ref=e424]: 禁用
+                  - button "删除" [ref=e425] [cursor=pointer]:
+                    - generic [ref=e426]: 删除
+            - row "7 zhaolei 13800010006 普通用户 启用 ¥3000 编辑 禁用 删除" [ref=e427]:
+              - cell "7" [ref=e428]:
+                - generic [ref=e429]: "7"
+              - cell "zhaolei" [ref=e430]:
+                - generic [ref=e431]: zhaolei
+              - cell "13800010006" [ref=e432]:
+                - generic [ref=e433]: "13800010006"
+              - cell "普通用户" [ref=e434]:
+                - generic [ref=e437]: 普通用户
+              - cell "启用" [ref=e438]:
+                - generic [ref=e441]: 启用
+              - cell "¥3000" [ref=e442]:
+                - generic [ref=e443]: ¥3000
+              - cell [ref=e444]
+              - cell "编辑 禁用 删除" [ref=e445]:
+                - generic [ref=e447]:
+                  - button "编辑" [ref=e448] [cursor=pointer]:
+                    - generic [ref=e449]: 编辑
+                  - button "禁用" [ref=e450] [cursor=pointer]:
+                    - generic [ref=e451]: 禁用
+                  - button "删除" [ref=e452] [cursor=pointer]:
+                    - generic [ref=e453]: 删除
+            - row "6 chenxin 13800010005 普通用户 启用 ¥7450 2026-04-01T21:19:53 编辑 禁用 删除" [ref=e454]:
+              - cell "6" [ref=e455]:
+                - generic [ref=e456]: "6"
+              - cell "chenxin" [ref=e457]:
+                - generic [ref=e458]: chenxin
+              - cell "13800010005" [ref=e459]:
+                - generic [ref=e460]: "13800010005"
+              - cell "普通用户" [ref=e461]:
+                - generic [ref=e464]: 普通用户
+              - cell "启用" [ref=e465]:
+                - generic [ref=e468]: 启用
+              - cell "¥7450" [ref=e469]:
+                - generic [ref=e470]: ¥7450
+              - cell "2026-04-01T21:19:53" [ref=e471]:
+                - generic [ref=e472]: 2026-04-01T21:19:53
+              - cell "编辑 禁用 删除" [ref=e473]:
+                - generic [ref=e475]:
+                  - button "编辑" [ref=e476] [cursor=pointer]:
+                    - generic [ref=e477]: 编辑
+                  - button "禁用" [ref=e478] [cursor=pointer]:
+                    - generic [ref=e479]: 禁用
+                  - button "删除" [ref=e480] [cursor=pointer]:
+                    - generic [ref=e481]: 删除
+            - row "5 liuyang 13800010004 普通用户 启用 ¥19800 2026-04-03T21:19:53 编辑 禁用 删除" [ref=e482]:
+              - cell "5" [ref=e483]:
+                - generic [ref=e484]: "5"
+              - cell "liuyang" [ref=e485]:
+                - generic [ref=e486]: liuyang
+              - cell "13800010004" [ref=e487]:
+                - generic [ref=e488]: "13800010004"
+              - cell "普通用户" [ref=e489]:
+                - generic [ref=e492]: 普通用户
+              - cell "启用" [ref=e493]:
+                - generic [ref=e496]: 启用
+              - cell "¥19800" [ref=e497]:
+                - generic [ref=e498]: ¥19800
+              - cell "2026-04-03T21:19:53" [ref=e499]:
+                - generic [ref=e500]: 2026-04-03T21:19:53
+              - cell "编辑 禁用 删除" [ref=e501]:
+                - generic [ref=e503]:
+                  - button "编辑" [ref=e504] [cursor=pointer]:
+                    - generic [ref=e505]: 编辑
+                  - button "禁用" [ref=e506] [cursor=pointer]:
+                    - generic [ref=e507]: 禁用
+                  - button "删除" [ref=e508] [cursor=pointer]:
+                    - generic [ref=e509]: 删除
+            - row "14 user 13800010013 普通用户 启用 ¥700 2026-04-08T19:19:53 编辑 禁用 删除" [ref=e510]:
+              - cell "14" [ref=e511]:
+                - generic [ref=e512]: "14"
+              - cell "user" [ref=e513]:
+                - generic [ref=e514]: user
+              - cell "13800010013" [ref=e515]:
+                - generic [ref=e516]: "13800010013"
+              - cell "普通用户" [ref=e517]:
+                - generic [ref=e520]: 普通用户
+              - cell "启用" [ref=e521]:
+                - generic [ref=e524]: 启用
+              - cell "¥700" [ref=e525]:
+                - generic [ref=e526]: ¥700
+              - cell "2026-04-08T19:19:53" [ref=e527]:
+                - generic [ref=e528]: 2026-04-08T19:19:53
+              - cell "编辑 禁用 删除" [ref=e529]:
+                - generic [ref=e531]:
+                  - button "编辑" [ref=e532] [cursor=pointer]:
+                    - generic [ref=e533]: 编辑
+                  - button "禁用" [ref=e534] [cursor=pointer]:
+                    - generic [ref=e535]: 禁用
+                  - button "删除" [ref=e536] [cursor=pointer]:
+                    - generic [ref=e537]: 删除
+            - row "12 huangping 13800010011 普通用户 启用 ¥4350 2026-04-08T17:19:53 编辑 禁用 删除" [ref=e538]:
+              - cell "12" [ref=e539]:
+                - generic [ref=e540]: "12"
+              - cell "huangping" [ref=e541]:
+                - generic [ref=e542]: huangping
+              - cell "13800010011" [ref=e543]:
+                - generic [ref=e544]: "13800010011"
+              - cell "普通用户" [ref=e545]:
+                - generic [ref=e548]: 普通用户
+              - cell "启用" [ref=e549]:
+                - generic [ref=e552]: 启用
+              - cell "¥4350" [ref=e553]:
+                - generic [ref=e554]: ¥4350
+              - cell "2026-04-08T17:19:53" [ref=e555]:
+                - generic [ref=e556]: 2026-04-08T17:19:53
+              - cell "编辑 禁用 删除" [ref=e557]:
+                - generic [ref=e559]:
+                  - button "编辑" [ref=e560] [cursor=pointer]:
+                    - generic [ref=e561]: 编辑
+                  - button "禁用" [ref=e562] [cursor=pointer]:
+                    - generic [ref=e563]: 禁用
+                  - button "删除" [ref=e564] [cursor=pointer]:
+                    - generic [ref=e565]: 删除
+            - row "1 admin 13800000001 管理员 启用 ¥100000 2026-04-08T21:20:00 编辑 禁用" [ref=e566]:
+              - cell "1" [ref=e567]:
+                - generic [ref=e568]: "1"
+              - cell "admin" [ref=e569]:
+                - generic [ref=e570]: admin
+              - cell "13800000001" [ref=e571]:
+                - generic [ref=e572]: "13800000001"
+              - cell "管理员" [ref=e573]:
+                - generic [ref=e576]: 管理员
+              - cell "启用" [ref=e577]:
+                - generic [ref=e580]: 启用
+              - cell "¥100000" [ref=e581]:
+                - generic [ref=e582]: ¥100000
+              - cell "2026-04-08T21:20:00" [ref=e583]:
+                - generic [ref=e584]: 2026-04-08T21:20:00
+              - cell "编辑 禁用" [ref=e585]:
+                - generic [ref=e587]:
+                  - button "编辑" [ref=e588] [cursor=pointer]:
+                    - generic [ref=e589]: 编辑
+                  - button "禁用" [ref=e590] [cursor=pointer]:
+                    - generic [ref=e591]: 禁用
+            - row "4 wangfang 13800010003 普通用户 启用 ¥5620 2026-04-05T21:19:53 编辑 禁用 删除" [ref=e592]:
+              - cell "4" [ref=e593]:
+                - generic [ref=e594]: "4"
+              - cell "wangfang" [ref=e595]:
+                - generic [ref=e596]: wangfang
+              - cell "13800010003" [ref=e597]:
+                - generic [ref=e598]: "13800010003"
+              - cell "普通用户" [ref=e599]:
+                - generic [ref=e602]: 普通用户
+              - cell "启用" [ref=e603]:
+                - generic [ref=e606]: 启用
+              - cell "¥5620" [ref=e607]:
+                - generic [ref=e608]: ¥5620
+              - cell "2026-04-05T21:19:53" [ref=e609]:
+                - generic [ref=e610]: 2026-04-05T21:19:53
+              - cell "编辑 禁用 删除" [ref=e611]:
+                - generic [ref=e613]:
+                  - button "编辑" [ref=e614] [cursor=pointer]:
+                    - generic [ref=e615]: 编辑
+                  - button "禁用" [ref=e616] [cursor=pointer]:
+                    - generic [ref=e617]: 禁用
+                  - button "删除" [ref=e618] [cursor=pointer]:
+                    - generic [ref=e619]: 删除
+      - generic [ref=e622]:
+        - generic [ref=e623]: Total 14
+        - generic [ref=e626] [cursor=pointer]:
+          - generic:
+            - combobox [ref=e628]
+            - generic [ref=e629]: 10/page
+          - img [ref=e632]
+        - button "Go to previous page" [disabled] [ref=e634]:
+          - generic:
+            - img
+        - list [ref=e635]:
+          - listitem "page 1" [ref=e636]: "1"
+          - listitem "page 2" [ref=e637] [cursor=pointer]: "2"
+        - button "Go to next page" [ref=e638] [cursor=pointer]:
+          - generic:
+            - img
+        - generic [ref=e639]:
+          - generic [ref=e640]: Go to
+          - spinbutton "Page" [ref=e643]: "1"

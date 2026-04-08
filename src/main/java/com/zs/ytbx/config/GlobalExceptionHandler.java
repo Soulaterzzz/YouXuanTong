@@ -4,13 +4,17 @@ import com.zs.ytbx.common.api.ApiResponse;
 import com.zs.ytbx.common.enums.ResultCode;
 import com.zs.ytbx.common.exception.BusinessException;
 import jakarta.validation.ConstraintViolationException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.stream.Collectors;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -19,7 +23,7 @@ public class GlobalExceptionHandler {
         return ApiResponse.<Void>builder()
                 .code(exception.getResultCode().getCode())
                 .message(exception.getBusinessMessage())
-                .traceId(java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmss")))
+                .traceId(traceId())
                 .build();
     }
 
@@ -28,16 +32,42 @@ public class GlobalExceptionHandler {
         String message = exception.getBindingResult().getFieldErrors().stream()
                 .map(FieldError::getDefaultMessage)
                 .collect(Collectors.joining("; "));
-        return ApiResponse.fail(ResultCode.INVALID_PARAM, message);
+        return ApiResponse.<String>builder()
+                .code(ResultCode.INVALID_PARAM.getCode())
+                .message(ResultCode.INVALID_PARAM.getMessage())
+                .data(message)
+                .traceId(traceId())
+                .build();
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
     public ApiResponse<String> handleConstraintViolationException(ConstraintViolationException exception) {
-        return ApiResponse.fail(ResultCode.INVALID_PARAM, exception.getMessage());
+        String message = exception.getConstraintViolations().stream()
+                .map(jakarta.validation.ConstraintViolation::getMessage)
+                .collect(Collectors.joining("; "));
+        if (message.isBlank()) {
+            message = ResultCode.INVALID_PARAM.getMessage();
+        }
+        return ApiResponse.<String>builder()
+                .code(ResultCode.INVALID_PARAM.getCode())
+                .message(ResultCode.INVALID_PARAM.getMessage())
+                .data(message)
+                .traceId(traceId())
+                .build();
     }
 
     @ExceptionHandler(Exception.class)
     public ApiResponse<String> handleException(Exception exception) {
-        return ApiResponse.fail(ResultCode.SYSTEM_ERROR, exception.getMessage());
+        String traceId = traceId();
+        log.error("Unhandled exception, traceId={}", traceId, exception);
+        return ApiResponse.<String>builder()
+                .code(ResultCode.SYSTEM_ERROR.getCode())
+                .message(ResultCode.SYSTEM_ERROR.getMessage())
+                .traceId(traceId)
+                .build();
+    }
+
+    private String traceId() {
+        return LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
     }
 }

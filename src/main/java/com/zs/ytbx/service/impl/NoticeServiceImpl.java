@@ -35,12 +35,16 @@ public class NoticeServiceImpl implements NoticeService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void publishNotices(NoticePublishRequest request) {
-        if (request.getNotices() == null || request.getNotices().isEmpty()) {
+        if (request.getNotices() == null) {
             throw new BusinessException(ResultCode.INVALID_PARAM, "通知列表不能为空");
         }
 
         LocalDateTime publishedAt = LocalDateTime.now();
-        axxNoticeMapper.delete(new LambdaQueryWrapper<AxxNoticeEntity>());
+
+        if (request.getNotices().isEmpty()) {
+            axxNoticeMapper.delete(new LambdaQueryWrapper<AxxNoticeEntity>());
+            return;
+        }
 
         for (NoticePublishRequest.NoticeItem item : request.getNotices()) {
             String title = item.getTitle() == null ? "" : item.getTitle().trim();
@@ -49,7 +53,13 @@ public class NoticeServiceImpl implements NoticeService {
             if (title.isEmpty() || content.isEmpty()) {
                 throw new BusinessException(ResultCode.INVALID_PARAM, "通知标题和内容不能为空");
             }
+        }
 
+        axxNoticeMapper.delete(new LambdaQueryWrapper<AxxNoticeEntity>());
+
+        for (NoticePublishRequest.NoticeItem item : request.getNotices()) {
+            String title = item.getTitle() == null ? "" : item.getTitle().trim();
+            String content = item.getContent() == null ? "" : item.getContent().trim();
             AxxNoticeEntity entity = new AxxNoticeEntity();
             entity.setTitle(title);
             entity.setContent(content);

@@ -11,45 +11,38 @@
         <el-icon><ZoomIn /></el-icon>
         <span>点击放大</span>
       </div>
-      <div class="product-badges">
-        <span class="badge new" v-if="product.isNew">新品</span>
-        <span class="badge hot" v-if="product.isHot">热门</span>
-      </div>
     </button>
 
     <div class="product-content">
       <div class="product-header">
         <div class="title-stack">
-          <h3 class="product-name">{{ product.name }}</h3>
-          <span class="product-category">{{ getCategoryLabel(product.categoryCode) }}</span>
+          <div class="product-title-line">
+            <h3 class="product-name">
+              <span class="product-name-main">{{ product.name }}</span>
+              <span v-if="isAdmin && product.alias" class="product-alias">{{ product.alias }}</span>
+            </h3>
+            <span v-if="product.isHot" class="product-tag hot">热销产品</span>
+            <span v-else-if="product.isNew" class="product-tag new">新品</span>
+          </div>
+          <p v-if="getProductSummary(product)" class="product-summary">
+            {{ getProductSummary(product) }}
+          </p>
         </div>
-        <span
-          class="product-status"
-          :class="product.saleStatus === 'ON_SALE' ? 'on-sale' : 'off-sale'"
-        >
-          {{ getSaleStatusLabel(product.saleStatus) }}
-        </span>
+        <div class="product-price-badge">
+          <span class="price-symbol">¥</span>
+          <span class="price-amount">{{ formatMoney(product.price) }}</span>
+        </div>
       </div>
 
       <div class="product-description">
-        <p class="description-text" v-if="product.description">{{ product.description }}</p>
-        <p class="features-text" v-if="product.features">
-          <el-icon><Star /></el-icon>
-          {{ product.features }}
+        <p class="description-line" v-if="product.features">
+          <span class="description-label">产品特点：</span>
+          <span class="description-value">{{ normalizeIntroText(product.features) }}</span>
         </p>
-      </div>
-
-      <div class="product-info-row">
-        <div class="info-item price-info">
-          <span class="info-label">价格</span>
-          <span class="info-value price-value">¥{{ formatMoney(product.price) }}</span>
-        </div>
-        <div class="info-item stock-info">
-          <span class="info-label">库存</span>
-          <span class="info-value stock-value" :class="{ 'low-stock': product.stock > 0 && product.stock < 10 }">
-            {{ formatStock(product.stock) }}
-          </span>
-        </div>
+        <p class="description-line" v-if="getTimingText(product)">
+          <span class="description-label">{{ getTimingLabel(product) }}：</span>
+          <span class="description-value">{{ getTimingText(product) }}</span>
+        </p>
       </div>
 
       <div class="product-actions">
@@ -105,8 +98,107 @@
 </template>
 
 <script setup>
-import { ZoomIn, Star, Edit, Switch, Delete, Upload, Download, Lightning } from '@element-plus/icons-vue'
-import { formatMoney, formatStock, getCategoryLabel, getProductImage, getSaleStatusLabel } from '@/utils/home/product.js'
+import { ZoomIn, Edit, Switch, Delete, Upload, Download, Lightning } from '@element-plus/icons-vue'
+import { formatMoney, getProductImage } from '@/utils/home/product.js'
+
+const INTRO_SPLIT_RE = /[；;。！？!?，,]+/
+const TIMING_HINT_RE = /(T\+\d+|截单|提盘|回盘|生效|起保|等待期|上午|下午|晚上|凌晨|时|点|周[一二三四五六日天12345])/
+
+const normalizeIntroSource = (value) => {
+  if (value === null || value === undefined) {
+    return ''
+  }
+
+  return String(value)
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/[：:]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+const normalizeIntroText = (value) => {
+  return normalizeIntroSource(value)
+    .replace(/[；;]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+const splitIntroClauses = (value) => {
+  const text = normalizeIntroSource(value)
+  if (!text) {
+    return []
+  }
+
+  return text
+    .split(INTRO_SPLIT_RE)
+    .map((part) => part.trim())
+    .filter(Boolean)
+}
+
+const isTimingClause = (value) => TIMING_HINT_RE.test(value)
+
+const getProductSummary = (product) => {
+  const sourceClauses = splitIntroClauses(product.description || product.features || product.companyName || '')
+  if (!sourceClauses.length) {
+    return normalizeIntroText(getCategoryFallback(product.categoryCode))
+  }
+
+  const summaryClauses = sourceClauses.filter((clause) => !isTimingClause(clause))
+  const pickedClauses = summaryClauses.length ? summaryClauses : sourceClauses
+  const summaryText = pickedClauses.slice(0, 2).join(' ')
+
+  return summaryText || normalizeIntroText(getCategoryFallback(product.categoryCode))
+}
+
+const getTimingText = (product) => {
+  const sourceClauses = splitIntroClauses([product.description, product.features].filter(Boolean).join(' '))
+  const timingClauses = sourceClauses.filter((clause) => isTimingClause(clause))
+
+  if (timingClauses.length) {
+    return timingClauses.join(' ')
+  }
+
+  if (product.companyName) {
+    return normalizeIntroText(product.companyName)
+  }
+
+  return normalizeIntroText(getCategoryFallback(product.categoryCode))
+}
+
+const getTimingLabel = (product) => {
+  const sourceClauses = splitIntroClauses([product.description, product.features].filter(Boolean).join(' '))
+  const hasTimingInfo = sourceClauses.some((clause) => isTimingClause(clause))
+
+  if (hasTimingInfo) {
+    return '投保时间'
+  }
+
+  if (product.companyName) {
+    return '承保公司'
+  }
+
+  return '产品分类'
+}
+
+const getCategoryFallback = (categoryCode) => {
+  const categoryMap = {
+    medical: '医疗险',
+    critical: '重疾险',
+    accident: '意外险',
+    life: '人寿险',
+    car: '车险',
+    '1-3': '1-3类意外',
+    '1-4': '1-4类意外',
+    '1-5': '1-5类意外',
+    '1-6': '1-6类意外',
+    child: '少儿医疗',
+    elder: '老年意外',
+    travel: '旅游险',
+    maternity: '驾乘险'
+  }
+
+  return categoryMap[categoryCode] || categoryCode || ''
+}
 
 defineProps({
   product: {
@@ -133,7 +225,7 @@ defineEmits([
 <style scoped>
 .optimized-product-card {
   display: grid;
-  grid-template-columns: 112px minmax(0, 1fr);
+  grid-template-columns: 140px minmax(0, 1fr);
   gap: 0;
   align-items: stretch;
   overflow: hidden;
@@ -153,7 +245,7 @@ defineEmits([
 .product-image-wrapper {
   position: relative;
   width: 100%;
-  min-height: 100%;
+  min-height: 160px;
   border: 0;
   padding: 0;
   cursor: pointer;
@@ -190,37 +282,11 @@ defineEmits([
   opacity: 1;
 }
 
-.product-badges {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.badge {
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: #fff;
-}
-
-.badge.new {
-  background: linear-gradient(135deg, var(--color-primary) 0%, #ff4d5a 100%);
-}
-
-.badge.hot {
-  background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
-}
-
 .product-content {
-  padding: 14px 14px 12px;
+  padding: 18px 20px 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
 }
 
@@ -234,117 +300,128 @@ defineEmits([
 .title-stack {
   min-width: 0;
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.product-title-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .product-name {
   margin: 0;
-  font-size: 16px;
-  line-height: 1.35;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 20px;
+  line-height: 1.18;
   font-weight: 800;
   color: #101828;
 }
 
-.product-category {
-  display: inline-flex;
-  margin-top: 6px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: rgba(0, 59, 114, 0.08);
-  color: var(--color-secondary);
-  font-size: 11px;
-  font-weight: 700;
+.product-name-main {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
-.product-status {
+.product-alias {
   flex-shrink: 0;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 11px;
+  color: #e60012;
+  font-size: 14px;
   font-weight: 700;
   white-space: nowrap;
 }
 
-.product-status.on-sale {
-  background: rgba(46, 125, 50, 0.1);
-  color: #2e7d32;
+.product-tag {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
-.product-status.off-sale {
-  background: rgba(198, 40, 40, 0.1);
-  color: #c62828;
+.product-tag.hot {
+  border: 1px solid #c8dbff;
+  background: #eaf2ff;
+  color: #2f62c9;
+}
+
+.product-tag.new {
+  border: 1px solid #f7d79f;
+  background: #fff6e4;
+  color: #c67a00;
+}
+
+.product-summary {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.5;
+  font-weight: 700;
+  color: #1f2937;
+  letter-spacing: 0.01em;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.product-price-badge {
+  flex-shrink: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  margin-top: 2px;
+  color: var(--color-primary);
+  font-weight: 800;
+}
+
+.price-symbol {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.price-amount {
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: -0.02em;
 }
 
 .product-description {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-}
-
-.description-text {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.5;
-  color: #475467;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.features-text {
-  margin: 0;
-  padding: 6px 10px;
-  border-radius: 10px;
-  background: #f8fafc;
-  color: #667085;
-  font-size: 11px;
-  line-height: 1.45;
-  display: flex;
-  gap: 6px;
-  align-items: flex-start;
-}
-
-.features-text .el-icon {
-  color: #f59e0b;
-  margin-top: 2px;
-}
-
-.product-info-row {
-  display: flex;
   gap: 8px;
+}
+
+.description-line {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.65;
+  color: #8c6b5c;
+  display: flex;
+  gap: 0;
   flex-wrap: wrap;
 }
 
-.info-item {
-  flex: 1 1 120px;
-  padding: 8px 10px;
-  border-radius: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  background: #fff;
+.description-label {
+  flex-shrink: 0;
+  font-weight: 700;
+  color: #9a7667;
 }
 
-.info-label {
-  display: block;
-  margin-bottom: 4px;
-  font-size: 10px;
-  color: #98a2b3;
-}
-
-.info-value {
-  font-size: 14px;
-  font-weight: 800;
-}
-
-.price-value {
-  color: var(--color-primary);
-}
-
-.stock-value {
-  color: #2e7d32;
-}
-
-.stock-value.low-stock {
-  color: #e64545;
+.description-value {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .product-actions {
@@ -361,11 +438,31 @@ defineEmits([
 
 @media screen and (max-width: 768px) {
   .optimized-product-card {
-    grid-template-columns: 96px minmax(0, 1fr);
+    grid-template-columns: 110px minmax(0, 1fr);
+  }
+
+  .product-image-wrapper {
+    min-height: 130px;
   }
 
   .product-content {
     padding: 12px;
+  }
+
+  .product-name {
+    font-size: 18px;
+  }
+
+  .product-summary {
+    font-size: 15px;
+  }
+
+  .price-amount {
+    font-size: 18px;
+  }
+
+  .description-line {
+    font-size: 13px;
   }
 
   .product-actions .el-button {
@@ -379,7 +476,7 @@ defineEmits([
   }
 
   .product-image-wrapper {
-    min-height: 140px;
+    min-height: 160px;
   }
 
   .product-actions .el-button {

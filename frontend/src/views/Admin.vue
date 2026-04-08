@@ -184,14 +184,19 @@
           <div class="table-card">
             <el-table :data="products" style="width: 100%" v-loading="productLoading">
               <el-table-column prop="id" label="ID" width="80" />
-              <el-table-column prop="name" label="产品名称" min-width="150" />
-              <el-table-column prop="alias" label="别名" min-width="120" />
+              <el-table-column label="产品名称" min-width="180">
+                <template #default="scope">
+                  <div class="admin-product-name-cell">
+                    <span class="admin-product-name-main">{{ scope.row.name }}</span>
+                    <span v-if="scope.row.alias" class="admin-product-alias">{{ scope.row.alias }}</span>
+                  </div>
+                </template>
+              </el-table-column>
               <el-table-column prop="categoryCode" label="类别" width="100" />
               <el-table-column prop="companyName" label="承保公司" width="120" />
               <el-table-column prop="price" label="价格" width="100">
                 <template #default="scope">¥{{ scope.row.price }}</template>
               </el-table-column>
-              <el-table-column prop="stock" label="库存" width="80" />
               <el-table-column prop="saleStatus" label="状态" width="100">
                 <template #default="scope">
                   <el-tag :type="scope.row.saleStatus === 'ON_SALE' ? 'success' : 'danger'">
@@ -322,9 +327,6 @@
         </el-form-item>
         <el-form-item label="价格">
           <el-input-number v-model="productForm.price" :min="0" :precision="2" style="width: 100%" />
-        </el-form-item>
-        <el-form-item label="库存">
-          <el-input-number v-model="productForm.stock" :min="0" style="width: 100%" />
         </el-form-item>
         <el-form-item label="产品描述">
           <el-input v-model="productForm.description" type="textarea" :rows="3" />
@@ -538,7 +540,7 @@ export default {
     const productDialogVisible = ref(false)
     const productDialogTitle = ref('新增产品')
     const productDialogLoading = ref(false)
-    const productForm = reactive({ id: null, productName: '', categoryCode: '1-3', companyName: '', price: 0, stock: 100, description: '', features: '', alias: '' })
+    const productForm = reactive({ id: null, productName: '', categoryCode: '1-3', companyName: '', price: 0, description: '', features: '', alias: '' })
 
     const loadProducts = async () => {
       productLoading.value = true
@@ -569,10 +571,10 @@ export default {
     const openProductDialog = (type, row = null) => {
       if (type === 'create') {
         productDialogTitle.value = '新增产品'
-        Object.assign(productForm, { id: null, productName: '', categoryCode: '1-3', companyName: '', price: 0, stock: 100, description: '', features: '', alias: '' })
+        Object.assign(productForm, { id: null, productName: '', categoryCode: '1-3', companyName: '', price: 0, description: '', features: '', alias: '' })
       } else {
         productDialogTitle.value = '编辑产品'
-        Object.assign(productForm, { id: row.id, productName: row.name, categoryCode: row.categoryCode, companyName: row.companyName, price: row.price, stock: row.stock, description: row.description, features: row.features, alias: row.alias || '' })
+        Object.assign(productForm, { id: row.id, productName: row.name, categoryCode: row.categoryCode, companyName: row.companyName, price: row.price, description: row.description, features: row.features, alias: row.alias || '' })
       }
       productDialogVisible.value = true
     }
@@ -814,6 +816,23 @@ export default {
 .filter-item label { font-size: 14px; color: #666; }
 
 .table-card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.05); overflow-x: auto; }
+.admin-product-name-cell {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.admin-product-name-main {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.admin-product-alias {
+  flex-shrink: 0;
+  color: #e60012;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
 .insurance-batch-tip { margin-bottom: 16px; padding: 12px 14px; background: #fff7e6; border: 1px solid #ffe7ba; border-radius: 8px; font-size: 13px; line-height: 1.6; color: #8c6218; }
 
 .pagination { margin-top: 20px; display: flex; justify-content: flex-end; }

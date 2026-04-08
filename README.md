@@ -115,21 +115,25 @@ mysql -u root -p ytbx < init_db.sql
 
 ### 默认测试账号
 
-| 角色 | 用户名 | 密码 |
-|------|--------|------|
-| 管理员 | `admin` | `admin111` |
-| 普通用户 | `user1` | `user123` |
+初始化脚本会写入管理员和普通用户种子账号，账号名如下：
 
-> 登录页已移除公开注册入口；普通用户账号由管理员在“用户管理”中创建。
+| 角色 | 用户名 |
+|------|--------|
+| 管理员 | `admin` |
+| 普通用户 | `user` |
+
+> 密码不再以明文写在仓库文档里；请按 `init_db.sql` 或部署环境变量完成初始化后再登录。
 
 ## 3. 配置后端数据库
 
-编辑 `src/main/resources/application.properties`，或使用环境变量覆盖：
+默认启动使用真实数据库模式，需要先启动 MySQL 并导入初始化脚本：
 
 ```properties
 spring.datasource.url=jdbc:mysql://127.0.0.1:3306/ytbx?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
 spring.datasource.username=root
 spring.datasource.password=your_password
+auth.token.secret=${AUTH_TOKEN_SECRET}
+app.cors.allowed-origins=http://localhost:5173,http://127.0.0.1:5173
 ```
 
 ## 4. 启动后端
@@ -139,6 +143,9 @@ mvn spring-boot:run
 ```
 
 默认地址：`http://localhost:8080`
+
+如果是首次启动，请先创建 `ytbx` 数据库并导入 `init_db.sql`，再启动应用。
+如果本地 MySQL 暂时不可用，启动会在数据库连接阶段失败，请先确认 MySQL 服务、账号密码和数据库名都正确。
 
 ## 5. 启动前端
 
@@ -165,7 +172,7 @@ cd frontend
 npm test
 ```
 
-完整测试方案见：`docs/qa-test-plan.md`
+后端回归以 `mvn test` 为准，前端回归以前端项目自己的测试命令为准。
 
 ---
 

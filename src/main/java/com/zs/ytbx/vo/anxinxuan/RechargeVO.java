@@ -8,6 +8,7 @@ import java.math.BigDecimal;
 @Builder
 public class RechargeVO {
     private Long id;
+    private String username;
     private String date;
     private BigDecimal amount;
     private String type;

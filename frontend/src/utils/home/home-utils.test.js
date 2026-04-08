@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildAdminAnalysisRange } from './date'
-import { cloneNoticeList, createNoticeId, normalizeNoticeItem } from './notice'
-import { formatMoney, formatStock, getCategoryLabel, getProductImage, getSaleStatusLabel } from './product'
+import { cloneNoticeList, createNoticeId, normalizeNoticeItem, sortNoticeList, sortNoticeListByPublishedAtAsc } from './notice'
+import { formatMoney, getCategoryLabel, getProductImage, getSaleStatusLabel } from './product'
 import { buildQueryParams, resolveDownloadFileName } from './download'
 import { validateProductImageFile, validateProductInsuranceBatchFile, validateProductTemplateFile } from './upload'
 import { buildInsuranceTimeline, formatPolicyTime } from './insurance'
@@ -26,12 +26,31 @@ describe('home utils', () => {
     expect(createNoticeId(1000)).toContain('1000-')
   })
 
+  it('按排序号排列通知列表', () => {
+    const list = sortNoticeList([
+      { id: '2', sortNo: 2, title: 'B', content: 'b', publishedAt: '2026-04-02' },
+      { id: '1', sortNo: 1, title: 'A', content: 'a', publishedAt: '2026-04-01' },
+      { id: '3', sortNo: 2, title: 'C', content: 'c', publishedAt: '2026-04-03' }
+    ])
+
+    expect(list.map(item => item.id)).toEqual(['1', '3', '2'])
+  })
+
+  it('按发布时间从早到晚排列通知列表', () => {
+    const list = sortNoticeListByPublishedAtAsc([
+      { id: '2', sortNo: 2, title: 'B', content: 'b', publishedAt: '2026-04-02' },
+      { id: '1', sortNo: 1, title: 'A', content: 'a', publishedAt: '2026-04-01' },
+      { id: '3', sortNo: 3, title: 'C', content: 'c', publishedAt: '2026-04-03' }
+    ])
+
+    expect(list.map(item => item.id)).toEqual(['1', '2', '3'])
+  })
+
   it('格式化产品信息', () => {
-    expect(getProductImage({ id: 9 })).toBe('/api/images/product/9')
+    expect(getProductImage({ id: 9 })).toContain('/api/images/product/9?v=')
     expect(getCategoryLabel('child')).toBe('少儿医疗')
     expect(getSaleStatusLabel('ON_SALE')).toBe('已上架')
     expect(formatMoney('12.3')).toBe('12.30')
-    expect(formatStock(8)).toBe('8 份')
   })
 
   it('构建下载查询和文件名', () => {

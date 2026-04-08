@@ -39,6 +39,13 @@
       </el-menu>
     </nav>
     <div class="header-right">
+      <div class="user-stats" aria-label="账户余额">
+        <div class="stat-item balance">
+          <el-icon><Coin /></el-icon>
+          <span class="stat-label">余额</span>
+          <span class="stat-value">¥{{ formatBalance(balance) }}</span>
+        </div>
+      </div>
       <div class="user-info-dropdown">
         <el-dropdown trigger="click" @command="handleCommand" @visible-change="handleVisibleChange">
           <button
@@ -55,12 +62,6 @@
           </button>
           <template #dropdown>
             <el-dropdown-menu>
-              <div class="dropdown-user-info">
-                <div class="dropdown-balance">
-                  <el-icon><Coin /></el-icon>
-                  <span>余额：¥{{ balance.toFixed(2) }}</span>
-                </div>
-              </div>
               <el-dropdown-item command="logout" divided>
                 <el-icon><SwitchButton /></el-icon>
                 <span>退出登录</span>
@@ -89,6 +90,11 @@ defineProps({
 const emit = defineEmits(['select', 'logout'])
 const dropdownVisible = ref(false)
 const triggerRef = ref(null)
+
+const formatBalance = (value) => {
+  const num = Number(value ?? 0)
+  return Number.isFinite(num) ? num.toFixed(2) : '0.00'
+}
 
 const handleCommand = (command) => {
   if (command === 'logout') {

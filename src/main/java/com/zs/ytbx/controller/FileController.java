@@ -1,7 +1,8 @@
 package com.zs.ytbx.controller;
 
-import org.springframework.core.io.ByteArrayResource;
-import org.springframework.core.io.Resource;
+import com.zs.ytbx.common.export.SimplePdfWriter;
+import com.zs.ytbx.config.FileStorageConfig;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -9,26 +10,50 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.List;
 
 @RestController
+@RequiredArgsConstructor
 public class FileController {
 
-    @GetMapping("/files/{*filePath}")
-    public ResponseEntity<Resource> download(@PathVariable String filePath) {
-        String normalized = StringUtils.hasText(filePath) ? filePath : "document.txt";
-        String fileName = normalized.contains("/") ? normalized.substring(normalized.lastIndexOf('/') + 1) : normalized;
-        byte[] content = ("YTBX 文件下载示例\n\n文件标识: " + normalized + "\n\n"
-                + "当前版本用于 MVP 一体化交付，可替换为 OSS / MinIO / 本地文件系统实现。")
-                .getBytes(StandardCharsets.UTF_8);
+    private static final MediaType PDF_MEDIA_TYPE = MediaType.APPLICATION_PDF;
 
-        return ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(fileName).build().toString())
-                .body(new ByteArrayResource(content));
+    private final FileStorageConfig fileStorageConfig;
+
+    @GetMapping("/files/{*filePath}")
+    public ResponseEntity<byte[]> download(@PathVariable String filePath) {
+        if (!StringUtils.hasText(filePath)) {
+            return ResponseEntity.notFound().build();
+        }
+
+        if (filePath.startsWith("mock/")) {
+            return buildMockPdf(filePath);
+        }
+
+        Path resolved = resolvePath(filePath);
+        if (resolved == null || !Files.exists(resolved) || !Files.isRegularFile(resolved)) {
+            return ResponseEntity.notFound().build();
+        }
+
+        try {
+            byte[] content = Files.readAllBytes(resolved);
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(resolveMediaType(resolved));
+            headers.setContentDisposition(ContentDisposition.attachment()
+                    .filename(resolved.getFileName().toString(), StandardCharsets.UTF_8)
+                    .build());
+            headers.setContentLength(content.length);
+            return ResponseEntity.ok().headers(headers).body(content);
+        } catch (IOException exception) {
+            return ResponseEntity.status(500).build();
+        }
     }
 
     @GetMapping("/agreements/trust/{policyNo}")
@@ -65,5 +90,55 @@ public class FileController {
         return ResponseEntity.ok()
                 .contentType(MediaType.TEXT_HTML)
                 .body(html);
+    }
+
+    private ResponseEntity<byte[]> buildMockPdf(String filePath) {
+        String fileName = getFileName(filePath);
+        byte[] content = SimplePdfWriter.writePages(List.of(SimplePdfWriter.renderDetailPage(
+                "电子保单示例",
+                List.of(
+                        new SimplePdfWriter.FieldLine("文件标识", filePath),
+                        new SimplePdfWriter.FieldLine("说明", "当前环境未配置真实电子保单文件，返回示例 PDF 用于联调。"),
+                        new SimplePdfWriter.FieldLine("提示", "上线时请将 biz_policy.e_policy_file_id 指向实际存储文件。")
+                ),
+                "YTBX 电子保单下载示例")));
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(PDF_MEDIA_TYPE);
+        headers.setContentDisposition(ContentDisposition.attachment()
+                .filename(fileName.endsWith(".pdf") ? fileName : fileName + ".pdf", StandardCharsets.UTF_8)
+                .build());
+        headers.setContentLength(content.length);
+        return ResponseEntity.ok().headers(headers).body(content);
+    }
+
+    private Path resolvePath(String filePath) {
+        Path candidate = Paths.get(filePath).toAbsolutePath().normalize();
+        Path uploadRoot = Paths.get(fileStorageConfig.getUploadPath()).toAbsolutePath().normalize();
+        Path templateRoot = Paths.get(fileStorageConfig.getTemplateFilePath()).toAbsolutePath().normalize();
+
+        if (candidate.startsWith(uploadRoot) || candidate.startsWith(templateRoot)) {
+            return candidate;
+        }
+
+        return null;
+    }
+
+    private MediaType resolveMediaType(Path path) {
+        try {
+            String contentType = Files.probeContentType(path);
+            if (StringUtils.hasText(contentType)) {
+                return MediaType.parseMediaType(contentType);
+            }
+        } catch (Exception ignored) {
+            // fall through to octet-stream
+        }
+        return MediaType.APPLICATION_OCTET_STREAM;
+    }
+
+    private String getFileName(String filePath) {
+        String normalized = filePath.replace('\\', '/');
+        int lastSlash = normalized.lastIndexOf('/');
+        return lastSlash >= 0 ? normalized.substring(lastSlash + 1) : normalized;
     }
 }

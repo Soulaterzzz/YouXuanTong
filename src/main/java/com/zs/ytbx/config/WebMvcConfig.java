@@ -20,7 +20,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/api/claims/**",
                         "/api/consult-orders/**",
                         "/api/advisors/**",
-                        "/api/auth/me",
+                        "/api/auth/current",
                         "/api/auth/logout"
                 );
     }

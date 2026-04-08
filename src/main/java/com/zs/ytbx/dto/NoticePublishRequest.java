@@ -1,7 +1,6 @@
 package com.zs.ytbx.dto;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
@@ -12,7 +11,7 @@ import java.util.List;
 public class NoticePublishRequest {
 
     @Valid
-    @NotEmpty(message = "通知列表不能为空")
+    @NotNull(message = "通知列表不能为空")
     private List<NoticeItem> notices;
 
     @Data

@@ -10,6 +10,7 @@ import com.zs.ytbx.common.enums.ResultCode;
 import com.zs.ytbx.common.exception.BusinessException;
 import com.zs.ytbx.common.export.SimpleXlsxReader;
 import com.zs.ytbx.common.export.SimpleXlsxWriter;
+import com.zs.ytbx.common.util.PasswordUtils;
 import com.zs.ytbx.dto.*;
 import com.zs.ytbx.entity.*;
 import com.zs.ytbx.mapper.*;
@@ -109,7 +110,7 @@ public class AdminServiceImpl implements AdminService {
         
         AxxUserEntity user = new AxxUserEntity();
         user.setUsername(request.getUsername());
-        user.setPassword(request.getPassword());
+        user.setPassword(PasswordUtils.encode(request.getPassword()));
         user.setMobile(request.getMobile());
         user.setUserType("USER");
         user.setStatus("ACTIVE");
@@ -135,7 +136,7 @@ public class AdminServiceImpl implements AdminService {
         }
         
         if (request.getPassword() != null && !request.getPassword().isEmpty()) {
-            user.setPassword(request.getPassword());
+            user.setPassword(PasswordUtils.encode(request.getPassword()));
         }
         if (request.getMobile() != null) {
             user.setMobile(request.getMobile());
@@ -202,6 +203,10 @@ public class AdminServiceImpl implements AdminService {
             wrapper.like(AxxProductEntity::getCompanyName, query.getCompany());
         }
 
+        if (query.getKeyword() != null && !query.getKeyword().isBlank()) {
+            wrapper.like(AxxProductEntity::getProductName, query.getKeyword().trim());
+        }
+
         wrapper.orderByAsc(AxxProductEntity::getSortNo);
         
         IPage<AxxProductEntity> page = axxProductMapper.selectPage(
@@ -251,6 +256,7 @@ public class AdminServiceImpl implements AdminService {
         product.setIsHot(request.getIsHot() != null ? request.getIsHot() : 0);
         product.setSaleStatus(request.getSaleStatus() != null ? request.getSaleStatus() : "ON_SALE");
         product.setSortNo(request.getSortNo() != null ? request.getSortNo() : 0);
+        product.setAlias(request.getAlias() == null ? null : request.getAlias().trim());
         product.setDeleted(0);
         product.setCreateTime(LocalDateTime.now());
         product.setUpdateTime(LocalDateTime.now());
@@ -308,6 +314,9 @@ public class AdminServiceImpl implements AdminService {
         }
         if (request.getSortNo() != null) {
             product.setSortNo(request.getSortNo());
+        }
+        if (request.getAlias() != null) {
+            product.setAlias(request.getAlias().trim());
         }
         
         product.setUpdateTime(LocalDateTime.now());
@@ -412,7 +421,6 @@ public class AdminServiceImpl implements AdminService {
                 "这里填写产品描述",
                 "这里填写产品特点",
                 "99.00",
-                "100",
                 "1",
                 "0",
                 "ON_SALE",
@@ -722,6 +730,7 @@ public class AdminServiceImpl implements AdminService {
                 .sortNo(entity.getSortNo())
                 .imageUrl(entity.getImageUrl())
                 .templateFileName(entity.getTemplateFileName())
+                .alias(entity.getAlias())
                 .build();
     }
 
@@ -736,6 +745,7 @@ public class AdminServiceImpl implements AdminService {
                 .isNew(entity.getIsNew() == 1)
                 .categoryCode(entity.getCategoryCode())
                 .companyName(entity.getCompanyName())
+                .alias(entity.getAlias())
                 .build();
     }
 
@@ -830,10 +840,20 @@ public class AdminServiceImpl implements AdminService {
     public PageResponse<RechargeVO> listAllRecharges(RechargeQuery query) {
         LambdaQueryWrapper<TransactionRecordEntity> wrapper = new LambdaQueryWrapper<>();
         
+        if (query.getUsername() != null && !query.getUsername().isEmpty()) {
+            // 通过用户名查询用户ID
+            AxxUserEntity user = axxUserMapper.selectOne(
+                new LambdaQueryWrapper<AxxUserEntity>()
+                    .eq(AxxUserEntity::getUsername, query.getUsername()));
+            if (user != null) {
+                wrapper.eq(TransactionRecordEntity::getUserId, user.getId());
+            }
+        }
+
         if (query.getType() != null && !query.getType().isEmpty()) {
             wrapper.eq(TransactionRecordEntity::getTransType, query.getType().toUpperCase());
         }
-        
+
         if (query.getDescription() != null && !query.getDescription().isEmpty()) {
             wrapper.like(TransactionRecordEntity::getDescription, query.getDescription());
         }
@@ -1197,7 +1217,7 @@ public class AdminServiceImpl implements AdminService {
     }
 
     private List<String> productImportHeaders() {
-        return List.of("产品编码", "产品名称", "分类编码", "承保公司", "产品描述", "产品特点", "价格", "库存", "是否新品", "是否热销", "上架状态", "排序号");
+        return List.of("产品编码", "产品名称", "分类编码", "承保公司", "产品描述", "产品特点", "价格", "是否新品", "是否热销", "上架状态", "排序号");
     }
 
     private void validateProductImportHeaders(List<String> headers) {
@@ -1222,10 +1242,10 @@ public class AdminServiceImpl implements AdminService {
         request.setDescription(getCell(row, 4));
         request.setFeatures(getCell(row, 5));
         request.setPrice(parseBigDecimal(requireCell(row, 6, rowNumber, "价格"), rowNumber, "价格"));
-        request.setIsNew(parseInteger(getCell(row, 8), rowNumber, "是否新品", 0));
-        request.setIsHot(parseInteger(getCell(row, 9), rowNumber, "是否热销", 0));
-        request.setSaleStatus(normalizeSaleStatus(getCell(row, 10)));
-        request.setSortNo(parseInteger(getCell(row, 11), rowNumber, "排序号", 0));
+        request.setIsNew(parseInteger(getCell(row, 7), rowNumber, "是否新品", 0));
+        request.setIsHot(parseInteger(getCell(row, 8), rowNumber, "是否热销", 0));
+        request.setSaleStatus(normalizeSaleStatus(getCell(row, 9)));
+        request.setSortNo(parseInteger(getCell(row, 10), rowNumber, "排序号", 0));
         return request;
     }
 
@@ -1328,8 +1348,17 @@ public class AdminServiceImpl implements AdminService {
     }
 
     private RechargeVO convertToRechargeVO(TransactionRecordEntity entity) {
+        // 查询用户名
+        String username = null;
+        if (entity.getUserId() != null) {
+            AxxUserEntity user = axxUserMapper.selectById(entity.getUserId());
+            if (user != null) {
+                username = user.getUsername();
+            }
+        }
         return RechargeVO.builder()
                 .id(entity.getId())
+                .username(username)
                 .date(entity.getCreateTime().toLocalDate().toString())
                 .amount(entity.getAmount())
                 .type(entity.getTransType().toLowerCase())

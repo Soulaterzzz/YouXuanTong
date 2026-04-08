@@ -2,8 +2,7 @@ import { defineAsyncComponent } from 'vue'
 
 import AppHeader from '@/components/layout/AppHeader.vue'
 import HomeOverviewSection from '@/components/home/HomeOverviewSection.vue'
-import { buildAdminAnalysisRange as buildAdminAnalysisRangeUtil, formatAdminDate as formatAdminDateUtil } from '@/utils/home/date.js'
-import { cloneNoticeList as cloneNoticeListUtil, createNoticeId as createNoticeIdUtil, normalizeNoticeItem as normalizeNoticeItemUtil } from '@/utils/home/notice.js'
+import { cloneNoticeList as cloneNoticeListUtil, createNoticeId as createNoticeIdUtil, formatNoticeTime as formatNoticeTimeUtil, normalizeNoticeItem as normalizeNoticeItemUtil, sortNoticeListByPublishedAtAsc as sortNoticeListByPublishedAtAscUtil } from '@/utils/home/notice.js'
 import { buildQueryParams as buildQueryParamsUtil, resolveDownloadFileName as resolveDownloadFileNameUtil } from '@/utils/home/download.js'
 import { buildInsuranceTimeline as buildInsuranceTimelineUtil, formatPolicyTime as formatPolicyTimeUtil } from '@/utils/home/insurance.js'
 import { getProductImage as getProductImageUtil } from '@/utils/home/product.js'
@@ -40,19 +39,15 @@ export default {
       balance: 0,
       activeMenu: 'home',
       activeCategory: 'all',
+      productSearchKeyword: '',
       stats: {
         totalProducts: 0,
         totalPolicies: 0,
         totalExpenses: 0,
-        totalInsurances: 0,
         todayNewOrders: 0,
         pendingOrders: 0,
         monthOrders: 0
       },
-      adminSalesRanking: [],
-      adminOrderTrend: [],
-      adminAnalysisRange: [],
-      adminAnalysisPeriodType: 'MONTH',
       productLoading: false,
       products: [],
       productTotal: 0,
@@ -82,13 +77,13 @@ export default {
         description: '',
         features: '',
         price: 0.01,
-        stock: 0,
         isNew: 0,
         isHot: 0,
         saleStatus: 'ON_SALE',
         sortNo: 0,
         imageUrl: '',
-        templateFileName: ''
+        templateFileName: '',
+        alias: ''
       },
       expenseLoading: false,
       expenseList: [],
@@ -125,8 +120,10 @@ export default {
       rechargeLoading: false,
       rechargeList: [],
       rechargeTotal: 0,
+      rechargePageSize: 20,
       rechargeCurrentPage: 1,
       rechargeFilter: {
+        username: '',
         date: '',
         type: '',
         description: ''
@@ -158,28 +155,27 @@ export default {
           { pattern: /^1[3-9]\d{9}$/, message: '手机号格式不正确', trigger: 'blur' }
         ]
       },
-      noticePublishDialogVisible: false,
       noticePublishedAt: '',
       publishedNoticeList: [],
-      noticeDraftList: [],
-      noticeDraft: {
-        id: null,
+      noticeDialogVisible: false,
+      noticeDialogMode: 'view',
+      noticeDialogIndex: 0,
+      noticeManageList: [],
+      noticeManageEditDialogVisible: false,
+      noticeManageEditIndex: -1,
+      noticeManageEditForm: {
+        id: '',
         title: '',
         content: ''
       },
-      editingNoticeIndex: -1,
-      noticeDetailDialogVisible: false,
-      noticeDetail: {
-        title: '',
-        content: '',
-        publishedAt: ''
-      },
+      noticeManageSubmitting: false,
       selectedProduct: null,
       activeDialogVisible: false,
       activeSubmitting: false,
       draftSubmitting: false,
       activeForm: {
         planName: '',
+        displayPrice: 0,
         beneficiaryName: '',
         beneficiaryId: '',
         beneficiaryJob: '',
@@ -189,6 +185,17 @@ export default {
       },
       activeFormRules: {
         planName: [{ required: true, message: '请选择方案名称', trigger: 'change' }],
+        displayPrice: [{
+          validator: (_, value, callback) => {
+            const price = Number(value)
+            if (!Number.isFinite(price) || price <= 0) {
+              callback(new Error('请输入大于 0 的显示价格'))
+              return
+            }
+            callback()
+          },
+          trigger: 'change'
+        }],
         beneficiaryName: [{ required: true, message: '请输入被保人姓名', trigger: 'blur' }],
         beneficiaryId: [{ required: true, message: '请输入被保人证件号', trigger: 'blur' }],
         beneficiaryJob: [{ required: true, message: '请选择被保人职业', trigger: 'change' }]
@@ -223,9 +230,6 @@ export default {
       previewImageDialogVisible: false,
       previewImageUrl: '',
       previewImageTitle: '',
-      // 通知公告弹窗
-      noticePopupDialogVisible: false,
-      noticePopupSelectedIndex: 0,
       // 产品类别管理
       categoryDialogVisible: false,
       categoryForm: {
@@ -246,50 +250,69 @@ export default {
   computed: {
     publishedNoticeTimeText() {
       if (!this.noticePublishedAt) {
-        return '最近发布：未发布'
+        return '最早发布：未发布'
       }
 
-      return `最近发布：${new Date(this.noticePublishedAt).toLocaleString('zh-CN', { hour12: false })}`
+      return `最早发布：${formatNoticeTimeUtil(this.noticePublishedAt)}`
     },
-    adminAnalysisRangeText() {
-      if (!this.adminAnalysisRange || this.adminAnalysisRange.length !== 2) {
-        return '默认展示本月的数据表现'
+    sortedPublishedNoticeList() {
+      const list = Array.isArray(this.publishedNoticeList) ? this.publishedNoticeList : []
+      return sortNoticeListByPublishedAtAscUtil(list)
+    },
+    noticeDialogDisplayList() {
+      if (this.noticeDialogMode === 'manage') {
+        return sortNoticeListByPublishedAtAscUtil(this.noticeManageList)
       }
-      return `${this.adminAnalysisRange[0]} 至 ${this.adminAnalysisRange[1]}`
+      return this.sortedPublishedNoticeList
     },
-    adminOrderTrendRangeText() {
-      return `${this.adminAnalysisRangeText} · ${this.adminOrderTrendModeLabel}`
-    },
-    adminOrderTrendModeLabel() {
-      const labelMap = {
-        WEEK: '按日统计',
-        MONTH: '按周统计',
-        QUARTER: '按半月统计',
-        YEAR: '按月统计'
+    noticeDialogCurrentNotice() {
+      const list = this.noticeDialogDisplayList
+      if (!list.length) {
+        return null
       }
-      return `${labelMap[this.adminAnalysisPeriodType] || '按周统计'} · 共 ${this.adminOrderTrendTotal} 单`
+
+      const index = Math.min(Math.max(Number(this.noticeDialogIndex) || 0, 0), list.length - 1)
+      return list[index] || null
     },
-    adminOrderTrendTotal() {
-      return this.adminOrderTrend.reduce((sum, item) => sum + Number(item.orderCount || 0), 0)
+    noticeDialogCounterText() {
+      const total = this.noticeDialogDisplayList.length
+      if (!total) {
+        return '0 / 0'
+      }
+
+      const index = Math.min(Math.max(Number(this.noticeDialogIndex) || 0, 0), total - 1)
+      return `${index + 1} / ${total}`
     },
-    noticePopupCurrent() {
-      return this.publishedNoticeList[this.noticePopupSelectedIndex] || this.publishedNoticeList[0] || null
+    noticeDialogTitleText() {
+      const total = this.noticeDialogDisplayList.length
+      if (this.noticeDialogMode === 'manage') {
+        return total > 0 ? `通知公告管理（${total}条）` : '通知公告管理'
+      }
+      return total > 0 ? `通知公告浏览（${total}条）` : '通知公告浏览'
+    },
+    noticeManageEditDialogTitle() {
+      return this.noticeManageEditIndex >= 0 ? '编辑通知' : '新建通知'
     },
   },
-  mounted() {
+  watch: {
+    activeMenu(newVal, oldVal) {
+      if (oldVal === 'home' && newVal !== 'home') {
+        this.closeNoticeDialog()
+        this.closeNoticeManageDialog()
+      }
+    }
+  },
+  async mounted() {
     if (!sessionStorage.getItem('authToken')) {
       this.$router.push('/login')
       return
     }
-    if (this.isAdmin) {
-      this.adminAnalysisRange = this.buildAdminAnalysisRange('MONTH')
-    }
     this.loadStats()
     this.loadProducts()
     this.loadBalance()
-    this.initializeNoticeCenter()
     this.loadCategories()
     this.loadCompanies()
+    this.showHomeNoticeDialog()
   },
   methods: {
     isSuccess(res) {
@@ -298,35 +321,6 @@ export default {
 
     getDialogRef(refName) {
       return this.dialogRefs?.[refName] || this.$refs?.[refName] || null
-    },
-
-    getAdminStatsParams() {
-      if (!this.adminAnalysisRange || this.adminAnalysisRange.length !== 2) {
-        return { periodType: this.adminAnalysisPeriodType }
-      }
-      return {
-        periodType: this.adminAnalysisPeriodType,
-        startDate: this.adminAnalysisRange[0],
-        endDate: this.adminAnalysisRange[1]
-      }
-    },
-
-    buildAdminAnalysisRange(periodType) {
-      return buildAdminAnalysisRangeUtil(periodType)
-    },
-
-    formatAdminDate(date) {
-      return formatAdminDateUtil(date)
-    },
-
-    applyAdminAnalysisPreset(periodType) {
-      this.adminAnalysisPeriodType = periodType
-      this.adminAnalysisRange = this.buildAdminAnalysisRange(periodType)
-      this.loadStats()
-    },
-
-    createNoticeId() {
-      return createNoticeIdUtil()
     },
 
     normalizeNoticeItem(item) {
@@ -351,7 +345,8 @@ export default {
           : []
 
         this.publishedNoticeList = this.cloneNoticeList(notices)
-        this.noticePublishedAt = notices[0]?.publishedAt || ''
+        const earliestNotice = sortNoticeListByPublishedAtAscUtil(notices)[0] || null
+        this.noticePublishedAt = earliestNotice?.publishedAt || ''
       } catch (error) {
         console.error('读取通知失败:', error)
         this.publishedNoticeList = []
@@ -359,141 +354,265 @@ export default {
       }
     },
 
-    initializeNoticeCenter() {
-      this.refreshPublishedNotices().then(() => {
-        this.maybeOpenNoticePopup()
-      })
-    },
-
-    maybeOpenNoticePopup() {
-      if (!this.publishedNoticeList.length) {
-        return
-      }
-
-      const latestVersion = this.publishedNoticeList[0]?.publishedAt || ''
-      if (!latestVersion) {
-        return
-      }
-
-      const seenVersion = sessionStorage.getItem('noticePopupVersion')
-      if (seenVersion === latestVersion) {
-        return
-      }
-
-      this.noticePopupSelectedIndex = 0
-      this.noticePopupDialogVisible = true
-      sessionStorage.setItem('noticePopupVersion', latestVersion)
-    },
-
-    selectNoticePopupItem(index) {
-      this.noticePopupSelectedIndex = index
-    },
-
-    openNoticeFromPopup() {
-      if (!this.noticePopupCurrent) {
-        return
-      }
-      this.openNoticeDetail(this.noticePopupCurrent)
-      this.noticePopupDialogVisible = false
-    },
-
-    closeNoticePopup() {
-      this.noticePopupDialogVisible = false
-    },
-
-    async openNoticePublishDialog() {
+    async showHomeNoticeDialog() {
+      this.noticeDialogMode = 'view'
       await this.refreshPublishedNotices()
-      this.noticeDraftList = this.cloneNoticeList(this.publishedNoticeList)
-      this.resetNoticeDraft()
-      this.noticePublishDialogVisible = true
-    },
-
-    openNoticeDetail(item) {
-      this.noticeDetail = {
-        title: item.title || '',
-        content: item.content || '',
-        publishedAt: item.publishedAt || ''
+      if (this.activeMenu !== 'home') {
+        return
       }
-      this.noticeDetailDialogVisible = true
+      this.openNoticeDialog(0)
     },
 
-    resetNoticeDraft() {
-      this.noticeDraft = {
-        id: null,
+    openNoticeDialog(index = 0) {
+      this.noticeDialogMode = 'view'
+      this.setNoticeDialogIndex(index)
+      this.noticeDialogVisible = true
+    },
+
+    closeNoticeDialog() {
+      this.noticeDialogVisible = false
+      this.noticeDialogMode = 'view'
+      this.noticeManageList = []
+      this.closeNoticeManageEditDialog()
+      this.noticeManageSubmitting = false
+    },
+
+    async openNoticeManageDialog() {
+      if (!this.isAdmin) {
+        return
+      }
+
+      this.noticeDialogMode = 'manage'
+      this.noticeDialogIndex = 0
+      await this.refreshPublishedNotices()
+      this.noticeManageList = this.buildNoticeManageList(this.publishedNoticeList)
+      this.closeNoticeManageEditDialog()
+      this.noticeManageSubmitting = false
+      this.noticeDialogVisible = true
+    },
+
+    closeNoticeManageDialog() {
+      this.noticeDialogVisible = false
+      this.noticeDialogMode = 'view'
+      this.noticeManageList = []
+      this.closeNoticeManageEditDialog()
+      this.noticeManageSubmitting = false
+    },
+
+    setNoticeDialogIndex(index = 0) {
+      const list = this.noticeDialogDisplayList
+      const total = list.length
+      this.noticeDialogIndex = total > 0
+        ? Math.min(Math.max(Number(index) || 0, 0), total - 1)
+        : 0
+    },
+
+    showPreviousNotice() {
+      const total = this.noticeDialogDisplayList.length
+      if (this.noticeDialogIndex <= 0 || !total) {
+        return
+      }
+      this.noticeDialogIndex -= 1
+    },
+
+    showNextNotice() {
+      const total = this.noticeDialogDisplayList.length
+      if (!total || this.noticeDialogIndex >= total - 1) {
+        return
+      }
+      this.noticeDialogIndex += 1
+    },
+
+    buildNoticeManageList(list = []) {
+      return sortNoticeListByPublishedAtAscUtil(this.cloneNoticeList(list)).map((item, index) => ({
+        id: item.id || createNoticeIdUtil(),
+        title: String(item.title || '').trim(),
+        content: String(item.content || '').trim(),
+        sortNo: index + 1,
+        publishedAt: item.publishedAt || ''
+      }))
+    },
+
+    normalizeNoticeManageSortNo() {
+      this.noticeManageList = this.noticeManageList.map((item, index) => ({
+        ...item,
+        sortNo: index + 1
+      }))
+    },
+
+    addNoticeManageRow() {
+      this.openNoticeManageEditDialog(-1)
+    },
+
+    resetNoticeManageEditDialog() {
+      this.noticeManageEditIndex = -1
+      this.noticeManageEditForm = {
+        id: '',
         title: '',
         content: ''
       }
-      this.editingNoticeIndex = -1
     },
 
-    saveNoticeDraftItem() {
-      const notice = this.normalizeNoticeItem(this.noticeDraft)
-      if (!notice) {
-        this.$message.warning('请先填写完整的通知标题和内容')
+    closeNoticeManageEditDialog() {
+      this.noticeManageEditDialogVisible = false
+      this.resetNoticeManageEditDialog()
+    },
+
+    handleNoticeManageEditDialogClosed() {
+      this.resetNoticeManageEditDialog()
+    },
+
+    openNoticeManageEditDialog(index = -1) {
+      const row = index >= 0 ? this.noticeManageList[index] : null
+      this.noticeManageEditIndex = index
+      this.noticeManageEditForm = {
+        id: row?.id || createNoticeIdUtil(),
+        title: String(row?.title || ''),
+        content: String(row?.content || '')
+      }
+      this.noticeManageEditDialogVisible = true
+      this.$nextTick(() => {
+        const titleInput = this.$refs?.noticeManageEditTitleInput
+        if (titleInput?.focus) {
+          titleInput.focus()
+        }
+      })
+    },
+
+    handleNoticeManageRowEdit(id) {
+      const index = this.noticeManageList.findIndex(item => item.id === id)
+      if (index < 0) {
         return
       }
 
-      if (this.editingNoticeIndex > -1) {
-        this.noticeDraftList.splice(this.editingNoticeIndex, 1, notice)
-      } else {
-        this.noticeDraftList.push(notice)
-      }
-
-      this.$message.success(this.editingNoticeIndex > -1 ? '通知已更新' : '通知已加入待发布列表')
-      this.resetNoticeDraft()
+      this.setNoticeDialogIndex(index)
+      this.openNoticeManageEditDialog(index)
     },
 
-    editNoticeItem(index) {
-      const target = this.noticeDraftList[index]
-      if (!target) {
+    async submitNoticeManageEditDialog() {
+      const title = String(this.noticeManageEditForm.title || '').trim()
+      const content = String(this.noticeManageEditForm.content || '').trim()
+
+      if (!title || !content) {
+        this.$message.warning('请输入通知标题和内容')
         return
       }
 
-      this.noticeDraft = { ...target }
-      this.editingNoticeIndex = index
-    },
-
-    removeNoticeItem(index) {
-      this.noticeDraftList.splice(index, 1)
-
-      if (this.editingNoticeIndex === index) {
-        this.resetNoticeDraft()
-      } else if (this.editingNoticeIndex > index) {
-        this.editingNoticeIndex -= 1
-      }
-    },
-
-    clearNoticeDraftList() {
-      this.noticeDraftList = []
-      this.resetNoticeDraft()
-    },
-
-    async publishNotices() {
-      if (!this.noticeDraftList.length) {
-        this.$message.warning('请先添加至少一条通知')
-        return
-      }
-
-      const notices = this.noticeDraftList
-        .map((item, index) => {
-          const normalized = this.normalizeNoticeItem(item)
-          return normalized ? { ...normalized, sortNo: index + 1 } : null
+      if (this.noticeManageEditIndex >= 0 && this.noticeManageList[this.noticeManageEditIndex]) {
+        const current = this.noticeManageList[this.noticeManageEditIndex]
+        this.noticeManageList.splice(this.noticeManageEditIndex, 1, {
+          ...current,
+          title,
+          content
         })
-        .filter(Boolean)
+        this.setNoticeDialogIndex(this.noticeManageEditIndex)
+      } else {
+        this.noticeManageList.push({
+          id: this.noticeManageEditForm.id || createNoticeIdUtil(),
+          title,
+          content,
+          sortNo: this.noticeManageList.length + 1,
+          publishedAt: ''
+        })
+        this.normalizeNoticeManageSortNo()
+        this.setNoticeDialogIndex(this.noticeManageList.length - 1)
+      }
+
+      this.closeNoticeManageEditDialog()
+    },
+
+    moveNoticeManageRow(index, offset) {
+      const targetIndex = index + offset
+      if (targetIndex < 0 || targetIndex >= this.noticeManageList.length) {
+        return
+      }
+
+      const list = [...this.noticeManageList]
+      const [row] = list.splice(index, 1)
+      list.splice(targetIndex, 0, row)
+      this.noticeManageList = list
+      this.normalizeNoticeManageSortNo()
+      this.setNoticeDialogIndex(this.noticeDialogIndex)
+      if (this.noticeManageEditDialogVisible && this.noticeManageEditIndex >= 0) {
+        const activeId = this.noticeManageEditForm?.id
+        const activeIndex = this.noticeManageList.findIndex(item => item.id === activeId)
+        if (activeIndex >= 0) {
+          this.noticeManageEditIndex = activeIndex
+        }
+      }
+    },
+
+    async removeNoticeManageRow(index) {
+      const row = this.noticeManageList[index]
+      if (!row) {
+        return
+      }
 
       try {
-        const res = await this.$axios.post('/api/admin/notices/publish', { notices })
-        if (!this.isSuccess(res)) {
-          this.$message.error(res.data?.message || '通知发布失败')
+        await this.$confirm('确认删除这条通知吗？删除后会在保存时同步生效。', '删除通知', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        })
+        this.noticeManageList.splice(index, 1)
+        this.normalizeNoticeManageSortNo()
+        this.setNoticeDialogIndex(this.noticeDialogIndex)
+        if (this.noticeManageEditDialogVisible && this.noticeManageEditForm?.id === row.id) {
+          this.closeNoticeManageEditDialog()
+        }
+      } catch (error) {
+        if (error !== 'cancel') {
+          console.error('删除通知失败:', error)
+          this.$message.error('删除通知失败')
+        }
+      }
+    },
+
+    async submitNoticeManageList() {
+      const notices = this.noticeManageList.map((item, index) => ({
+        sortNo: index + 1,
+        title: String(item.title || '').trim(),
+        content: String(item.content || '').trim()
+      }))
+
+      for (let i = 0; i < notices.length; i += 1) {
+        if (!notices[i].title || !notices[i].content) {
+          this.$message.warning(`请填写第 ${i + 1} 条通知的标题和内容`)
           return
         }
+      }
 
-        await this.refreshPublishedNotices()
-        this.noticePublishDialogVisible = false
-        this.$message.success('通知已发布')
+      if (!notices.length) {
+        try {
+          await this.$confirm('当前没有任何通知，确认清空首页通知并发布吗？', '清空通知', {
+            confirmButtonText: '确认清空',
+            cancelButtonText: '取消',
+            type: 'warning'
+          })
+        } catch (error) {
+          if (error !== 'cancel') {
+            console.error('清空通知失败:', error)
+            this.$message.error('保存通知失败')
+          }
+          return
+        }
+      }
+
+      this.noticeManageSubmitting = true
+      try {
+        const res = await this.$axios.post('/api/admin/notices/publish', { notices })
+        if (this.isSuccess(res)) {
+          this.$message.success('通知已更新')
+          this.closeNoticeManageDialog()
+          await this.refreshPublishedNotices()
+        } else {
+          this.$message.error(res.data?.message || '保存通知失败')
+        }
       } catch (error) {
-        console.error('发布通知失败:', error)
-        this.$message.error(error.response?.data?.message || '通知发布失败')
+        console.error('保存通知失败:', error)
+        this.$message.error(error.response?.data?.message || '保存通知失败')
+      } finally {
+        this.noticeManageSubmitting = false
       }
     },
 
@@ -511,39 +630,32 @@ export default {
     async loadStats() {
       try {
         if (this.isAdmin) {
-          const [productsRes, expensesRes, insurancesRes, statsRes] = await Promise.all([
+          const [productsRes, expensesRes, statsRes] = await Promise.all([
             this.$axios.get('/api/admin/products', { params: { page: 1, size: 1 } }),
             this.$axios.get('/api/admin/expenses', { params: { page: 1, size: 1 } }),
-            this.$axios.get('/api/admin/insurances', { params: { page: 1, size: 1 } }),
-            this.$axios.get('/api/admin/stats', { params: this.getAdminStatsParams() })
+            this.$axios.get('/api/admin/stats')
           ])
-          
+
           const adminStats = this.isSuccess(statsRes) ? statsRes.data.data || {} : {}
-          
+
           this.stats = {
             totalProducts: this.isSuccess(productsRes) ? productsRes.data.data.total || 0 : 0,
             totalPolicies: 0,
             totalExpenses: this.isSuccess(expensesRes) ? expensesRes.data.data.total || 0 : 0,
-            totalInsurances: this.isSuccess(insurancesRes) ? insurancesRes.data.data.total || 0 : 0,
             todayNewOrders: adminStats.todayNewOrders || 0,
             pendingOrders: adminStats.pendingOrders || 0,
             monthOrders: adminStats.monthOrders || 0
           }
-          this.adminSalesRanking = adminStats.productSalesRanking || []
-          this.adminOrderTrend = adminStats.orderTrendAnalysis || []
           return
         }
 
-        this.adminSalesRanking = []
-        this.adminOrderTrend = []
         const res = await this.$axios.get('/api/anxinxuan/stats')
         if (this.isSuccess(res)) {
           const data = res.data.data || {}
           this.stats = {
             totalProducts: data.totalProducts || 0,
             totalPolicies: data.totalPolicies || 0,
-            totalExpenses: Number(data.totalExpenses || 0),
-            totalInsurances: 0
+            totalExpenses: Number(data.totalExpenses || 0)
           }
           this.balance = Number(data.balance || 0)
         }
@@ -553,13 +665,10 @@ export default {
           totalProducts: 0,
           totalPolicies: 0,
           totalExpenses: 0,
-          totalInsurances: 0,
           todayNewOrders: 0,
           pendingOrders: 0,
           monthOrders: 0
         }
-        this.adminSalesRanking = []
-        this.adminOrderTrend = []
       }
     },
 
@@ -569,8 +678,7 @@ export default {
       switch (key) {
         case 'home':
           await this.loadStats()
-          await this.refreshPublishedNotices()
-          this.maybeOpenNoticePopup()
+          await this.showHomeNoticeDialog()
           break
         case 'product':
           this.loadProducts()
@@ -591,8 +699,7 @@ export default {
           // 通知公告页面，切换到首页显示通知列表
           this.activeMenu = 'home'
           await this.loadStats()
-          await this.refreshPublishedNotices()
-          this.maybeOpenNoticePopup()
+          await this.showHomeNoticeDialog()
           break
         case 'userAdmin':
           this.loadUsers()
@@ -617,6 +724,22 @@ export default {
     resetProductFilter() {
       this.companyFilter = 'all'
       this.activeCategory = 'all'
+      this.productSearchKeyword = ''
+      this.productCurrentPage = 1
+      this.loadProducts()
+    },
+
+    handleProductSearchKeywordChange(value) {
+      this.productSearchKeyword = String(value || '')
+    },
+
+    searchProducts() {
+      this.productCurrentPage = 1
+      this.loadProducts()
+    },
+
+    clearProductSearch() {
+      this.productSearchKeyword = ''
       this.productCurrentPage = 1
       this.loadProducts()
     },
@@ -641,28 +764,46 @@ export default {
     },
 
     getFilterText() {
-      if (this.companyFilter !== 'all') {
-        return this.getCompanyName(this.companyFilter) || this.companyFilter
+      const parts = []
+
+      if (this.activeCategory !== 'all') {
+        parts.push(this.getCategoryName(this.activeCategory) || this.activeCategory)
       }
-      return ''
+
+      if (this.companyFilter !== 'all') {
+        parts.push(this.getCompanyName(this.companyFilter) || this.companyFilter)
+      }
+
+      const keyword = String(this.productSearchKeyword || '').trim()
+      if (keyword) {
+        parts.push(`搜索：${keyword}`)
+      }
+
+      return parts.join(' · ')
     },
 
     async loadProducts() {
       this.productLoading = true
       try {
         const company = this.companyFilter !== 'all' ? this.getCompanyName(this.companyFilter) : ''
+        const keyword = String(this.productSearchKeyword || '').trim()
         const params = {
           page: this.productCurrentPage,
           size: this.productPageSize,
           category: this.activeCategory === 'all' ? '' : this.activeCategory,
-          company: company
+          company,
+          keyword
         }
         const endpoint = this.isAdmin ? '/api/admin/products' : '/api/anxinxuan/products'
         const res = await this.$axios.get(endpoint, { params })
         if (this.isSuccess(res)) {
           const data = res.data.data || {}
-          this.products = data.records || []
-          this.productTotal = data.total || 0
+          this.products = Array.isArray(data.records) ? data.records : []
+          const total = Number(data.total)
+          this.productTotal = Number.isFinite(total) ? total : 0
+          if (!this.productTotal && this.products.length > 0) {
+            this.productTotal = this.products.length
+          }
         } else {
           this.products = []
           this.productTotal = 0
@@ -831,6 +972,12 @@ export default {
       return company ? company.name : ''
     },
 
+    getCategoryName(categoryCode) {
+      if (!categoryCode) return ''
+      const category = this.categoryList.find(cat => cat.code === categoryCode)
+      return category ? category.name : ''
+    },
+
     handleProductPageChange(page) {
       this.productCurrentPage = page
       this.loadProducts()
@@ -853,13 +1000,13 @@ export default {
         description: '',
         features: '',
         price: 0.01,
-        stock: 0,
         isNew: 0,
         isHot: 0,
         saleStatus: 'ON_SALE',
         sortNo: 0,
         imageUrl: '',
-        templateFileName: ''
+        templateFileName: '',
+        alias: ''
       }
     },
 
@@ -875,13 +1022,13 @@ export default {
           description: product.description || '',
           features: product.features || '',
           price: product.price || 0.01,
-          stock: product.stock || 0,
           isNew: product.isNew ? 1 : 0,
           isHot: product.isHot ? 1 : 0,
           saleStatus: product.saleStatus || 'ON_SALE',
           sortNo: product.sortNo || 0,
           imageUrl: product.imageUrl || '',
-          templateFileName: product.templateFileName || ''
+          templateFileName: product.templateFileName || '',
+          alias: product.alias || ''
         }
       } else {
         this.productDialogTitle = '新增产品'
@@ -907,11 +1054,11 @@ export default {
         description: this.productForm.description,
         features: this.productForm.features,
         price: this.productForm.price,
-        stock: this.productForm.stock,
         isNew: this.productForm.isNew,
         isHot: this.productForm.isHot,
         saleStatus: this.productForm.saleStatus,
-        sortNo: this.productForm.sortNo
+        sortNo: this.productForm.sortNo,
+        alias: this.productForm.alias
       }
 
       this.productSubmitting = true
@@ -1204,6 +1351,7 @@ export default {
       this.activeForm = {
         productId: product.id,
         planName: '',
+        displayPrice: Number(product.price ?? 0),
         beneficiaryName: '',
         beneficiaryId: '',
         beneficiaryJob: '',
@@ -1214,6 +1362,22 @@ export default {
       this.activeDialogVisible = true
     },
 
+    getActiveDisplayPrice() {
+      const currentPrice = Number(this.activeForm?.displayPrice)
+      if (Number.isFinite(currentPrice) && currentPrice > 0) {
+        return currentPrice
+      }
+
+      const productPrice = Number(this.selectedProduct?.price ?? 0)
+      return Number.isFinite(productPrice) && productPrice > 0 ? productPrice : 0
+    },
+
+    getActiveTotalAmount() {
+      const quantity = Number(this.activeForm?.count ?? 0)
+      const unitPrice = this.getActiveDisplayPrice()
+      return unitPrice * (Number.isFinite(quantity) && quantity > 0 ? quantity : 0)
+    },
+
     async submitActiveForm() {
       this.getDialogRef('activeFormRef')?.validate(async (valid) => {
         if (!valid) {
@@ -1221,7 +1385,11 @@ export default {
         }
         this.activeSubmitting = true
         try {
-          const res = await this.$axios.post('/api/anxinxuan/products/activate', this.activeForm)
+          const payload = {
+            ...this.activeForm,
+            displayPrice: this.getActiveDisplayPrice()
+          }
+          const res = await this.$axios.post('/api/anxinxuan/products/activate', payload)
           if (this.isSuccess(res)) {
             this.$message.success('提交审核成功')
             this.activeDialogVisible = false
@@ -1248,7 +1416,11 @@ export default {
         }
         this.draftSubmitting = true
         try {
-          const res = await this.$axios.post('/api/anxinxuan/products/save-draft', this.activeForm)
+          const payload = {
+            ...this.activeForm,
+            displayPrice: this.getActiveDisplayPrice()
+          }
+          const res = await this.$axios.post('/api/anxinxuan/products/save-draft', payload)
           if (this.isSuccess(res)) {
             this.$message.success('已保存为待提交')
             this.activeDialogVisible = false
@@ -1315,6 +1487,12 @@ export default {
 
     handleExpensePageChange(page) {
       this.expenseCurrentPage = page
+      this.loadExpenses()
+    },
+
+    handleExpenseSizeChange(size) {
+      this.expensePageSize = size
+      this.expenseCurrentPage = 1
       this.loadExpenses()
     },
 
@@ -1564,14 +1742,14 @@ export default {
 
     async downloadPolicy(row) {
       if (!row || !row.id) {
-        this.$message.warning('请选择需要导出的保险记录')
+        this.$message.warning('请选择需要下载PDF的保险记录')
         return
       }
       try {
         await this.downloadFile(`/api/anxinxuan/insurances/${row.id}/pdf`, `insurance-${row.id}.pdf`)
-        this.$message.success('已开始导出PDF')
+        this.$message.success('已开始下载PDF')
       } catch (error) {
-        this.$message.error(error.response?.data?.message || 'PDF导出失败')
+        this.$message.error(error.response?.data?.message || 'PDF下载失败')
       }
     },
 
@@ -1686,7 +1864,8 @@ export default {
       try {
         const params = {
           page: this.rechargeCurrentPage,
-          size: 20,
+          size: this.rechargePageSize,
+          username: this.rechargeFilter.username || undefined,
           type: this.rechargeFilter.type,
           description: this.rechargeFilter.description
         }
@@ -1722,6 +1901,12 @@ export default {
       this.loadRecharges()
     },
 
+    handleRechargeSizeChange(size) {
+      this.rechargePageSize = size
+      this.rechargeCurrentPage = 1
+      this.loadRecharges()
+    },
+
     async loadUsers() {
       this.userLoading = true
       try {
@@ -1737,6 +1922,8 @@ export default {
           this.userList = res.data.data.records || res.data.data || []
           this.userTotal = res.data.data.total || 0
         }
+        // 加载所有用户用于充值对话框
+        await this.loadAllUsers()
       } catch (error) {
         console.error('加载用户列表失败:', error)
       } finally {

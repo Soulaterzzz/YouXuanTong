@@ -4,10 +4,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.env.Environment;
+import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+
+import java.util.Arrays;
 
 @Slf4j
 @Component
@@ -16,6 +20,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 public class DatabaseMigrationRunner implements ApplicationRunner {
 
     private final JdbcTemplate jdbcTemplate;
+    private final Environment environment;
 
     @Override
     public void run(ApplicationArguments args) {
@@ -23,11 +28,33 @@ public class DatabaseMigrationRunner implements ApplicationRunner {
             ensureNoticeTable();
             ensureProductTemplateColumns();
             ensureProductCodeUniqueIndex();
+            ensureAccountBalanceVersionColumn();
             ensureInsuranceWorkflowColumns();
             migrateLegacyInsuranceWorkflowStatuses();
+        } catch (CannotGetJdbcConnectionException ex) {
+            if (isStrictMode()) {
+                log.error("数据库迁移失败，应用启动中止", ex);
+                throw new IllegalStateException("数据库迁移失败，请检查数据库连接和权限配置", ex);
+            }
+            log.warn("数据库连接不可用，跳过启动迁移；应用将继续启动，但真实数据接口仍需要可用的 MySQL 数据库。原因：{}",
+                    rootCauseMessage(ex));
         } catch (DataAccessException ex) {
-            log.warn("数据库迁移未执行，当前数据库不可用或连接信息未配置完整：{}", ex.getMessage());
+            log.error("数据库迁移失败，应用启动中止", ex);
+            throw new IllegalStateException("数据库迁移失败，请检查数据库连接和权限配置", ex);
         }
+    }
+
+    private boolean isStrictMode() {
+        return Arrays.stream(environment.getActiveProfiles())
+                .anyMatch(profile -> "prod".equalsIgnoreCase(profile));
+    }
+
+    private String rootCauseMessage(Throwable throwable) {
+        Throwable current = throwable;
+        while (current.getCause() != null) {
+            current = current.getCause();
+        }
+        return current.getMessage() == null ? throwable.getMessage() : current.getMessage();
     }
 
     private void ensureNoticeTable() {
@@ -50,6 +77,8 @@ public class DatabaseMigrationRunner implements ApplicationRunner {
     }
 
     private void ensureProductTemplateColumns() {
+        ensureColumnExists("axx_product", "alias",
+                "ALTER TABLE axx_product ADD COLUMN alias VARCHAR(128) DEFAULT NULL COMMENT '产品别名' AFTER product_name");
         ensureColumnExists("axx_product", "template_file_name",
                 "ALTER TABLE axx_product ADD COLUMN template_file_name VARCHAR(255) DEFAULT NULL COMMENT '模板文件名'");
         ensureColumnExists("axx_product", "template_file_path",
@@ -76,6 +105,11 @@ public class DatabaseMigrationRunner implements ApplicationRunner {
         }
 
         jdbcTemplate.execute("ALTER TABLE axx_product ADD UNIQUE KEY uk_product_code_deleted (product_code, deleted)");
+    }
+
+    private void ensureAccountBalanceVersionColumn() {
+        ensureColumnExists("axx_account_balance", "version",
+                "ALTER TABLE axx_account_balance ADD COLUMN version INT NOT NULL DEFAULT 0 COMMENT '版本号，用于乐观锁'");
     }
 
     private void ensureInsuranceWorkflowColumns() {

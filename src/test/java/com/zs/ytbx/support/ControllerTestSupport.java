@@ -2,6 +2,7 @@ package com.zs.ytbx.support;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zs.ytbx.config.GlobalExceptionHandler;
+import org.springframework.http.converter.ByteArrayHttpMessageConverter;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -17,7 +18,9 @@ public abstract class ControllerTestSupport {
 
         return MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
-                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .setMessageConverters(
+                        new ByteArrayHttpMessageConverter(),
+                        new MappingJackson2HttpMessageConverter(objectMapper))
                 .setValidator(validator)
                 .build();
     }

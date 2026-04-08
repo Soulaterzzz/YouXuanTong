@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS axx_account_balance (
     user_id BIGINT NOT NULL COMMENT '用户ID',
     balance DECIMAL(18,2) NOT NULL DEFAULT 0.00 COMMENT '账户余额',
     frozen_balance DECIMAL(18,2) NOT NULL DEFAULT 0.00 COMMENT '冻结余额',
+    version INT NOT NULL DEFAULT 0 COMMENT '版本号，用于乐观锁',
     deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除',
     create_by BIGINT DEFAULT NULL COMMENT '创建人',
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -137,12 +138,12 @@ CREATE TABLE IF NOT EXISTS axx_product (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键',
     product_code VARCHAR(64) NOT NULL COMMENT '产品编码',
     product_name VARCHAR(128) NOT NULL COMMENT '产品名称',
+    alias VARCHAR(128) DEFAULT NULL COMMENT '产品别名',
     category_code VARCHAR(64) NOT NULL COMMENT '分类编码',
     company_name VARCHAR(128) DEFAULT NULL COMMENT '承保公司',
     description VARCHAR(500) DEFAULT NULL COMMENT '产品描述',
     features VARCHAR(500) DEFAULT NULL COMMENT '产品特点',
     price DECIMAL(18,2) NOT NULL COMMENT '价格',
-    stock INT NOT NULL DEFAULT 0 COMMENT '库存',
     is_new TINYINT NOT NULL DEFAULT 0 COMMENT '是否新品',
     is_hot TINYINT NOT NULL DEFAULT 0 COMMENT '是否热门',
     sale_status VARCHAR(32) NOT NULL DEFAULT 'ON_SALE' COMMENT '销售状态',
@@ -197,36 +198,39 @@ SET FOREIGN_KEY_CHECKS = 1;
 -- ================================================
 -- 1. 产品数据（8款保险产品）
 -- ================================================
-INSERT INTO axx_product (product_code, product_name, category_code, company_name, description, features, price, stock, is_new, is_hot, sale_status, sort_no, create_time, update_time) VALUES
-('GS-001', '国寿财1-3类10+5+5+50（青柑）', '1-3', '国寿财险', '个单：18-63周岁；可投保：1-3类职业；T+1生效；每周一三五十点截单', '无门诊免赔额；承保动物伤害；意外医疗全额赔付', 55.00, 999, 1, 1, 'ON_SALE', 1, NOW(), NOW()),
-('PA-001', '平安财意外10+1+50+10（含意保）', '1-3', '平安财险', '1-3类职业可投；每周一三五十十点截单', '限投一份；正常1+6生效；包含住院津贴', 60.00, 999, 0, 1, 'ON_SALE', 2, NOW(), NOW()),
-('ZA-001', '少儿门诊医疗险', 'child', '众安保险', '0-17岁可投保；门急诊可报销；等待期短', '门急诊保障；住院医疗；特定疾病额外赔付；不限社保', 380.00, 500, 1, 0, 'ON_SALE', 3, NOW(), NOW()),
-('RB-001', '老年意外险（尊享版）', 'elder', '人保财险', '50-80岁可投保；综合意外保障；高龄专属', '意外医疗；骨折津贴；救护车费用；住院护理', 200.00, 999, 0, 1, 'ON_SALE', 4, NOW(), NOW()),
-('GS-002', '国寿财1-4类意外险', '1-4', '国寿财险', '1-4类职业可投；保障全面；性价比高', '意外身故伤残；意外医疗；住院津贴', 80.00, 999, 0, 0, 'ON_SALE', 5, NOW(), NOW()),
-('PA-002', '平安财高危职业意外险', '5-6', '平安财险', '5-6类高危职业专属；保障力度强', '高危职业可投；意外身故伤残；意外医疗', 150.00, 500, 1, 0, 'ON_SALE', 6, NOW(), NOW()),
-('TP-001', '太保百万医疗险', 'medical', '太平洋保险', '一般医疗+重疾医疗；保额高达600万', '重疾绿通；住院垫付；质子重离子', 300.00, 999, 0, 1, 'ON_SALE', 7, NOW(), NOW()),
-('ZA-002', '众安出行意外险', 'travel', '众安保险', '出行保障；飞机/火车/轮船/汽车全覆盖', '交通工具意外；航班延误；行李丢失', 50.00, 999, 0, 0, 'ON_SALE', 8, NOW(), NOW());
+INSERT INTO axx_product (product_code, product_name, category_code, company_name, description, features, price, is_new, is_hot, sale_status, sort_no, create_time, update_time) VALUES
+('GS-001', '国寿财1-3类10+5+5+50（青柑）', '1-3', '国寿财险', '个单：18-63周岁；可投保：1-3类职业；T+1生效；每周一三五十点截单', '无门诊免赔额；承保动物伤害；意外医疗全额赔付', 55.00, 1, 1, 'ON_SALE', 1, NOW(), NOW()),
+('PA-001', '平安财意外10+1+50+10（含意保）', '1-3', '平安财险', '1-3类职业可投；每周一三五十十点截单', '限投一份；正常1+6生效；包含住院津贴', 60.00, 0, 1, 'ON_SALE', 2, NOW(), NOW()),
+('ZA-001', '少儿门诊医疗险', 'child', '众安保险', '0-17岁可投保；门急诊可报销；等待期短', '门急诊保障；住院医疗；特定疾病额外赔付；不限社保', 380.00, 1, 0, 'ON_SALE', 3, NOW(), NOW()),
+('RB-001', '老年意外险（尊享版）', 'elder', '人保财险', '50-80岁可投保；综合意外保障；高龄专属', '意外医疗；骨折津贴；救护车费用；住院护理', 200.00, 0, 1, 'ON_SALE', 4, NOW(), NOW()),
+('GS-002', '国寿财1-4类意外险', '1-4', '国寿财险', '1-4类职业可投；保障全面；性价比高', '意外身故伤残；意外医疗；住院津贴', 80.00, 0, 0, 'ON_SALE', 5, NOW(), NOW()),
+('PA-002', '平安财高危职业意外险', '5-6', '平安财险', '5-6类高危职业专属；保障力度强', '高危职业可投；意外身故伤残；意外医疗', 150.00, 1, 0, 'ON_SALE', 6, NOW(), NOW()),
+('TP-001', '太保百万医疗险', 'medical', '太平洋保险', '一般医疗+重疾医疗；保额高达600万', '重疾绿通；住院垫付；质子重离子', 300.00, 0, 1, 'ON_SALE', 7, NOW(), NOW()),
+('ZA-002', '众安出行意外险', 'travel', '众安保险', '出行保障；飞机/火车/轮船/汽车全覆盖', '交通工具意外；航班延误；行李丢失', 50.00, 0, 0, 'ON_SALE', 8, NOW(), NOW());
 
 -- ================================================
--- 2. 用户数据（1管理员 + 12普通用户）
+-- 2. 用户数据（1管理员 + 13普通用户）
 -- ================================================
 INSERT INTO axx_user (id, username, password, mobile, user_type, status, last_login_time, create_time, update_time) VALUES
 -- 管理员账户
-(1, 'admin', 'admin123', '13800000001', 'ADMIN', 'ACTIVE', DATE_SUB(NOW(), INTERVAL 1 HOUR), DATE_SUB(NOW(), INTERVAL 30 DAY), NOW()),
+(1, 'admin', 'pbkdf2$120000$ZcYjwHep3pTWJQ1H39lEcw$5_q2gIA7F5OfqL5doKGQ_jaPuRoTRKEHJmkzx_vCD5w', '13800000001', 'ADMIN', 'ACTIVE', DATE_SUB(NOW(), INTERVAL 1 HOUR), DATE_SUB(NOW(), INTERVAL 30 DAY), NOW()),
+
+-- 默认普通用户测试账号
+(14, 'user', 'pbkdf2$120000$WQYl_CQPG72gmid6BdnfrQ$TCfryLi_iwQcTfZd_5T4QrKTjJIvh1lrEI5Z4eimd9M', '13800010013', 'USER', 'ACTIVE', DATE_SUB(NOW(), INTERVAL 2 HOUR), DATE_SUB(NOW(), INTERVAL 20 DAY), NOW()),
 
 -- 普通用户账户（不同活跃程度）
-(2, 'zhangwei', 'user123', '13800010001', 'USER', 'ACTIVE', DATE_SUB(NOW(), INTERVAL 2 HOUR), DATE_SUB(NOW(), INTERVAL 60 DAY), NOW()),
-(3, 'liming', 'user123', '13800010002', 'USER', 'ACTIVE', DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_SUB(NOW(), INTERVAL 45 DAY), NOW()),
-(4, 'wangfang', 'user123', '13800010003', 'USER', 'ACTIVE', DATE_SUB(NOW(), INTERVAL 3 DAY), DATE_SUB(NOW(), INTERVAL 30 DAY), NOW()),
-(5, 'liuyang', 'user123', '13800010004', 'USER', 'ACTIVE', DATE_SUB(NOW(), INTERVAL 5 DAY), DATE_SUB(NOW(), INTERVAL 20 DAY), NOW()),
-(6, 'chenxin', 'user123', '13800010005', 'USER', 'ACTIVE', DATE_SUB(NOW(), INTERVAL 7 DAY), DATE_SUB(NOW(), INTERVAL 15 DAY), NOW()),
-(7, 'zhaolei', 'user123', '13800010006', 'USER', 'ACTIVE', NULL, DATE_SUB(NOW(), INTERVAL 10 DAY), NOW()),
-(8, 'sunli', 'user123', '13800010007', 'USER', 'ACTIVE', NULL, DATE_SUB(NOW(), INTERVAL 8 DAY), NOW()),
-(9, 'zhoujun', 'user123', '13800010008', 'USER', 'ACTIVE', NULL, DATE_SUB(NOW(), INTERVAL 5 DAY), NOW()),
-(10, 'wuqiang', 'user123', '13800010009', 'USER', 'DISABLED', NULL, DATE_SUB(NOW(), INTERVAL 90 DAY), NOW()),
-(11, 'zhenghua', 'user123', '13800010010', 'USER', 'ACTIVE', NULL, DATE_SUB(NOW(), INTERVAL 3 DAY), NOW()),
-(12, 'huangping', 'user123', '13800010011', 'USER', 'ACTIVE', DATE_SUB(NOW(), INTERVAL 4 HOUR), DATE_SUB(NOW(), INTERVAL 25 DAY), NOW()),
-(13, 'linxiao', 'user123', '13800010012', 'USER', 'ACTIVE', DATE_SUB(NOW(), INTERVAL 6 HOUR), DATE_SUB(NOW(), INTERVAL 40 DAY), NOW());
+(2, 'zhangwei', 'pbkdf2$120000$H76XGGsPCvnTdI37Xbhj4w$R9hqDBnk1PXj3n1VsAHLcOXyGBXMbP_ckgLwlFdW7yg', '13800010001', 'USER', 'ACTIVE', DATE_SUB(NOW(), INTERVAL 2 HOUR), DATE_SUB(NOW(), INTERVAL 60 DAY), NOW()),
+(3, 'liming', 'pbkdf2$120000$H76XGGsPCvnTdI37Xbhj4w$R9hqDBnk1PXj3n1VsAHLcOXyGBXMbP_ckgLwlFdW7yg', '13800010002', 'USER', 'ACTIVE', DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_SUB(NOW(), INTERVAL 45 DAY), NOW()),
+(4, 'wangfang', 'pbkdf2$120000$H76XGGsPCvnTdI37Xbhj4w$R9hqDBnk1PXj3n1VsAHLcOXyGBXMbP_ckgLwlFdW7yg', '13800010003', 'USER', 'ACTIVE', DATE_SUB(NOW(), INTERVAL 3 DAY), DATE_SUB(NOW(), INTERVAL 30 DAY), NOW()),
+(5, 'liuyang', 'pbkdf2$120000$H76XGGsPCvnTdI37Xbhj4w$R9hqDBnk1PXj3n1VsAHLcOXyGBXMbP_ckgLwlFdW7yg', '13800010004', 'USER', 'ACTIVE', DATE_SUB(NOW(), INTERVAL 5 DAY), DATE_SUB(NOW(), INTERVAL 20 DAY), NOW()),
+(6, 'chenxin', 'pbkdf2$120000$H76XGGsPCvnTdI37Xbhj4w$R9hqDBnk1PXj3n1VsAHLcOXyGBXMbP_ckgLwlFdW7yg', '13800010005', 'USER', 'ACTIVE', DATE_SUB(NOW(), INTERVAL 7 DAY), DATE_SUB(NOW(), INTERVAL 15 DAY), NOW()),
+(7, 'zhaolei', 'pbkdf2$120000$H76XGGsPCvnTdI37Xbhj4w$R9hqDBnk1PXj3n1VsAHLcOXyGBXMbP_ckgLwlFdW7yg', '13800010006', 'USER', 'ACTIVE', NULL, DATE_SUB(NOW(), INTERVAL 10 DAY), NOW()),
+(8, 'sunli', 'pbkdf2$120000$H76XGGsPCvnTdI37Xbhj4w$R9hqDBnk1PXj3n1VsAHLcOXyGBXMbP_ckgLwlFdW7yg', '13800010007', 'USER', 'ACTIVE', NULL, DATE_SUB(NOW(), INTERVAL 8 DAY), NOW()),
+(9, 'zhoujun', 'pbkdf2$120000$H76XGGsPCvnTdI37Xbhj4w$R9hqDBnk1PXj3n1VsAHLcOXyGBXMbP_ckgLwlFdW7yg', '13800010008', 'USER', 'ACTIVE', NULL, DATE_SUB(NOW(), INTERVAL 5 DAY), NOW()),
+(10, 'wuqiang', 'pbkdf2$120000$H76XGGsPCvnTdI37Xbhj4w$R9hqDBnk1PXj3n1VsAHLcOXyGBXMbP_ckgLwlFdW7yg', '13800010009', 'USER', 'DISABLED', NULL, DATE_SUB(NOW(), INTERVAL 90 DAY), NOW()),
+(11, 'zhenghua', 'pbkdf2$120000$H76XGGsPCvnTdI37Xbhj4w$R9hqDBnk1PXj3n1VsAHLcOXyGBXMbP_ckgLwlFdW7yg', '13800010010', 'USER', 'ACTIVE', NULL, DATE_SUB(NOW(), INTERVAL 3 DAY), NOW()),
+(12, 'huangping', 'pbkdf2$120000$H76XGGsPCvnTdI37Xbhj4w$R9hqDBnk1PXj3n1VsAHLcOXyGBXMbP_ckgLwlFdW7yg', '13800010011', 'USER', 'ACTIVE', DATE_SUB(NOW(), INTERVAL 4 HOUR), DATE_SUB(NOW(), INTERVAL 25 DAY), NOW()),
+(13, 'linxiao', 'pbkdf2$120000$H76XGGsPCvnTdI37Xbhj4w$R9hqDBnk1PXj3n1VsAHLcOXyGBXMbP_ckgLwlFdW7yg', '13800010012', 'USER', 'ACTIVE', DATE_SUB(NOW(), INTERVAL 6 HOUR), DATE_SUB(NOW(), INTERVAL 40 DAY), NOW());
 
 -- ================================================
 -- 3. 账户余额数据
@@ -234,6 +238,9 @@ INSERT INTO axx_user (id, username, password, mobile, user_type, status, last_lo
 INSERT INTO axx_account_balance (user_id, balance, frozen_balance, create_by, create_time, update_by, update_time) VALUES
 -- 管理员账户
 (1, 100000.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 30 DAY), 1, NOW()),
+
+-- 默认普通用户测试账号
+(14, 700.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 20 DAY), 14, NOW()),
 
 -- 普通用户账户余额
 (2, 8500.00, 0.00, 1, DATE_SUB(NOW(), INTERVAL 60 DAY), 2, NOW()),
@@ -422,9 +429,10 @@ INSERT INTO axx_notice (title, content, sort_no, published_at, create_by, create
 -- 初始化完成
 -- ================================================
 -- 账户说明:
--- 管理员: admin / admin123
+-- 管理员: admin
+-- 默认普通用户: user
 -- 普通用户: zhangwei, liming, wangfang, liuyang, chenxin, zhaolei, sunli, zhoujun, zhenghua, huangping, linxiao
--- 密码统一为: user123
+-- 其余普通用户密码已使用 PBKDF2 哈希存储
 -- 
 -- 测试场景覆盖:
 -- 1. 已生效保单 (ACTIVE) - 7个费用清单，多个被保人

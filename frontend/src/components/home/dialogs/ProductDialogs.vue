@@ -1,96 +1,160 @@
 <template>
   <!-- 产品编辑弹窗 -->
-  <el-dialog ref="dialogRef" @open="handleDialogOpen" @closed="handleDialogClose" v-model="productDialogVisible" :title="productDialogTitle" width="620px" :close-on-click-modal="false">
-    <el-form :model="productForm" label-width="90px">
-      <el-form-item label="产品编码">
-        <el-input v-model="productForm.productCode" placeholder="请输入产品编码" />
-      </el-form-item>
-      <el-form-item label="产品名称">
-        <el-input v-model="productForm.productName" placeholder="请输入产品名称" />
-      </el-form-item>
-      <el-form-item label="产品类别">
-        <el-select v-model="productForm.categoryCode" style="width: 100%" placeholder="请选择产品类别">
-          <el-option v-for="category in categoryList" :key="category.code" :label="category.name" :value="category.code" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="承保公司">
-        <el-select v-model="productForm.companyCode" style="width: 100%" placeholder="请选择承保公司">
-          <el-option v-for="company in companyList" :key="company.code" :label="company.name" :value="company.code" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="价格">
-        <el-input-number v-model="productForm.price" :min="0.01" :precision="2" style="width: 100%" />
-      </el-form-item>
-      <el-form-item label="库存">
-        <el-input-number v-model="productForm.stock" :min="0" style="width: 100%" />
-      </el-form-item>
-      <el-form-item label="排序号">
-        <el-input-number v-model="productForm.sortNo" :min="0" style="width: 100%" />
-      </el-form-item>
-      <el-form-item label="产品描述">
-        <el-input v-model="productForm.description" type="textarea" :rows="3" />
-      </el-form-item>
-      <el-form-item label="产品特点">
-        <el-input v-model="productForm.features" type="textarea" :rows="2" />
-      </el-form-item>
-      <el-form-item label="产品图片">
-        <el-upload
-          class="product-image-uploader"
-          :action="`/api/images/product/${productForm.id}/upload`"
-          :disabled="!productForm.id"
-          :show-file-list="false"
-          :on-success="handleImageUploadSuccess"
-          :on-error="handleImageUploadError"
-          :before-upload="beforeImageUpload"
-          accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-          :with-credentials="true"
-        >
-          <img v-if="productForm.imageUrl" :src="productForm.imageUrl" class="product-image-preview" />
-          <el-icon v-else class="product-image-uploader-icon"><Plus /></el-icon>
-        </el-upload>
-        <div class="image-upload-tip">
-          <el-button size="small" type="danger" @click="deleteProductImage" v-if="productForm.id && productForm.imageUrl">
-            删除图片
-          </el-button>
-          <span class="tip-text">{{ productForm.id ? '支持 jpg、png、gif、webp 格式，大小不超过 10MB' : '请先保存产品后再上传图片' }}</span>
+  <el-dialog ref="dialogRef" @open="handleDialogOpen" @closed="handleDialogClose" v-model="productDialogVisible" :title="productDialogTitle" width="680px" :close-on-click-modal="false" destroy-on-close>
+    <div class="product-edit-form">
+      <!-- 基本信息区 -->
+      <div class="form-section">
+        <div class="form-section-title">
+          <el-icon><InfoFilled /></el-icon>
+          基本信息
         </div>
-      </el-form-item>
-      <el-form-item label="模板文件">
-        <div class="template-upload-container">
-          <el-upload
-            class="template-uploader"
-            :action="`/api/images/product/${productForm.id}/template`"
-            :disabled="!productForm.id"
-            :show-file-list="false"
-            :on-success="handleTemplateUploadSuccess"
-            :on-error="handleTemplateUploadError"
-            :before-upload="beforeTemplateUpload"
-            accept=".pdf,.doc,.docx,.xls,.xlsx,.txt"
-            :with-credentials="true"
-            method="post"
-          >
-            <el-button type="primary" size="small">
-              <el-icon><Upload /></el-icon>
-              上传模板
-            </el-button>
-          </el-upload>
-          <div v-if="productForm.templateFileName" class="template-file-info">
-            <el-icon><Document /></el-icon>
-            <span class="template-file-name">{{ productForm.templateFileName }}</span>
-            <el-button size="small" type="primary" link @click="downloadTemplate">下载</el-button>
-            <el-button size="small" type="danger" link @click="deleteTemplate">删除</el-button>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="产品名称" required>
+              <el-input v-model="productForm.productName" placeholder="请输入产品名称" clearable />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="产品编码">
+              <el-input v-model="productForm.productCode" placeholder="请输入产品编码" clearable />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="24">
+            <el-form-item label="产品别名">
+              <el-input v-model="productForm.alias" placeholder="仅管理员可见的产品别名" clearable />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="产品类别" required>
+              <el-select v-model="productForm.categoryCode" style="width: 100%" placeholder="请选择产品类别" clearable>
+                <el-option v-for="category in categoryList" :key="category.code" :label="category.name" :value="category.code" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="承保公司" required>
+              <el-select v-model="productForm.companyCode" style="width: 100%" placeholder="请选择承保公司" clearable>
+                <el-option v-for="company in companyList" :key="company.code" :label="company.name" :value="company.code" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="8">
+            <el-form-item label="价格" required>
+              <el-input-number v-model="productForm.price" :min="0.01" :precision="2" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="排序号">
+              <el-input-number v-model="productForm.sortNo" :min="0" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="销售状态">
+              <el-select v-model="productForm.saleStatus" style="width: 100%">
+                <el-option label="上架" value="ON_SALE" />
+                <el-option label="下架" value="OFF_SALE" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+      </div>
+
+      <!-- 描述信息区 -->
+      <div class="form-section">
+        <div class="form-section-title">
+          <el-icon><Document /></el-icon>
+          描述信息
+        </div>
+        <el-form-item label="产品描述">
+          <el-input v-model="productForm.description" type="textarea" :rows="2" placeholder="请输入产品描述" />
+        </el-form-item>
+        <el-form-item label="产品特点">
+          <el-input v-model="productForm.features" type="textarea" :rows="2" placeholder="请输入产品特点，如：保额高、保障全、理赔快" />
+        </el-form-item>
+      </div>
+
+      <!-- 图片与模板区 -->
+      <div class="form-section">
+        <div class="form-section-title">
+          <el-icon><Picture /></el-icon>
+          图片与模板
+        </div>
+        <div class="upload-row">
+          <div class="upload-item">
+            <div class="upload-label">产品图片</div>
+            <el-upload
+              class="product-image-uploader"
+              :action="`/api/images/product/${productForm.id}/upload`"
+              :disabled="!productForm.id"
+              :show-file-list="false"
+              :on-success="handleImageUploadSuccess"
+              :on-error="handleImageUploadError"
+              :before-upload="beforeImageUpload"
+              accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+              :with-credentials="true"
+            >
+              <div v-if="productForm.imageUrl" class="image-preview-wrapper">
+                <img :src="productForm.imageUrl" class="product-image-preview" />
+                <div class="image-overlay">
+                  <el-icon><ZoomIn /></el-icon>
+                  <span>点击更换</span>
+                </div>
+              </div>
+              <div v-else class="image-placeholder">
+                <el-icon class="placeholder-icon"><Plus /></el-icon>
+                <span>{{ productForm.id ? '上传图片' : '保存后上传' }}</span>
+              </div>
+            </el-upload>
+            <div class="upload-actions" v-if="productForm.id && productForm.imageUrl">
+              <el-button size="small" type="danger" @click="deleteProductImage">删除图片</el-button>
+            </div>
           </div>
-          <div class="template-upload-tip">
-            {{ productForm.id ? '支持 PDF、Word、Excel、TXT 格式，大小不超过 10MB' : '请先保存产品后再上传模板文件' }}
+          <div class="upload-item">
+            <div class="upload-label">模板文件</div>
+            <el-upload
+              class="template-uploader"
+              :action="`/api/images/product/${productForm.id}/template`"
+              :disabled="!productForm.id"
+              :show-file-list="false"
+              :on-success="handleTemplateUploadSuccess"
+              :on-error="handleTemplateUploadError"
+              :before-upload="beforeTemplateUpload"
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.txt"
+              :with-credentials="true"
+              method="post"
+            >
+              <el-button type="primary">
+                <el-icon><Upload /></el-icon>
+                {{ productForm.templateFileName ? '更换模板' : '上传模板' }}
+              </el-button>
+            </el-upload>
+            <div v-if="productForm.templateFileName" class="template-file-info">
+              <el-icon><Document /></el-icon>
+              <span class="template-file-name">{{ productForm.templateFileName }}</span>
+              <el-button size="small" type="primary" link @click="downloadTemplate">下载</el-button>
+              <el-button size="small" type="danger" link @click="deleteTemplate">删除</el-button>
+            </div>
+            <div class="upload-tip">
+              支持 PDF、Word、Excel、TXT
+            </div>
           </div>
         </div>
-      </el-form-item>
-    </el-form>
+      </div>
+    </div>
     <template #footer>
-      <span class="dialog-footer">
+      <div class="dialog-footer">
         <el-button @click="productDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="productSubmitting" @click="saveProduct">保存</el-button>
-      </span>
+        <el-button type="primary" :loading="productSubmitting" @click="saveProduct">
+          <el-icon><Check /></el-icon>
+          保存
+        </el-button>
+      </div>
     </template>
   </el-dialog>
 
@@ -178,13 +242,12 @@
         height="420"
         empty-text="暂无可确认的数据"
       >
-        <el-table-column prop="rowNumber" label="行号" width="80" />
+        <el-table-column type="index" label="序号" width="80" :index="index => index + 1" />
         <el-table-column prop="planName" label="方案名称" min-width="180" show-overflow-tooltip />
         <el-table-column prop="beneficiaryName" label="被保人姓名" min-width="120" show-overflow-tooltip />
         <el-table-column prop="beneficiaryId" label="证件号" min-width="180" show-overflow-tooltip />
         <el-table-column prop="beneficiaryJob" label="职业" min-width="120" show-overflow-tooltip />
         <el-table-column prop="count" label="份数" width="80" />
-        <el-table-column prop="address" label="地址" min-width="160" show-overflow-tooltip />
         <el-table-column prop="agent" label="业务员" min-width="120" show-overflow-tooltip />
       </el-table>
     </div>
@@ -289,8 +352,8 @@
         </el-col>
         <el-col :span="12">
           <div class="info-item">
-            <span class="label">单价：</span>
-            <span class="value price">¥{{ selectedProduct.price }}</span>
+            <span class="label">原始单价：</span>
+            <span class="value price">¥{{ Number(selectedProduct.price || 0).toFixed(2) }}</span>
           </div>
         </el-col>
       </el-row>
@@ -306,6 +369,17 @@
           <el-option label="旅游险" value="travel"></el-option>
           <el-option label="驾乘险" value="maternity"></el-option>
         </el-select>
+      </el-form-item>
+      <el-form-item label="显示价格" prop="displayPrice">
+        <el-input-number
+          v-model="activeForm.displayPrice"
+          :min="0.01"
+          :precision="2"
+          :step="0.01"
+          controls-position="right"
+          style="width: 100%;"
+        />
+        <div style="margin-top: 4px; color: #909399; font-size: 12px;">打印 PDF 凭证时将使用此价格</div>
       </el-form-item>
       <el-form-item label="被保人姓名" prop="beneficiaryName">
         <el-input v-model="activeForm.beneficiaryName" placeholder="请输入被保人姓名"></el-input>
@@ -346,12 +420,12 @@
         </div>
         <div class="summary-row" v-if="selectedProduct">
           <span>应付金额：</span>
-          <span class="amount">¥{{ (selectedProduct.price * activeForm.count).toFixed(2) }}</span>
+          <span class="amount">¥{{ getActiveTotalAmount().toFixed(2) }}</span>
         </div>
         <div class="summary-row" v-if="selectedProduct">
           <span>余额不足：</span>
-          <span :class="['remain', balance >= selectedProduct.price * activeForm.count ? 'enough' : 'not-enough']">
-            {{ balance >= selectedProduct.price * activeForm.count ? '否' : '是，请先充值' }}
+          <span :class="['remain', balance >= getActiveTotalAmount() ? 'enough' : 'not-enough']">
+            {{ balance >= getActiveTotalAmount() ? '否' : '是，请先充值' }}
           </span>
         </div>
       </div>
@@ -360,7 +434,7 @@
       <span class="dialog-footer">
         <el-button @click="activeDialogVisible = false">取消</el-button>
         <el-button :loading="draftSubmitting" @click="saveDraftForm">保存待提交</el-button>
-        <el-button type="primary" :loading="activeSubmitting" :disabled="selectedProduct && balance < selectedProduct.price * activeForm.count" @click="submitActiveForm">提交审核</el-button>
+        <el-button type="primary" :loading="activeSubmitting" :disabled="selectedProduct && balance < getActiveTotalAmount()" @click="submitActiveForm">提交审核</el-button>
       </span>
     </template>
   </el-dialog>
@@ -387,7 +461,11 @@ import {
   Document,
   Delete,
   Plus,
-  Upload
+  Upload,
+  InfoFilled,
+  Picture,
+  ZoomIn,
+  Check
 } from '@element-plus/icons-vue'
 import { useHomeDialogBridge } from '@/composables/home/useHomeDialogBridge.js'
 
@@ -397,7 +475,11 @@ export default {
     Document,
     Upload,
     Plus,
-    Delete
+    Delete,
+    InfoFilled,
+    Picture,
+    ZoomIn,
+    Check
   },
   setup() {
     const { bridge } = useHomeDialogBridge(['productInsuranceBatchUploadRef', 'activeFormRef'])

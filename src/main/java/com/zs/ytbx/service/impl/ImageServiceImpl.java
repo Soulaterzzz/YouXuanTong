@@ -15,6 +15,12 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.awt.Color;
+import java.awt.Font;
+import java.awt.GradientPaint;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -55,6 +61,35 @@ public class ImageServiceImpl implements ImageService {
         }
 
         return getDefaultImage();
+    }
+
+    @Override
+    public String getProductImageContentType(Long productId) {
+        AxxProductEntity product = productMapper.selectById(productId);
+        if (product == null) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "产品不存在");
+        }
+
+        if (product.getImageContentType() != null && !product.getImageContentType().isEmpty()) {
+            return product.getImageContentType();
+        }
+
+        String imagePath = product.getImagePath();
+        if (imagePath != null && !imagePath.isEmpty()) {
+            try {
+                Path path = Paths.get(imagePath);
+                if (Files.exists(path)) {
+                    String contentType = Files.probeContentType(path);
+                    if (contentType != null && !contentType.isEmpty()) {
+                        return contentType;
+                    }
+                }
+            } catch (IOException e) {
+                log.warn("探测产品图片内容类型失败: productId={}, path={}", productId, imagePath, e);
+            }
+        }
+
+        return "image/jpeg";
     }
 
     @Override
@@ -172,7 +207,37 @@ public class ImageServiceImpl implements ImageService {
     }
 
     private byte[] getDefaultImage() {
-        return new byte[0];
+        try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            BufferedImage image = new BufferedImage(800, 500, BufferedImage.TYPE_INT_RGB);
+            Graphics2D graphics = image.createGraphics();
+            try {
+                graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                graphics.setPaint(new GradientPaint(0, 0, new Color(247, 250, 252), 800, 500, new Color(226, 232, 240)));
+                graphics.fillRect(0, 0, 800, 500);
+
+                graphics.setColor(new Color(230, 0, 18));
+                graphics.fillRoundRect(282, 132, 236, 236, 42, 42);
+
+                graphics.setColor(Color.WHITE);
+                graphics.setFont(new Font("SansSerif", Font.BOLD, 58));
+                String title = "暂无图片";
+                int titleWidth = graphics.getFontMetrics().stringWidth(title);
+                graphics.drawString(title, (800 - titleWidth) / 2, 272);
+
+                graphics.setFont(new Font("SansSerif", Font.PLAIN, 24));
+                String subtitle = "点击上传产品图片";
+                int subtitleWidth = graphics.getFontMetrics().stringWidth(subtitle);
+                graphics.drawString(subtitle, (800 - subtitleWidth) / 2, 320);
+            } finally {
+                graphics.dispose();
+            }
+
+            javax.imageio.ImageIO.write(image, "jpg", outputStream);
+            return outputStream.toByteArray();
+        } catch (IOException e) {
+            log.warn("生成默认产品图片失败", e);
+            return new byte[0];
+        }
     }
 
     @Override
@@ -288,7 +353,25 @@ public class ImageServiceImpl implements ImageService {
 
     @Override
     public void deleteProductTemplate(Long productId) {
-        log.info("删除产品模板: productId={}", productId);
+        AxxProductEntity product = productMapper.selectById(productId);
+        if (product == null) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "产品不存在");
+        }
+
+        String templatePath = product.getTemplateFilePath();
+        if (templatePath != null && !templatePath.isEmpty()) {
+            try {
+                Path path = Paths.get(templatePath);
+                Files.deleteIfExists(path);
+                log.info("删除产品模板文件: {}", templatePath);
+            } catch (IOException e) {
+                log.error("删除产品模板文件失败: {}", templatePath, e);
+            }
+        }
+
+        product.setTemplateFileName(null);
+        product.setTemplateFilePath(null);
+        productMapper.updateById(product);
     }
 
     private void validateTemplateFile(MultipartFile file) {
