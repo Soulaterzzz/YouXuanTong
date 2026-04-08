@@ -176,6 +176,14 @@ npm test
 
 ---
 
+## 部署优化说明
+
+- `deploy/server-bootstrap-ubuntu.sh` 现在会先判断系统依赖是否已安装，已安装时会跳过 `apt-get update`、Docker 源配置和重复安装。
+- 部署镜像会根据 `Dockerfile`、后端源码、前端源码和 `lockfile` 生成指纹，未变化时直接 `docker compose up -d --no-build`，只有代码或构建配置变化时才重新构建。
+- `deploy/docker-compose.yml` 为 MySQL 和应用都补了更短的健康检查间隔，首次启动和部署后的等待时间会更短。
+
+---
+
 ## 数据库说明
 
 ### 初始化脚本

@@ -84,17 +84,40 @@ jobs:
       - name: Deploy application
         id: deploy
         run: |
+          set -euo pipefail
+          PROJECT_ROOT="$PWD"
+          export PROJECT_ROOT
+          # shellcheck source=/dev/null
+          source deploy/deploy-utils.sh
+
+          DEPLOY_FINGERPRINT="$(compute_deploy_fingerprint)"
+          export DEPLOY_FINGERPRINT
+
           START_TIME=$(date +%s)
           echo "::group::构建并启动服务"
 
-          if docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --build --remove-orphans; then
-            END_TIME=$(date +%s)
-            DEPLOY_DURATION=$((END_TIME - START_TIME))
-            echo "DEPLOY_DURATION=${DEPLOY_DURATION}" >> "$GITHUB_ENV"
-            echo "部署构建耗时: ${DEPLOY_DURATION} 秒"
+          if deploy_image_needs_rebuild "${DEPLOY_FINGERPRINT}"; then
+            echo "部署指纹已变化，执行镜像构建"
+            if docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --build --remove-orphans; then
+              END_TIME=$(date +%s)
+              DEPLOY_DURATION=$((END_TIME - START_TIME))
+              echo "DEPLOY_DURATION=${DEPLOY_DURATION}" >> "$GITHUB_ENV"
+              echo "部署构建耗时: ${DEPLOY_DURATION} 秒"
+            else
+              echo "::error::部署构建失败"
+              exit 1
+            fi
           else
-            echo "::error::部署构建失败"
-            exit 1
+            echo "部署指纹未变化，跳过镜像构建，直接启动容器"
+            if docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --no-build --remove-orphans; then
+              END_TIME=$(date +%s)
+              DEPLOY_DURATION=$((END_TIME - START_TIME))
+              echo "DEPLOY_DURATION=${DEPLOY_DURATION}" >> "$GITHUB_ENV"
+              echo "部署耗时: ${DEPLOY_DURATION} 秒"
+            else
+              echo "::error::部署启动失败"
+              exit 1
+            fi
           fi
 
           echo "::endgroup::"
@@ -103,20 +126,19 @@ jobs:
         id: health
         if: steps.deploy.outcome == 'success'
         run: |
-          source deploy/.env
-          APP_PORT="${APP_PORT:-8080}"
-          HEALTH_URL="http://127.0.0.1:${APP_PORT}"
+          set -euo pipefail
           MAX_ATTEMPTS=30
           ATTEMPT=0
 
-          echo "等待服务启动..."
+          echo "等待容器健康状态..."
           while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
-            if curl -sf "$HEALTH_URL" >/dev/null 2>&1; then
+            STATUS=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' ytbx-app 2>/dev/null || true)
+            if [ "$STATUS" = "healthy" ]; then
               echo "服务健康检查通过 (耗时 $((ATTEMPT * 2)) 秒)"
               exit 0
             fi
             ATTEMPT=$((ATTEMPT + 1))
-            echo "等待中... ($ATTEMPT/$MAX_ATTEMPTS)"
+            echo "等待中... ($ATTEMPT/$MAX_ATTEMPTS), 当前状态: ${STATUS:-unknown}"
             sleep 2
           done
 

@@ -41,6 +41,9 @@ RUN mvn -B -Dmaven.test.skip=true clean package spring-boot:repackage \
 # ============================================
 FROM eclipse-temurin:17-jre-alpine
 
+ARG DEPLOY_FINGERPRINT=unknown
+LABEL com.zs.ytbx.deploy-fingerprint="${DEPLOY_FINGERPRINT}"
+
 # 安装必要工具和时区数据（精简版）
 RUN apk add --no-cache tzdata curl && \
     cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \

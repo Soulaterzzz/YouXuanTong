@@ -67,6 +67,12 @@ if [[ ! -f "${PROJECT_ROOT}/deploy/docker-compose.yml" ]]; then
   exit 1
 fi
 
+DEPLOY_UTILS_FILE="${PROJECT_ROOT}/deploy/deploy-utils.sh"
+if [[ -f "${DEPLOY_UTILS_FILE}" ]]; then
+  # shellcheck source=/dev/null
+  . "${DEPLOY_UTILS_FILE}"
+fi
+
 # ============================================================================
 # 包安装函数
 # ============================================================================
@@ -158,24 +164,48 @@ update_package_index() {
 
 # 安装基础软件包和 Docker（合并为一次安装）
 install_all_packages() {
-  local base_packages="ca-certificates curl git gnupg nginx openssl"
-  local docker_packages="docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
+  local base_packages=(ca-certificates curl git gnupg openssl)
+  local docker_packages=(docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin)
+  local missing_packages=()
+  local missing_base=()
+  local missing_docker=()
+  local docker_install_required="0"
 
-  # 检查需要安装的包
-  local missing_base=($(get_missing_packages ${base_packages}))
-  local missing_packages=("${missing_base[@]}")
+  if [[ "${ENABLE_NGINX}" == "1" ]]; then
+    base_packages+=(nginx)
+  fi
 
-  # 检查 Docker 是否已安装
+  # 仅在缺包时才进入 apt 安装流程
+  missing_base=($(get_missing_packages "${base_packages[@]}"))
+  if [[ ${#missing_base[@]} -gt 0 ]]; then
+    missing_packages+=("${missing_base[@]}")
+  fi
+
   if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
-    log "INFO" "Docker 已安装，跳过 Docker 安装"
+    missing_docker=($(get_missing_packages "${docker_packages[@]}"))
+    if [[ ${#missing_docker[@]} -gt 0 ]]; then
+      docker_install_required="1"
+      missing_packages+=("${missing_docker[@]}")
+    fi
   else
-    log "INFO" "Docker 未安装或版本不兼容"
-    missing_packages+=(${docker_packages})
+    docker_install_required="1"
+    missing_docker=("${docker_packages[@]}")
+    missing_packages+=("${missing_docker[@]}")
   fi
 
   if [[ ${#missing_packages[@]} -eq 0 ]]; then
-    log "INFO" "所有依赖包已安装"
+    log "INFO" "运行依赖已全部安装，跳过 apt 更新和安装"
     return 0
+  fi
+
+  if [[ "${docker_install_required}" == "1" ]]; then
+    log "INFO" "检测到 Docker 依赖缺失，准备更新 Docker 源并修复旧包"
+    remove_old_docker_packages
+    configure_docker_repository
+  fi
+
+  if ! update_package_index; then
+    return 1
   fi
 
   log "INFO" "即将安装以下软件包: ${missing_packages[*]}"
@@ -768,12 +798,44 @@ configure_user_group() {
 
 prepare_directories() {
   log "INFO" "准备必要的目录..."
-  mkdir -p /opt/ytbx
-  mkdir -p "${HOST_UPLOAD_DIR}/templates"
-  chmod -R 775 "${HOST_UPLOAD_DIR}"
+  local upload_dir_created="0"
+  local current_uid=""
+  local current_gid=""
+  local expected_uid=""
+  local expected_gid=""
+  local recursive_fix_required="0"
 
-  if [[ -n "${PRIMARY_USER}" ]]; then
-    chown -R "${PRIMARY_USER}:${PRIMARY_USER}" "${HOST_UPLOAD_DIR}" 2>/dev/null || true
+  mkdir -p /opt/ytbx
+  if [[ ! -d "${HOST_UPLOAD_DIR}" ]]; then
+    upload_dir_created="1"
+  fi
+  mkdir -p "${HOST_UPLOAD_DIR}/templates"
+  chmod 775 "${HOST_UPLOAD_DIR}" 2>/dev/null || true
+  chmod 775 "${HOST_UPLOAD_DIR}/templates" 2>/dev/null || true
+
+  if [[ "${upload_dir_created}" == "1" ]]; then
+    recursive_fix_required="1"
+  elif [[ -n "${PRIMARY_USER}" ]] && id -u "${PRIMARY_USER}" >/dev/null 2>&1; then
+    expected_uid="$(id -u "${PRIMARY_USER}")"
+    expected_gid="$(id -g "${PRIMARY_USER}")"
+    current_uid="$(stat -c '%u' "${HOST_UPLOAD_DIR}" 2>/dev/null || echo "")"
+    current_gid="$(stat -c '%g' "${HOST_UPLOAD_DIR}" 2>/dev/null || echo "")"
+    if [[ "${current_uid}" != "${expected_uid}" || "${current_gid}" != "${expected_gid}" ]]; then
+      recursive_fix_required="1"
+    fi
+  fi
+
+  if [[ "${recursive_fix_required}" == "1" ]]; then
+    log "INFO" "上传目录首次创建或属主不匹配，执行一次性递归权限修复"
+    chmod -R 775 "${HOST_UPLOAD_DIR}" 2>/dev/null || true
+    if [[ -n "${PRIMARY_USER}" ]] && id -u "${PRIMARY_USER}" >/dev/null 2>&1; then
+      chown -R "${PRIMARY_USER}:${PRIMARY_USER}" "${HOST_UPLOAD_DIR}" 2>/dev/null || true
+    fi
+  else
+    log "INFO" "上传目录已存在且权限正常，跳过递归修复"
+    if [[ -n "${PRIMARY_USER}" ]] && id -u "${PRIMARY_USER}" >/dev/null 2>&1; then
+      chown "${PRIMARY_USER}:${PRIMARY_USER}" "${HOST_UPLOAD_DIR}" 2>/dev/null || true
+    fi
   fi
 
   log "INFO" "目录准备完成"
@@ -865,12 +927,28 @@ EOF_NGINX
 start_services() {
   log "INFO" "启动 Docker 服务..."
   cd "${PROJECT_ROOT}"
+  local deploy_fingerprint
+  local compose_cmd=(docker compose --env-file deploy/.env -f deploy/docker-compose.yml)
 
-  if docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --build > >(tee -a "${LOG_FILE}") 2>&1; then
-    log "INFO" "服务启动成功"
+  deploy_fingerprint="$(compute_deploy_fingerprint)"
+  export DEPLOY_FINGERPRINT="${deploy_fingerprint}"
+
+  if deploy_image_needs_rebuild "${deploy_fingerprint}"; then
+    log "INFO" "部署指纹变化或镜像不存在，执行镜像构建"
+    if "${compose_cmd[@]}" up -d --build --remove-orphans > >(tee -a "${LOG_FILE}") 2>&1; then
+      log "INFO" "服务启动成功"
+    else
+      log "ERROR" "服务启动失败"
+      return 1
+    fi
   else
-    log "ERROR" "服务启动失败"
-    return 1
+    log "INFO" "部署指纹未变化，跳过镜像构建，直接启动容器"
+    if "${compose_cmd[@]}" up -d --no-build --remove-orphans > >(tee -a "${LOG_FILE}") 2>&1; then
+      log "INFO" "服务启动成功"
+    else
+      log "ERROR" "服务启动失败"
+      return 1
+    fi
   fi
 }
 
@@ -878,15 +956,44 @@ start_services() {
 check_service_health() {
   local max_attempts=30
   local attempt=0
-  local health_url="http://127.0.0.1:${APP_PORT}"
+  local container_name="ytbx-app"
+  local health_status=""
 
   log "INFO" "检查服务健康状态..."
+
+  if command -v docker >/dev/null 2>&1; then
+    while [[ ${attempt} -lt ${max_attempts} ]]; do
+      health_status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "${container_name}" 2>/dev/null || true)"
+      case "${health_status}" in
+        healthy)
+          log "INFO" "服务健康检查通过"
+          return 0
+          ;;
+        unhealthy)
+          log "WARN" "容器健康状态异常，继续等待... (${attempt + 1}/${max_attempts})"
+          ;;
+        running|starting|created|"")
+          log "INFO" "等待容器健康状态... (${attempt + 1}/${max_attempts})"
+          ;;
+        *)
+          log "INFO" "当前容器状态: ${health_status}，继续等待... (${attempt + 1}/${max_attempts})"
+          ;;
+      esac
+
+      attempt=$((attempt + 1))
+      sleep 2
+    done
+
+    log "WARN" "容器健康检查超时，请手动检查服务状态"
+    return 1
+  fi
 
   if ! command -v curl >/dev/null 2>&1; then
     log "WARN" "curl 命令不可用，跳过健康检查"
     return 0
   fi
 
+  local health_url="http://127.0.0.1:${APP_PORT}"
   while [[ ${attempt} -lt ${max_attempts} ]]; do
     if curl -sf "${health_url}" >/dev/null 2>&1; then
       log "INFO" "服务健康检查通过"
@@ -1231,11 +1338,7 @@ main() {
   validate_configuration
   hydrate_defaults
 
-  # 安装依赖（先尝试配置国内源）
-  configure_chinese_apt_mirrors
-  update_package_index
-  remove_old_docker_packages
-  configure_docker_repository
+  # 安装依赖（按需执行）
   install_all_packages
   start_docker_service
 
