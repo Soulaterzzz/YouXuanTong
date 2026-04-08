@@ -13,7 +13,6 @@ public class ProductDetailVO {
     private String description;
     private String features;
     private BigDecimal price;
-    private Integer stock;
     private boolean isNew;
     private String categoryCode;
     private String companyName;

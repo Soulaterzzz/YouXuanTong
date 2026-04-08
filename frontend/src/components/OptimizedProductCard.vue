@@ -1,28 +1,36 @@
 <template>
-  <div class="optimized-product-card">
-    <!-- 产品图片区域 -->
-    <div class="product-image-wrapper" @click="previewImage(product)">
-      <img :src="getProductImage(product)" :alt="product.name" class="product-image">
+  <article class="optimized-product-card">
+    <button type="button" class="product-image-wrapper" @click="$emit('preview-image', product)">
+      <img
+        :src="getProductImage(product)"
+        :alt="`保险产品 ${product.name}`"
+        class="product-image"
+        loading="lazy"
+      >
       <div class="image-overlay">
         <el-icon><ZoomIn /></el-icon>
         <span>点击放大</span>
       </div>
-      <!-- 标签 -->
       <div class="product-badges">
         <span class="badge new" v-if="product.isNew">新品</span>
         <span class="badge hot" v-if="product.isHot">热门</span>
       </div>
-    </div>
+    </button>
 
-    <!-- 产品内容区域 -->
     <div class="product-content">
-      <!-- 标题和类别 -->
       <div class="product-header">
-        <h3 class="product-name">{{ product.name }}</h3>
-        <span class="product-category">{{ product.category }}</span>
+        <div class="title-stack">
+          <h3 class="product-name">{{ product.name }}</h3>
+          <span class="product-category">{{ getCategoryLabel(product.categoryCode) }}</span>
+        </div>
+        <span
+          class="product-status"
+          :class="product.saleStatus === 'ON_SALE' ? 'on-sale' : 'off-sale'"
+        >
+          {{ getSaleStatusLabel(product.saleStatus) }}
+        </span>
       </div>
 
-      <!-- 描述信息 -->
       <div class="product-description">
         <p class="description-text" v-if="product.description">{{ product.description }}</p>
         <p class="features-text" v-if="product.features">
@@ -31,321 +39,358 @@
         </p>
       </div>
 
-      <!-- 价格和库存信息 - 优化布局 -->
       <div class="product-info-row">
-        <!-- 价格信息 -->
         <div class="info-item price-info">
-          <span class="info-label">价格：</span>
-          <span class="info-value price-value">¥{{ product.price }}</span>
+          <span class="info-label">价格</span>
+          <span class="info-value price-value">¥{{ formatMoney(product.price) }}</span>
         </div>
-        <!-- 库存信息 -->
         <div class="info-item stock-info">
-          <span class="info-label">库存：</span>
-          <span class="info-value stock-value" :class="{ 'low-stock': product.stock < 10 }">
-            {{ product.stock > 0 ? product.stock : '充足' }}
+          <span class="info-label">库存</span>
+          <span class="info-value stock-value" :class="{ 'low-stock': product.stock > 0 && product.stock < 10 }">
+            {{ formatStock(product.stock) }}
           </span>
         </div>
       </div>
 
-      <!-- 操作按钮区域 -->
-      <div class="product-actions" v-if="isAdmin">
-        <el-button type="primary" size="small" @click="editProduct(product)">
+      <div class="product-actions">
+        <el-button v-if="isAdmin" type="primary" size="small" @click="$emit('open-product-dialog', product)">
           <el-icon><Edit /></el-icon>
           编辑
         </el-button>
-        <el-button :type="product.saleStatus === 'ON_SALE' ? 'danger' : 'success'"
-                   size="small"
-                   @click="toggleProductStatus(product)">
+        <el-button
+          v-if="isAdmin"
+          :type="product.saleStatus === 'ON_SALE' ? 'danger' : 'success'"
+          size="small"
+          @click="$emit('toggle-product-status', product)"
+        >
           <el-icon><Switch /></el-icon>
           {{ product.saleStatus === 'ON_SALE' ? '下架' : '上架' }}
         </el-button>
-        <el-button type="danger" size="small" @click="deleteProduct(product)">
+        <el-button v-if="isAdmin" type="danger" plain size="small" @click="$emit('delete-product', product)">
           <el-icon><Delete /></el-icon>
           删除
         </el-button>
+        <el-button
+          type="warning"
+          plain
+          size="small"
+          :disabled="!product.templateFileName"
+          @click="$emit('open-batch-dialog', product)"
+        >
+          <el-icon><Upload /></el-icon>
+          批量激活
+        </el-button>
+        <el-button
+          type="primary"
+          plain
+          size="small"
+          :disabled="!product.templateFileName"
+          @click="$emit('download-template', product)"
+        >
+          <el-icon><Download /></el-icon>
+          下载模板
+        </el-button>
+        <el-button
+          type="warning"
+          size="small"
+          :disabled="product.saleStatus && product.saleStatus !== 'ON_SALE'"
+          @click="$emit('open-activate-dialog', product)"
+        >
+          <el-icon><Lightning /></el-icon>
+          激活
+        </el-button>
       </div>
     </div>
-  </div>
+  </article>
 </template>
 
-<script>
-import { ZoomIn, Star, Edit, Switch, Delete } from '@element-plus/icons-vue'
+<script setup>
+import { ZoomIn, Star, Edit, Switch, Delete, Upload, Download, Lightning } from '@element-plus/icons-vue'
+import { formatMoney, formatStock, getCategoryLabel, getProductImage, getSaleStatusLabel } from '@/utils/home/product.js'
 
-export default {
-  name: 'OptimizedProductCard',
-  components: {
-    ZoomIn, Star, Edit, Switch, Delete
+defineProps({
+  product: {
+    type: Object,
+    required: true
   },
-  props: {
-    product: {
-      type: Object,
-      required: true
-    },
-    isAdmin: {
-      type: Boolean,
-      default: false
-    }
-  },
-  methods: {
-    previewImage(product) {
-      // 预览图片逻辑
-    },
-    editProduct(product) {
-      // 编辑产品逻辑
-    },
-    toggleProductStatus(product) {
-      // 切换产品状态逻辑
-    },
-    deleteProduct(product) {
-      // 删除产品逻辑
-    },
-    getProductImage(product) {
-      // 获取产品图片逻辑
-      return product.imageUrl || 'placeholder.png'
-    }
+  isAdmin: {
+    type: Boolean,
+    default: false
   }
-}
+})
+
+defineEmits([
+  'preview-image',
+  'open-product-dialog',
+  'toggle-product-status',
+  'delete-product',
+  'open-batch-dialog',
+  'download-template',
+  'open-activate-dialog'
+])
 </script>
 
 <style scoped>
 .optimized-product-card {
-  display: flex;
-  flex-direction: column;
-  border-radius: 12px;
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 0;
+  align-items: stretch;
   overflow: hidden;
-  background: #ffffff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
-  height: 100%;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
 
 .optimized-product-card:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   transform: translateY(-2px);
+  border-color: rgba(230, 0, 18, 0.18);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.1);
 }
 
-/* 产品图片区域 */
 .product-image-wrapper {
   position: relative;
   width: 100%;
-  height: 200px;
-  overflow: hidden;
-  background: #f5f7fa;
+  min-height: 100%;
+  border: 0;
+  padding: 0;
   cursor: pointer;
+  overflow: hidden;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e6ebf2 100%);
 }
 
 .product-image {
   width: 100%;
   height: 100%;
-  object-fit: contain;
-  transition: transform 0.3s ease;
+  object-fit: cover;
+  transition: transform 0.35s ease;
+}
+
+.product-image-wrapper:hover .product-image {
+  transform: scale(1.04);
 }
 
 .image-overlay {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  inset: auto 0 0;
+  padding: 14px 12px 12px;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  color: #ffffff;
   gap: 8px;
+  color: #fff;
+  background: linear-gradient(180deg, transparent 0%, rgba(15, 23, 42, 0.76) 100%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
 }
 
 .product-image-wrapper:hover .image-overlay {
   opacity: 1;
 }
 
-.product-image-wrapper:hover .product-image {
-  transform: scale(1.05);
-}
-
-/* 产品标签 */
 .product-badges {
   position: absolute;
-  top: 12px;
-  left: 12px;
+  top: 10px;
+  left: 10px;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .badge {
-  padding: 4px 12px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #fff;
 }
 
 .badge.new {
-  background: #67c23a;
-  color: #ffffff;
+  background: linear-gradient(135deg, var(--color-primary) 0%, #ff4d5a 100%);
 }
 
 .badge.hot {
-  background: #e6a23c;
-  color: #ffffff;
+  background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
 }
 
-/* 产品内容区域 */
 .product-content {
-  flex: 1;
-  padding: 16px;
+  padding: 14px 14px 12px;
   display: flex;
   flex-direction: column;
+  gap: 10px;
+  min-width: 0;
 }
 
-/* 产品标题和类别 */
 .product-header {
   display: flex;
+  align-items: flex-start;
   justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: 12px;
+}
+
+.title-stack {
+  min-width: 0;
+  flex: 1;
 }
 
 .product-name {
-  flex: 1;
-  font-size: 16px;
-  font-weight: 600;
-  color: #303133;
-  line-height: 1.4;
   margin: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  font-size: 16px;
+  line-height: 1.35;
+  font-weight: 800;
+  color: #101828;
 }
 
 .product-category {
-  font-size: 12px;
-  padding: 4px 8px;
-  background: #ecf5ff;
-  color: #409eff;
-  border-radius: 4px;
+  display: inline-flex;
+  margin-top: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0, 59, 114, 0.08);
+  color: var(--color-secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.product-status {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
   white-space: nowrap;
 }
 
-/* 产品描述 */
+.product-status.on-sale {
+  background: rgba(46, 125, 50, 0.1);
+  color: #2e7d32;
+}
+
+.product-status.off-sale {
+  background: rgba(198, 40, 40, 0.1);
+  color: #c62828;
+}
+
 .product-description {
-  margin-bottom: 12px;
-  flex: 1;
-  overflow: hidden;
-}
-
-.description-text {
-  font-size: 14px;
-  color: #606266;
-  line-height: 1.5;
-  margin: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
-.features-text {
-  font-size: 13px;
-  color: #909399;
-  line-height: 1.4;
-  margin: 0;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 6px;
 }
 
-/* 价格和库存信息行 - 优化布局 */
+.description-text {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #475467;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.features-text {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #667085;
+  font-size: 11px;
+  line-height: 1.45;
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.features-text .el-icon {
+  color: #f59e0b;
+  margin-top: 2px;
+}
+
 .product-info-row {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  margin-top: auto;
-  padding-top: 12px;
-  border-top: 1px solid #ebeef5;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .info-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+  flex: 1 1 120px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: #fff;
 }
 
 .info-label {
-  font-size: 13px;
-  color: #909399;
+  display: block;
+  margin-bottom: 4px;
+  font-size: 10px;
+  color: #98a2b3;
 }
 
 .info-value {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 800;
 }
 
 .price-value {
-  color: #f56c6c;
+  color: var(--color-primary);
 }
 
 .stock-value {
-  color: #67c23a;
+  color: #2e7d32;
 }
 
 .stock-value.low-stock {
-  color: #e6a23c;
+  color: #e64545;
 }
 
-/* 操作按钮区域 */
 .product-actions {
   display: flex;
-  gap: 8px;
-  margin-top: 12px;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 .product-actions .el-button {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
+  flex: 0 0 auto;
+  border-radius: 10px;
 }
 
-/* 响应式布局 */
 @media screen and (max-width: 768px) {
   .optimized-product-card {
-    flex-direction: row;
-    height: auto;
+    grid-template-columns: 96px minmax(0, 1fr);
+  }
+
+  .product-content {
+    padding: 12px;
+  }
+
+  .product-actions .el-button {
+    min-height: 40px;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .optimized-product-card {
+    grid-template-columns: 1fr;
   }
 
   .product-image-wrapper {
-    width: 120px;
-    height: 120px;
-    flex-shrink: 0;
+    min-height: 140px;
   }
 
-  .product-header {
-    flex-direction: column;
-    align-items: flex-start;
+  .product-actions .el-button {
+    width: 100%;
+    justify-content: center;
   }
+}
 
-  .product-name {
-    font-size: 14px;
-  }
-
-  .product-info-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-
-  .product-actions {
-    flex-direction: column;
+@media (pointer: coarse) {
+  .product-actions .el-button {
+    min-height: 44px;
   }
 }
 </style>

@@ -16,6 +16,8 @@ import com.zs.ytbx.mapper.*;
 import com.zs.ytbx.service.AdminService;
 import com.zs.ytbx.vo.anxinxuan.*;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -40,6 +42,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class AdminServiceImpl implements AdminService {
+
+    private static final Logger log = LoggerFactory.getLogger(AdminServiceImpl.class);
 
     private final AxxUserMapper axxUserMapper;
     private final AccountBalanceMapper accountBalanceMapper;
@@ -243,7 +247,6 @@ public class AdminServiceImpl implements AdminService {
         product.setDescription(request.getDescription());
         product.setFeatures(request.getFeatures());
         product.setPrice(request.getPrice());
-        product.setStock(request.getStock() != null ? request.getStock() : 0);
         product.setIsNew(request.getIsNew() != null ? request.getIsNew() : 0);
         product.setIsHot(request.getIsHot() != null ? request.getIsHot() : 0);
         product.setSaleStatus(request.getSaleStatus() != null ? request.getSaleStatus() : "ON_SALE");
@@ -293,9 +296,6 @@ public class AdminServiceImpl implements AdminService {
         }
         if (request.getPrice() != null) {
             product.setPrice(request.getPrice());
-        }
-        if (request.getStock() != null) {
-            product.setStock(request.getStock());
         }
         if (request.getIsNew() != null) {
             product.setIsNew(request.getIsNew());
@@ -509,6 +509,35 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    public void batchApproveInsurances(BatchInsuranceRequest request, Long reviewerId, String reviewerName) {
+        for (Long insuranceId : request.getInsuranceIds()) {
+            try {
+                InsuranceApproveRequest approveRequest = new InsuranceApproveRequest();
+                approveRequest.setReviewComment(request.getReviewComment() != null ? request.getReviewComment() : "批量审核通过");
+                approveInsurance(insuranceId, approveRequest, reviewerId, reviewerName);
+            } catch (Exception e) {
+                log.error("批量审核失败 insuranceId={}", insuranceId, e);
+            }
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void batchRejectInsurances(BatchInsuranceRequest request, Long reviewerId, String reviewerName) {
+        for (Long insuranceId : request.getInsuranceIds()) {
+            try {
+                InsuranceRejectRequest rejectRequest = new InsuranceRejectRequest();
+                rejectRequest.setReviewComment(request.getReviewComment() != null ? request.getReviewComment() : "批量审核拒绝");
+                rejectRequest.setRejectReason(request.getRejectReason() != null ? request.getRejectReason() : "批量审核拒绝");
+                rejectInsurance(insuranceId, rejectRequest, reviewerId, reviewerName);
+            } catch (Exception e) {
+                log.error("批量审核失败 insuranceId={}", insuranceId, e);
+            }
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public void startUnderwriting(Long insuranceId) {
         InsuranceRecordEntity insurance = requireInsurance(insuranceId);
         ensureTransition(insurance, InsuranceStatus.APPROVED, InsuranceStatus.UNDERWRITING);
@@ -685,7 +714,6 @@ public class AdminServiceImpl implements AdminService {
                 .description(entity.getDescription())
                 .features(entity.getFeatures())
                 .price(entity.getPrice())
-                .stock(entity.getStock())
                 .isNew(entity.getIsNew() == 1)
                 .isHot(entity.getIsHot() == 1)
                 .categoryCode(entity.getCategoryCode())
@@ -705,7 +733,6 @@ public class AdminServiceImpl implements AdminService {
                 .description(entity.getDescription())
                 .features(entity.getFeatures())
                 .price(entity.getPrice())
-                .stock(entity.getStock())
                 .isNew(entity.getIsNew() == 1)
                 .categoryCode(entity.getCategoryCode())
                 .companyName(entity.getCompanyName())
@@ -1195,7 +1222,6 @@ public class AdminServiceImpl implements AdminService {
         request.setDescription(getCell(row, 4));
         request.setFeatures(getCell(row, 5));
         request.setPrice(parseBigDecimal(requireCell(row, 6, rowNumber, "价格"), rowNumber, "价格"));
-        request.setStock(parseInteger(getCell(row, 7), rowNumber, "库存", 0));
         request.setIsNew(parseInteger(getCell(row, 8), rowNumber, "是否新品", 0));
         request.setIsHot(parseInteger(getCell(row, 9), rowNumber, "是否热销", 0));
         request.setSaleStatus(normalizeSaleStatus(getCell(row, 10)));

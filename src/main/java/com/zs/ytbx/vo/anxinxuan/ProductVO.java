@@ -14,7 +14,6 @@ public class ProductVO {
     private String description;
     private String features;
     private BigDecimal price;
-    private Integer stock;
     private boolean isNew;
     private boolean isHot;
     private String categoryCode;

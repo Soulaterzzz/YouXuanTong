@@ -1,0 +1,570 @@
+- generic [ref=e21]:
+  - link "跳转到主要内容" [ref=e22] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner [ref=e23]:
+    - generic [ref=e24]:
+      - generic [ref=e25]: 优选通
+      - generic [ref=e26]: 保险服务平台
+    - navigation [ref=e27]:
+      - menubar [ref=e28]:
+        - menuitem "首页" [ref=e29] [cursor=pointer]:
+          - img [ref=e31]
+          - generic [ref=e33]: 首页
+        - menuitem "产品中心" [ref=e34] [cursor=pointer]:
+          - img [ref=e36]
+          - generic [ref=e38]: 产品中心
+        - menuitem "费用清单" [ref=e39] [cursor=pointer]:
+          - img [ref=e41]
+          - generic [ref=e43]: 费用清单
+        - menuitem "保险清单" [ref=e44] [cursor=pointer]:
+          - img [ref=e46]
+          - generic [ref=e49]: 保险清单
+        - menuitem "消费明细" [ref=e50] [cursor=pointer]:
+          - img [ref=e52]
+          - generic [ref=e56]: 消费明细
+        - menuitem "用户管理" [ref=e57] [cursor=pointer]:
+          - img [ref=e59]
+          - generic [ref=e61]: 用户管理
+    - button "用户菜单，当前用户 admin" [ref=e65] [cursor=pointer]:
+      - img [ref=e67]
+      - generic [ref=e69]: admin
+      - img [ref=e71]
+  - main [ref=e73]:
+    - generic [ref=e328]:
+      - complementary [ref=e329]:
+        - generic [ref=e330]:
+          - heading "产品类别" [level=3] [ref=e331]:
+            - img [ref=e333]
+            - text: 产品类别
+          - menubar [ref=e335]:
+            - menuitem "全部产品" [ref=e336] [cursor=pointer]:
+              - img [ref=e338]
+              - text: 全部产品
+            - menuitem "1-3类意外" [ref=e340] [cursor=pointer]:
+              - img [ref=e342]
+              - text: 1-3类意外
+            - menuitem "1-4类意外" [ref=e344] [cursor=pointer]:
+              - img [ref=e346]
+              - text: 1-4类意外
+            - menuitem "1-5类意外" [ref=e348] [cursor=pointer]:
+              - img [ref=e350]
+              - text: 1-5类意外
+            - menuitem "1-6类意外" [ref=e352] [cursor=pointer]:
+              - img [ref=e354]
+              - text: 1-6类意外
+            - menuitem "少儿医疗" [ref=e356] [cursor=pointer]:
+              - img [ref=e358]
+              - text: 少儿医疗
+            - menuitem "老年意外" [ref=e360] [cursor=pointer]:
+              - img [ref=e362]
+              - text: 老年意外
+            - menuitem "旅游险" [ref=e367] [cursor=pointer]:
+              - img [ref=e369]
+              - text: 旅游险
+            - menuitem "驾乘险" [ref=e374] [cursor=pointer]:
+              - img [ref=e376]
+              - text: 驾乘险
+      - generic [ref=e381]:
+        - generic [ref=e382]:
+          - generic [ref=e383]:
+            - heading "产品筛选" [level=3] [ref=e384]:
+              - img [ref=e386]
+              - text: 产品筛选
+            - generic [ref=e388]:
+              - button "管理类别" [ref=e389] [cursor=pointer]:
+                - generic [ref=e390]:
+                  - img [ref=e392]
+                  - text: 管理类别
+              - button "管理公司" [active] [ref=e394] [cursor=pointer]:
+                - generic [ref=e395]:
+                  - img [ref=e397]
+                  - text: 管理公司
+              - button "添加产品" [ref=e399] [cursor=pointer]:
+                - generic [ref=e400]:
+                  - img [ref=e402]
+                  - text: 添加产品
+          - generic [ref=e404]:
+            - generic [ref=e405]: 承保公司：
+            - radiogroup "radio-group" [ref=e406]:
+              - generic [ref=e407]:
+                - radio "全部" [checked] [ref=e408]
+                - generic [ref=e409] [cursor=pointer]: 全部
+              - generic [ref=e410]:
+                - radio "国寿财险" [ref=e411]
+                - generic [ref=e412] [cursor=pointer]: 国寿财险
+              - generic [ref=e413]:
+                - radio "平安财险" [ref=e414]
+                - generic [ref=e415] [cursor=pointer]: 平安财险
+              - generic [ref=e416]:
+                - radio "中华联合" [ref=e417]
+                - generic [ref=e418] [cursor=pointer]: 中华联合
+              - generic [ref=e419]:
+                - radio "太平财险" [ref=e420]
+                - generic [ref=e421] [cursor=pointer]: 太平财险
+              - generic [ref=e422]:
+                - radio "人保财险" [ref=e423]
+                - generic [ref=e424] [cursor=pointer]: 人保财险
+        - generic [ref=e426]:
+          - text: 共
+          - strong [ref=e427]: "0"
+          - text: 个产品
+        - generic [ref=e428]:
+          - article [ref=e429]:
+            - button "保险产品 测试1 点击放大" [ref=e430] [cursor=pointer]:
+              - img "保险产品 测试1" [ref=e431]
+              - generic [ref=e432]:
+                - img [ref=e434]
+                - generic [ref=e436]: 点击放大
+            - generic [ref=e437]:
+              - generic [ref=e438]:
+                - generic [ref=e439]:
+                  - heading "测试1" [level=3] [ref=e440]
+                  - generic [ref=e441]: 1-3类意外
+                - generic [ref=e442]: 已上架
+              - generic [ref=e443]:
+                - paragraph [ref=e444]: test
+                - paragraph [ref=e445]:
+                  - img [ref=e447]
+                  - text: test
+              - generic [ref=e449]:
+                - generic [ref=e450]:
+                  - generic [ref=e451]: 价格
+                  - generic [ref=e452]: ¥120.00
+                - generic [ref=e453]:
+                  - generic [ref=e454]: 库存
+                  - generic [ref=e455]: 充足
+              - generic [ref=e456]:
+                - button "编辑" [ref=e457] [cursor=pointer]:
+                  - generic [ref=e458]:
+                    - img [ref=e460]
+                    - text: 编辑
+                - button "下架" [ref=e463] [cursor=pointer]:
+                  - generic [ref=e464]:
+                    - img [ref=e466]
+                    - text: 下架
+                - button "删除" [ref=e468] [cursor=pointer]:
+                  - generic [ref=e469]:
+                    - img [ref=e471]
+                    - text: 删除
+                - button "批量激活" [ref=e473] [cursor=pointer]:
+                  - generic [ref=e474]:
+                    - img [ref=e476]
+                    - text: 批量激活
+                - button "下载模板" [ref=e478] [cursor=pointer]:
+                  - generic [ref=e479]:
+                    - img [ref=e481]
+                    - text: 下载模板
+                - button "激活" [ref=e483] [cursor=pointer]:
+                  - generic [ref=e484]:
+                    - img [ref=e486]
+                    - text: 激活
+          - article [ref=e489]:
+            - button "保险产品 国寿财1-3类10+5+5+50（青柑） 点击放大" [ref=e490] [cursor=pointer]:
+              - img "保险产品 国寿财1-3类10+5+5+50（青柑）" [ref=e491]
+              - generic [ref=e492]:
+                - img [ref=e494]
+                - generic [ref=e496]: 点击放大
+            - generic [ref=e497]:
+              - generic [ref=e498]:
+                - generic [ref=e499]:
+                  - heading "国寿财1-3类10+5+5+50（青柑）" [level=3] [ref=e500]
+                  - generic [ref=e501]: 1-3类意外
+                - generic [ref=e502]: 已上架
+              - generic [ref=e503]:
+                - paragraph [ref=e504]: 个单：18-63周岁；可投保：1-3类职业；T+1生效；每周一三五十点截单
+                - paragraph [ref=e505]:
+                  - img [ref=e507]
+                  - text: 无门诊免赔额；承保动物伤害；意外医疗全额赔付
+              - generic [ref=e509]:
+                - generic [ref=e510]:
+                  - generic [ref=e511]: 价格
+                  - generic [ref=e512]: ¥55.00
+                - generic [ref=e513]:
+                  - generic [ref=e514]: 库存
+                  - generic [ref=e515]: 充足
+              - generic [ref=e516]:
+                - button "编辑" [ref=e517] [cursor=pointer]:
+                  - generic [ref=e518]:
+                    - img [ref=e520]
+                    - text: 编辑
+                - button "下架" [ref=e523] [cursor=pointer]:
+                  - generic [ref=e524]:
+                    - img [ref=e526]
+                    - text: 下架
+                - button "删除" [ref=e528] [cursor=pointer]:
+                  - generic [ref=e529]:
+                    - img [ref=e531]
+                    - text: 删除
+                - button "批量激活" [disabled] [ref=e533]:
+                  - generic [ref=e534]:
+                    - img [ref=e536]
+                    - text: 批量激活
+                - button "下载模板" [disabled] [ref=e538]:
+                  - generic [ref=e539]:
+                    - img [ref=e541]
+                    - text: 下载模板
+                - button "激活" [ref=e543] [cursor=pointer]:
+                  - generic [ref=e544]:
+                    - img [ref=e546]
+                    - text: 激活
+          - article [ref=e549]:
+            - button "保险产品 平安财意外10+1+50+10（含意保） 点击放大" [ref=e550] [cursor=pointer]:
+              - img "保险产品 平安财意外10+1+50+10（含意保）" [ref=e551]
+              - generic [ref=e552]:
+                - img [ref=e554]
+                - generic [ref=e556]: 点击放大
+            - generic [ref=e557]:
+              - generic [ref=e558]:
+                - generic [ref=e559]:
+                  - heading "平安财意外10+1+50+10（含意保）" [level=3] [ref=e560]
+                  - generic [ref=e561]: 1-3类意外
+                - generic [ref=e562]: 已上架
+              - generic [ref=e563]:
+                - paragraph [ref=e564]: 1-3类职业可投；每周一三五十十点截单
+                - paragraph [ref=e565]:
+                  - img [ref=e567]
+                  - text: 限投一份；正常1+6生效；包含住院津贴
+              - generic [ref=e569]:
+                - generic [ref=e570]:
+                  - generic [ref=e571]: 价格
+                  - generic [ref=e572]: ¥60.00
+                - generic [ref=e573]:
+                  - generic [ref=e574]: 库存
+                  - generic [ref=e575]: 充足
+              - generic [ref=e576]:
+                - button "编辑" [ref=e577] [cursor=pointer]:
+                  - generic [ref=e578]:
+                    - img [ref=e580]
+                    - text: 编辑
+                - button "下架" [ref=e583] [cursor=pointer]:
+                  - generic [ref=e584]:
+                    - img [ref=e586]
+                    - text: 下架
+                - button "删除" [ref=e588] [cursor=pointer]:
+                  - generic [ref=e589]:
+                    - img [ref=e591]
+                    - text: 删除
+                - button "批量激活" [disabled] [ref=e593]:
+                  - generic [ref=e594]:
+                    - img [ref=e596]
+                    - text: 批量激活
+                - button "下载模板" [disabled] [ref=e598]:
+                  - generic [ref=e599]:
+                    - img [ref=e601]
+                    - text: 下载模板
+                - button "激活" [ref=e603] [cursor=pointer]:
+                  - generic [ref=e604]:
+                    - img [ref=e606]
+                    - text: 激活
+          - article [ref=e609]:
+            - button "保险产品 少儿门诊医疗险 点击放大" [ref=e610] [cursor=pointer]:
+              - img "保险产品 少儿门诊医疗险" [ref=e611]
+              - generic [ref=e612]:
+                - img [ref=e614]
+                - generic [ref=e616]: 点击放大
+            - generic [ref=e617]:
+              - generic [ref=e618]:
+                - generic [ref=e619]:
+                  - heading "少儿门诊医疗险" [level=3] [ref=e620]
+                  - generic [ref=e621]: 少儿医疗
+                - generic [ref=e622]: 已上架
+              - generic [ref=e623]:
+                - paragraph [ref=e624]: 0-17岁可投保；门急诊可报销；等待期短
+                - paragraph [ref=e625]:
+                  - img [ref=e627]
+                  - text: 门急诊保障；住院医疗；特定疾病额外赔付；不限社保
+              - generic [ref=e629]:
+                - generic [ref=e630]:
+                  - generic [ref=e631]: 价格
+                  - generic [ref=e632]: ¥380.00
+                - generic [ref=e633]:
+                  - generic [ref=e634]: 库存
+                  - generic [ref=e635]: 充足
+              - generic [ref=e636]:
+                - button "编辑" [ref=e637] [cursor=pointer]:
+                  - generic [ref=e638]:
+                    - img [ref=e640]
+                    - text: 编辑
+                - button "下架" [ref=e643] [cursor=pointer]:
+                  - generic [ref=e644]:
+                    - img [ref=e646]
+                    - text: 下架
+                - button "删除" [ref=e648] [cursor=pointer]:
+                  - generic [ref=e649]:
+                    - img [ref=e651]
+                    - text: 删除
+                - button "批量激活" [disabled] [ref=e653]:
+                  - generic [ref=e654]:
+                    - img [ref=e656]
+                    - text: 批量激活
+                - button "下载模板" [disabled] [ref=e658]:
+                  - generic [ref=e659]:
+                    - img [ref=e661]
+                    - text: 下载模板
+                - button "激活" [ref=e663] [cursor=pointer]:
+                  - generic [ref=e664]:
+                    - img [ref=e666]
+                    - text: 激活
+          - article [ref=e669]:
+            - button "保险产品 老年意外险（尊享版） 点击放大" [ref=e670] [cursor=pointer]:
+              - img "保险产品 老年意外险（尊享版）" [ref=e671]
+              - generic [ref=e672]:
+                - img [ref=e674]
+                - generic [ref=e676]: 点击放大
+            - generic [ref=e677]:
+              - generic [ref=e678]:
+                - generic [ref=e679]:
+                  - heading "老年意外险（尊享版）" [level=3] [ref=e680]
+                  - generic [ref=e681]: 老年意外
+                - generic [ref=e682]: 已上架
+              - generic [ref=e683]:
+                - paragraph [ref=e684]: 50-80岁可投保；综合意外保障；高龄专属
+                - paragraph [ref=e685]:
+                  - img [ref=e687]
+                  - text: 意外医疗；骨折津贴；救护车费用；住院护理
+              - generic [ref=e689]:
+                - generic [ref=e690]:
+                  - generic [ref=e691]: 价格
+                  - generic [ref=e692]: ¥200.00
+                - generic [ref=e693]:
+                  - generic [ref=e694]: 库存
+                  - generic [ref=e695]: 充足
+              - generic [ref=e696]:
+                - button "编辑" [ref=e697] [cursor=pointer]:
+                  - generic [ref=e698]:
+                    - img [ref=e700]
+                    - text: 编辑
+                - button "下架" [ref=e703] [cursor=pointer]:
+                  - generic [ref=e704]:
+                    - img [ref=e706]
+                    - text: 下架
+                - button "删除" [ref=e708] [cursor=pointer]:
+                  - generic [ref=e709]:
+                    - img [ref=e711]
+                    - text: 删除
+                - button "批量激活" [disabled] [ref=e713]:
+                  - generic [ref=e714]:
+                    - img [ref=e716]
+                    - text: 批量激活
+                - button "下载模板" [disabled] [ref=e718]:
+                  - generic [ref=e719]:
+                    - img [ref=e721]
+                    - text: 下载模板
+                - button "激活" [ref=e723] [cursor=pointer]:
+                  - generic [ref=e724]:
+                    - img [ref=e726]
+                    - text: 激活
+          - article [ref=e729]:
+            - button "保险产品 国寿财1-4类意外险 点击放大" [ref=e730] [cursor=pointer]:
+              - img "保险产品 国寿财1-4类意外险" [ref=e731]
+              - generic [ref=e732]:
+                - img [ref=e734]
+                - generic [ref=e736]: 点击放大
+            - generic [ref=e737]:
+              - generic [ref=e738]:
+                - generic [ref=e739]:
+                  - heading "国寿财1-4类意外险" [level=3] [ref=e740]
+                  - generic [ref=e741]: 1-4类意外
+                - generic [ref=e742]: 已上架
+              - generic [ref=e743]:
+                - paragraph [ref=e744]: 1-4类职业可投；保障全面；性价比高
+                - paragraph [ref=e745]:
+                  - img [ref=e747]
+                  - text: 意外身故伤残；意外医疗；住院津贴
+              - generic [ref=e749]:
+                - generic [ref=e750]:
+                  - generic [ref=e751]: 价格
+                  - generic [ref=e752]: ¥80.00
+                - generic [ref=e753]:
+                  - generic [ref=e754]: 库存
+                  - generic [ref=e755]: 充足
+              - generic [ref=e756]:
+                - button "编辑" [ref=e757] [cursor=pointer]:
+                  - generic [ref=e758]:
+                    - img [ref=e760]
+                    - text: 编辑
+                - button "下架" [ref=e763] [cursor=pointer]:
+                  - generic [ref=e764]:
+                    - img [ref=e766]
+                    - text: 下架
+                - button "删除" [ref=e768] [cursor=pointer]:
+                  - generic [ref=e769]:
+                    - img [ref=e771]
+                    - text: 删除
+                - button "批量激活" [disabled] [ref=e773]:
+                  - generic [ref=e774]:
+                    - img [ref=e776]
+                    - text: 批量激活
+                - button "下载模板" [disabled] [ref=e778]:
+                  - generic [ref=e779]:
+                    - img [ref=e781]
+                    - text: 下载模板
+                - button "激活" [ref=e783] [cursor=pointer]:
+                  - generic [ref=e784]:
+                    - img [ref=e786]
+                    - text: 激活
+          - article [ref=e789]:
+            - button "保险产品 平安财高危职业意外险 点击放大" [ref=e790] [cursor=pointer]:
+              - img "保险产品 平安财高危职业意外险" [ref=e791]
+              - generic [ref=e792]:
+                - img [ref=e794]
+                - generic [ref=e796]: 点击放大
+            - generic [ref=e797]:
+              - generic [ref=e798]:
+                - generic [ref=e799]:
+                  - heading "平安财高危职业意外险" [level=3] [ref=e800]
+                  - generic [ref=e801]: 5-6
+                - generic [ref=e802]: 已上架
+              - generic [ref=e803]:
+                - paragraph [ref=e804]: 5-6类高危职业专属；保障力度强
+                - paragraph [ref=e805]:
+                  - img [ref=e807]
+                  - text: 高危职业可投；意外身故伤残；意外医疗
+              - generic [ref=e809]:
+                - generic [ref=e810]:
+                  - generic [ref=e811]: 价格
+                  - generic [ref=e812]: ¥150.00
+                - generic [ref=e813]:
+                  - generic [ref=e814]: 库存
+                  - generic [ref=e815]: 充足
+              - generic [ref=e816]:
+                - button "编辑" [ref=e817] [cursor=pointer]:
+                  - generic [ref=e818]:
+                    - img [ref=e820]
+                    - text: 编辑
+                - button "下架" [ref=e823] [cursor=pointer]:
+                  - generic [ref=e824]:
+                    - img [ref=e826]
+                    - text: 下架
+                - button "删除" [ref=e828] [cursor=pointer]:
+                  - generic [ref=e829]:
+                    - img [ref=e831]
+                    - text: 删除
+                - button "批量激活" [disabled] [ref=e833]:
+                  - generic [ref=e834]:
+                    - img [ref=e836]
+                    - text: 批量激活
+                - button "下载模板" [disabled] [ref=e838]:
+                  - generic [ref=e839]:
+                    - img [ref=e841]
+                    - text: 下载模板
+                - button "激活" [ref=e843] [cursor=pointer]:
+                  - generic [ref=e844]:
+                    - img [ref=e846]
+                    - text: 激活
+          - article [ref=e849]:
+            - button "保险产品 太保百万医疗险 点击放大" [ref=e850] [cursor=pointer]:
+              - img "保险产品 太保百万医疗险" [ref=e851]
+              - generic [ref=e852]:
+                - img [ref=e854]
+                - generic [ref=e856]: 点击放大
+            - generic [ref=e857]:
+              - generic [ref=e858]:
+                - generic [ref=e859]:
+                  - heading "太保百万医疗险" [level=3] [ref=e860]
+                  - generic [ref=e861]: 医疗险
+                - generic [ref=e862]: 已上架
+              - generic [ref=e863]:
+                - paragraph [ref=e864]: 一般医疗+重疾医疗；保额高达600万
+                - paragraph [ref=e865]:
+                  - img [ref=e867]
+                  - text: 重疾绿通；住院垫付；质子重离子
+              - generic [ref=e869]:
+                - generic [ref=e870]:
+                  - generic [ref=e871]: 价格
+                  - generic [ref=e872]: ¥300.00
+                - generic [ref=e873]:
+                  - generic [ref=e874]: 库存
+                  - generic [ref=e875]: 充足
+              - generic [ref=e876]:
+                - button "编辑" [ref=e877] [cursor=pointer]:
+                  - generic [ref=e878]:
+                    - img [ref=e880]
+                    - text: 编辑
+                - button "下架" [ref=e883] [cursor=pointer]:
+                  - generic [ref=e884]:
+                    - img [ref=e886]
+                    - text: 下架
+                - button "删除" [ref=e888] [cursor=pointer]:
+                  - generic [ref=e889]:
+                    - img [ref=e891]
+                    - text: 删除
+                - button "批量激活" [disabled] [ref=e893]:
+                  - generic [ref=e894]:
+                    - img [ref=e896]
+                    - text: 批量激活
+                - button "下载模板" [disabled] [ref=e898]:
+                  - generic [ref=e899]:
+                    - img [ref=e901]
+                    - text: 下载模板
+                - button "激活" [ref=e903] [cursor=pointer]:
+                  - generic [ref=e904]:
+                    - img [ref=e906]
+                    - text: 激活
+          - article [ref=e909]:
+            - button "保险产品 众安出行意外险 点击放大" [ref=e910] [cursor=pointer]:
+              - img "保险产品 众安出行意外险" [ref=e911]
+              - generic [ref=e912]:
+                - img [ref=e914]
+                - generic [ref=e916]: 点击放大
+            - generic [ref=e917]:
+              - generic [ref=e918]:
+                - generic [ref=e919]:
+                  - heading "众安出行意外险" [level=3] [ref=e920]
+                  - generic [ref=e921]: 旅游险
+                - generic [ref=e922]: 已上架
+              - generic [ref=e923]:
+                - paragraph [ref=e924]: 出行保障；飞机/火车/轮船/汽车全覆盖
+                - paragraph [ref=e925]:
+                  - img [ref=e927]
+                  - text: 交通工具意外；航班延误；行李丢失
+              - generic [ref=e929]:
+                - generic [ref=e930]:
+                  - generic [ref=e931]: 价格
+                  - generic [ref=e932]: ¥50.00
+                - generic [ref=e933]:
+                  - generic [ref=e934]: 库存
+                  - generic [ref=e935]: 充足
+              - generic [ref=e936]:
+                - button "编辑" [ref=e937] [cursor=pointer]:
+                  - generic [ref=e938]:
+                    - img [ref=e940]
+                    - text: 编辑
+                - button "下架" [ref=e943] [cursor=pointer]:
+                  - generic [ref=e944]:
+                    - img [ref=e946]
+                    - text: 下架
+                - button "删除" [ref=e948] [cursor=pointer]:
+                  - generic [ref=e949]:
+                    - img [ref=e951]
+                    - text: 删除
+                - button "批量激活" [disabled] [ref=e953]:
+                  - generic [ref=e954]:
+                    - img [ref=e956]
+                    - text: 批量激活
+                - button "下载模板" [disabled] [ref=e958]:
+                  - generic [ref=e959]:
+                    - img [ref=e961]
+                    - text: 下载模板
+                - button "激活" [ref=e963] [cursor=pointer]:
+                  - generic [ref=e964]:
+                    - img [ref=e966]
+                    - text: 激活
+        - generic [ref=e970]:
+          - generic [ref=e971]: Total 0
+          - generic [ref=e974] [cursor=pointer]:
+            - generic:
+              - combobox [ref=e976]
+              - generic [ref=e977]: 10/page
+            - img [ref=e980]
+          - button "Go to previous page" [disabled] [ref=e982]:
+            - generic:
+              - img
+          - list [ref=e983]:
+            - listitem "page 1" [ref=e984]: "1"
+          - button "Go to next page" [disabled] [ref=e985]:
+            - generic:
+              - img
+          - generic [ref=e986]:
+            - generic [ref=e987]: Go to
+            - spinbutton "Page" [ref=e990]: "1"

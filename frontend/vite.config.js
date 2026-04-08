@@ -9,6 +9,36 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     }
   },
+  build: {
+    assetsInlineLimit: 4096,
+    cssCodeSplit: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) {
+            return undefined
+          }
+
+          if (id.includes('vue') || id.includes('vue-router')) {
+            return 'vue-vendor'
+          }
+
+          if (id.includes('element-plus')) {
+            return 'element-plus'
+          }
+
+          if (id.includes('axios')) {
+            return 'axios'
+          }
+
+          return undefined
+        },
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash][extname]'
+      }
+    }
+  },
   server: {
     port: 5173,
     proxy: {

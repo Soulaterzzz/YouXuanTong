@@ -89,18 +89,14 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
         return convertToProductDetailVO(entity);
     }
 
+    private static final int MAX_RETRY = 3;
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void activateProduct(ActivateRequest request, Long userId) {
         AxxProductEntity product = requireProduct(request.getProductId());
-        AccountBalanceEntity balance = ensureBalance(userId);
         int quantity = normalizeQuantity(request.getCount());
         BigDecimal totalAmount = calculateTotalAmount(product, quantity);
-        BigDecimal balanceBefore = balance.getBalance();
-
-        if (balanceBefore.compareTo(totalAmount) < 0) {
-            throw new BusinessException(ResultCode.INVALID_PARAM, "余额不足，请先充值");
-        }
 
         ExpenseRecordEntity expense = buildExpenseRecord(request, userId, product, quantity, totalAmount, InsuranceStatus.PENDING_REVIEW);
         expenseRecordMapper.insert(expense);
@@ -108,11 +104,27 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
         InsuranceRecordEntity insurance = buildInsuranceRecord(request, userId, product, quantity, InsuranceStatus.PENDING_REVIEW, expense.getId());
         insuranceRecordMapper.insert(insurance);
 
-        balance.setBalance(balanceBefore.subtract(totalAmount));
-        accountBalanceMapper.updateById(balance);
+        deductBalanceWithOptimisticLock(userId, totalAmount, expense.getId(),
+                "提交投保审核：" + product.getProductName() + " x" + quantity);
+    }
 
-        createConsumeTransaction(userId, totalAmount, balanceBefore, balance.getBalance(),
-                "提交投保审核：" + product.getProductName() + " x" + quantity, expense.getId());
+    private void deductBalanceWithOptimisticLock(Long userId, BigDecimal amount, Long expenseId, String description) {
+        for (int i = 0; i < MAX_RETRY; i++) {
+            AccountBalanceEntity balance = ensureBalance(userId);
+            BigDecimal balanceBefore = balance.getBalance();
+
+            if (balanceBefore.compareTo(amount) < 0) {
+                throw new BusinessException(ResultCode.INVALID_PARAM, "余额不足，请先充值");
+            }
+
+            balance.setBalance(balanceBefore.subtract(amount));
+            int updated = accountBalanceMapper.updateById(balance);
+            if (updated > 0) {
+                createConsumeTransaction(userId, amount, balanceBefore, balance.getBalance(), description, expenseId);
+                return;
+            }
+        }
+        throw new BusinessException(ResultCode.SYSTEM_ERROR, "余额更新失败，请重试");
     }
 
     @Override
@@ -546,7 +558,6 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
                 .description(entity.getDescription())
                 .features(entity.getFeatures())
                 .price(entity.getPrice())
-                .stock(entity.getStock())
                 .isNew(entity.getIsNew() == 1)
                 .isHot(entity.getIsHot() == 1)
                 .categoryCode(entity.getCategoryCode())
@@ -566,7 +577,6 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
                 .description(entity.getDescription())
                 .features(entity.getFeatures())
                 .price(entity.getPrice())
-                .stock(entity.getStock())
                 .isNew(entity.getIsNew() == 1)
                 .categoryCode(entity.getCategoryCode())
                 .companyName(entity.getCompanyName())

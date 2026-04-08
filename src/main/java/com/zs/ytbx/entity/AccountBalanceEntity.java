@@ -1,6 +1,7 @@
 package com.zs.ytbx.entity;
 
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.Version;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -16,4 +17,7 @@ public class AccountBalanceEntity extends BaseEntity {
     private BigDecimal balance;
 
     private BigDecimal frozenBalance;
+
+    @Version
+    private Integer version;
 }

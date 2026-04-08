@@ -29,8 +29,6 @@ public class ProductRequest {
     @DecimalMin(value = "0.01", message = "价格必须大于0")
     private BigDecimal price;
     
-    private Integer stock = 0;
-    
     private Integer isNew = 0;
     
     private Integer isHot = 0;

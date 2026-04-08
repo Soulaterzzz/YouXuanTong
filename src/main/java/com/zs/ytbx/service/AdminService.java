@@ -29,6 +29,8 @@ public interface AdminService {
     PageResponse<InsuranceVO> listAllInsurances(InsuranceQuery query);
     void approveInsurance(Long insuranceId, InsuranceApproveRequest request, Long reviewerId, String reviewerName);
     void rejectInsurance(Long insuranceId, InsuranceRejectRequest request, Long reviewerId, String reviewerName);
+    void batchApproveInsurances(BatchInsuranceRequest request, Long reviewerId, String reviewerName);
+    void batchRejectInsurances(BatchInsuranceRequest request, Long reviewerId, String reviewerName);
     void startUnderwriting(Long insuranceId);
     void activateInsurance(Long insuranceId, ActivateInsuranceRequest request);
     void activateInsurances(List<BatchActivateInsuranceRequest.Item> items);

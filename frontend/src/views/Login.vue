@@ -13,19 +13,38 @@
         <p>请联系管理员在用户管理中创建用户账号</p>
       </div>
 
-      <form @submit.prevent="handleLogin">
+      <form @submit.prevent="handleLogin" novalidate>
         <div class="form-item">
-          <label>用户名</label>
-          <input type="text" v-model="loginForm.username" placeholder="请输入用户名" required>
+          <label for="username">用户名</label>
+          <input
+            id="username"
+            type="text"
+            v-model="loginForm.username"
+            placeholder="请输入用户名"
+            autocomplete="username"
+            :aria-invalid="loginError ? 'true' : 'false'"
+            :aria-describedby="loginError ? 'login-error' : undefined"
+            required
+            autofocus
+          >
         </div>
         <div class="form-item">
-          <label>密码</label>
-          <input type="password" v-model="loginForm.password" placeholder="请输入密码" required>
+          <label for="password">密码</label>
+          <input
+            id="password"
+            type="password"
+            v-model="loginForm.password"
+            placeholder="请输入密码"
+            autocomplete="current-password"
+            :aria-invalid="loginError ? 'true' : 'false'"
+            :aria-describedby="loginError ? 'login-error' : undefined"
+            required
+          >
         </div>
         <div class="form-item" v-if="loginError">
-          <div class="error-msg">{{ loginError }}</div>
+          <div id="login-error" class="error-msg" role="alert" aria-live="polite">{{ loginError }}</div>
         </div>
-        <button type="submit" class="login-btn" :disabled="loginLoading">
+        <button type="submit" class="login-btn" :disabled="loginLoading" :aria-busy="loginLoading ? 'true' : 'false'">
           {{ loginLoading ? '登录中...' : '登录' }}
         </button>
       </form>
@@ -90,7 +109,9 @@ const handleLogin = async () => {
 <style scoped>
 .login-page {
   min-height: 100vh;
-  background-color: #f5f7fa;
+  background:
+    radial-gradient(circle at top left, rgba(230, 0, 18, 0.08), transparent 32%),
+    linear-gradient(180deg, #f7f8fb 0%, #eef2f7 100%);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -98,11 +119,12 @@ const handleLogin = async () => {
 
 .login-header {
   width: 100%;
-  background-color: #fff;
-  border-bottom: 3px solid #e60012;
+  background: rgba(255, 255, 255, 0.92);
+  border-bottom: 1px solid rgba(230, 0, 18, 0.18);
   padding: 15px 24px;
   text-align: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(12px);
 }
 
 .logo {
@@ -113,8 +135,8 @@ const handleLogin = async () => {
 
 .logo-text {
   font-size: 22px;
-  font-weight: bold;
-  color: #e60012;
+  font-weight: 800;
+  color: var(--color-primary);
 }
 
 .logo-sub {
@@ -126,9 +148,10 @@ const handleLogin = async () => {
   width: 420px;
   margin-top: 60px;
   padding: 30px 40px 40px;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 20px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.12);
 }
 
 .login-panel-header {
@@ -139,14 +162,14 @@ const handleLogin = async () => {
 .login-panel-header h1 {
   margin: 0 0 10px;
   font-size: 26px;
-  color: #1f2937;
+  color: var(--color-text-primary);
 }
 
 .login-panel-header p {
   margin: 0;
   font-size: 14px;
   line-height: 1.6;
-  color: #6b7280;
+  color: var(--color-text-secondary);
 }
 
 .form-item {
@@ -156,7 +179,7 @@ const handleLogin = async () => {
 .form-item label {
   display: block;
   font-size: 14px;
-  color: #333;
+  color: var(--color-text-primary);
   margin-bottom: 8px;
   font-weight: 500;
 }
@@ -164,17 +187,18 @@ const handleLogin = async () => {
 .form-item input {
   width: 100%;
   padding: 12px 14px;
-  border: 1px solid #dcdfe6;
-  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
   font-size: 14px;
-  transition: all 0.3s;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
   box-sizing: border-box;
+  background: #fff;
 }
 
 .form-item input:focus {
   outline: none;
-  border-color: #e60012;
-  box-shadow: 0 0 0 2px rgba(230, 0, 18, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(230, 0, 18, 0.14);
 }
 
 .form-item input::placeholder {
@@ -182,38 +206,57 @@ const handleLogin = async () => {
 }
 
 .form-item .error-msg {
-  color: #f56c6c;
+  color: var(--color-danger);
   font-size: 12px;
   margin-top: 6px;
   padding: 8px 12px;
-  background: #fef0f0;
-  border-radius: 4px;
+  background: rgba(245, 108, 108, 0.1);
+  border-radius: 10px;
 }
 
 .login-btn {
   width: 100%;
   padding: 12px;
-  background: #e60012;
+  background: linear-gradient(135deg, var(--color-primary) 0%, #ff4d5a 100%);
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 12px;
   font-size: 16px;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
   margin-top: 10px;
+  box-shadow: 0 10px 24px rgba(230, 0, 18, 0.22);
 }
 
 .login-btn:hover {
-  background: #c5000f;
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px rgba(230, 0, 18, 0.26);
 }
 
 .login-btn:active {
-  transform: scale(0.98);
+  transform: translateY(0);
 }
 
 .login-btn:disabled {
   background: #fab6b6;
   cursor: not-allowed;
+  box-shadow: none;
+}
+
+.login-btn:focus-visible,
+.form-item input:focus-visible {
+  outline: 3px solid rgba(230, 0, 18, 0.18);
+  outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .login-btn {
+    min-height: 44px;
+  }
+
+  .form-item input {
+    min-height: 44px;
+  }
 }
 
 @media screen and (max-width: 768px) {
