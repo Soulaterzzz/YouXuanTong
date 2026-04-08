@@ -13,6 +13,7 @@ collect_deploy_fingerprint_candidates() {
   for candidate in \
     "${project_root}/Dockerfile" \
     "${project_root}/.dockerignore" \
+    "${project_root}/deploy/maven-settings.xml" \
     "${project_root}/pom.xml" \
     "${project_root}/frontend/package.json" \
     "${project_root}/frontend/package-lock.json" \

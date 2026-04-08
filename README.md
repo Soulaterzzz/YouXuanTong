@@ -180,6 +180,7 @@ npm test
 
 - `deploy/server-bootstrap-ubuntu.sh` 现在会先判断系统依赖是否已安装，已安装时会跳过 `apt-get update`、Docker 源配置和重复安装。
 - 部署镜像会根据 `Dockerfile`、后端源码、前端源码和 `lockfile` 生成指纹，未变化时直接 `docker compose up -d --no-build`，只有代码或构建配置变化时才重新构建。
+- Docker 构建阶段已经内置 Maven 国内镜像源，`dependency:go-offline` 和后端打包都会优先走阿里云仓库，减少 `repo.maven.apache.org` 的等待时间。
 - `deploy/docker-compose.yml` 为 MySQL 和应用都补了更短的健康检查间隔，首次启动和部署后的等待时间会更短。
 
 ---

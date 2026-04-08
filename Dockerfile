@@ -22,9 +22,13 @@ FROM maven:3.9-eclipse-temurin-17-alpine AS backend-build
 
 WORKDIR /app
 
+# 使用国内 Maven 镜像源，加速依赖下载
+RUN mkdir -p /root/.m2
+COPY deploy/maven-settings.xml /root/.m2/settings.xml
+
 # 优先复制 pom.xml 下载依赖（利用缓存）
 COPY pom.xml ./
-RUN mvn -B dependency:go-offline -Dmaven.test.skip=true
+RUN mvn -s /root/.m2/settings.xml -B dependency:go-offline -Dmaven.test.skip=true
 
 # 复制源码
 COPY src ./src
@@ -33,7 +37,7 @@ COPY src ./src
 COPY --from=frontend-build /app/frontend/dist ./src/main/resources/static/
 
 # 构建并提取 JAR（分层打包以优化镜像）
-RUN mvn -B -Dmaven.test.skip=true clean package spring-boot:repackage \
+RUN mvn -s /root/.m2/settings.xml -B -Dmaven.test.skip=true clean package spring-boot:repackage \
     && java -Djarmode=layertools -jar target/*.jar extract --destination extracted
 
 # ============================================
