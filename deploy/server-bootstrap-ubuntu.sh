@@ -24,6 +24,7 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+PROJECT_UPLOAD_DIR="${PROJECT_ROOT}/uploads"
 DEPLOY_ENV_FILE="${PROJECT_ROOT}/deploy/.env"
 LOG_FILE="${PROJECT_ROOT}/deploy/deploy-$(date +%Y%m%d_%H%M%S).log"
 DEPLOY_BASE_DIR="${DEPLOY_BASE_DIR:-/opt/ytbx}"
@@ -35,7 +36,7 @@ MYSQL_COMPOSE_FILE="${PROJECT_ROOT}/deploy/docker-compose.yml"
 SERVICE_USER="${SERVICE_USER:-ytbx}"
 SERVICE_GROUP="${SERVICE_GROUP:-${SERVICE_USER}}"
 APP_PORT="${APP_PORT:-8080}"
-HOST_UPLOAD_DIR="${HOST_UPLOAD_DIR:-/data/ytbx/uploads}"
+HOST_UPLOAD_DIR="${HOST_UPLOAD_DIR:-${PROJECT_UPLOAD_DIR}}"
 USE_EXTERNAL_DB="${USE_EXTERNAL_DB:-1}"
 MYSQL_HOST="${MYSQL_HOST:-}"
 MYSQL_PORT="${MYSQL_PORT:-3306}"
@@ -287,7 +288,7 @@ validate_host_upload_dir() {
   fi
 
   if [[ "${value}" != /* ]]; then
-    VALIDATION_ERROR="上传目录必须是绝对路径，例如 /data/ytbx/uploads"
+    VALIDATION_ERROR="上传目录必须是绝对路径，例如 ${PROJECT_UPLOAD_DIR}"
     return 1
   fi
 
@@ -783,7 +784,7 @@ prompt_for_configuration() {
     fi
 
     prompt_text_input APP_PORT "后端服务端口（nginx 反代到该端口）" validate_app_port
-    prompt_text_input HOST_UPLOAD_DIR "上传目录（绝对路径）" validate_host_upload_dir
+    prompt_text_input HOST_UPLOAD_DIR "上传目录（绝对路径，默认项目根目录下的 uploads）" validate_host_upload_dir
     prompt_text_input PRODUCT_IMAGE_PATH "商品图片子目录（相对路径）" validate_product_image_path
     prompt_text_input MAX_FILE_SIZE "最大上传大小（字节）" validate_max_file_size
     prompt_text_input ALLOWED_EXTENSIONS "允许扩展名（逗号分隔）" validate_allowed_extensions
