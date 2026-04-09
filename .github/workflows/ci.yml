@@ -49,6 +49,3 @@ jobs:
 
       - name: Package backend
         run: mvn -B -DskipTests package
-
-      - name: Build deployment image
-        run: docker build -t ytbx:${{ github.sha }} .

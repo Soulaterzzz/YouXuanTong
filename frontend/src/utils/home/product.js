@@ -17,7 +17,7 @@ function getApiBaseUrl() {
     return window.location.origin.replace(/\/$/, '')
   }
 
-  return 'http://127.0.0.1:8081'
+  return 'http://127.0.0.1:8080'
 }
 
 export function getCategoryLabel(categoryCode) {

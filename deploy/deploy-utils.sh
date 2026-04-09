@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 
-# 仅提供函数，不设置 shell 选项，避免影响调用者。
-
-DEPLOY_IMAGE_LABEL="${DEPLOY_IMAGE_LABEL:-com.zs.ytbx.deploy-fingerprint}"
-DEPLOY_IMAGE_NAME="${DEPLOY_IMAGE_NAME:-ytbx-app:latest}"
+# 宿主机部署指纹工具
+# 当前部署脚本已经不依赖 Docker 应用镜像，但保留这组通用函数，
+# 方便在需要时快速计算前后端与部署配置是否发生变化。
 
 collect_deploy_fingerprint_candidates() {
   local project_root="${PROJECT_ROOT:?PROJECT_ROOT 未设置}"
@@ -11,14 +10,15 @@ collect_deploy_fingerprint_candidates() {
   local dir
 
   for candidate in \
-    "${project_root}/Dockerfile" \
-    "${project_root}/.dockerignore" \
-    "${project_root}/deploy/maven-settings.xml" \
     "${project_root}/pom.xml" \
     "${project_root}/frontend/package.json" \
     "${project_root}/frontend/package-lock.json" \
     "${project_root}/frontend/index.html" \
-    "${project_root}/frontend/vite.config.js"; do
+    "${project_root}/frontend/vite.config.js" \
+    "${project_root}/deploy/server-bootstrap-ubuntu.sh" \
+    "${project_root}/deploy/docker-compose.yml" \
+    "${project_root}/deploy/nginx/ytbx.conf.example" \
+    "${project_root}/deploy/.env.example"; do
     [[ -f "${candidate}" ]] || continue
     printf '%s\n' "${candidate#${project_root}/}"
   done
@@ -59,31 +59,4 @@ compute_deploy_fingerprint() {
   fingerprint="$(sha256sum "${manifest}" | awk '{print $1}')"
   rm -f "${manifest}"
   printf '%s\n' "${fingerprint}"
-}
-
-get_deploy_image_fingerprint() {
-  local fingerprint
-
-  fingerprint="$(docker image inspect -f "{{ index .Config.Labels \"${DEPLOY_IMAGE_LABEL}\" }}" "${DEPLOY_IMAGE_NAME}" 2>/dev/null || true)"
-
-  case "${fingerprint}" in
-    "<no value>"|"map[]")
-      fingerprint=""
-      ;;
-  esac
-
-  printf '%s\n' "${fingerprint}"
-}
-
-deploy_image_needs_rebuild() {
-  local desired_fingerprint="${1:-}"
-  local current_fingerprint
-
-  if [[ -z "${desired_fingerprint}" ]]; then
-    return 0
-  fi
-
-  current_fingerprint="$(get_deploy_image_fingerprint)"
-
-  [[ -z "${current_fingerprint}" || "${current_fingerprint}" != "${desired_fingerprint}" ]]
 }

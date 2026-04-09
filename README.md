@@ -90,7 +90,7 @@
 
 - JDK 17+
 - Maven 3.6+
-- Node.js 18+
+- Node.js 20+（推荐 22+）
 - MySQL 8.0+
 
 ## 2. 初始化数据库
@@ -136,6 +136,13 @@ auth.token.secret=${AUTH_TOKEN_SECRET}
 app.cors.allowed-origins=http://localhost:5173,http://127.0.0.1:5173
 ```
 
+如果使用部署脚本，脚本会根据你的选择自动生成 `MYSQL_URL`、数据库账号和 Nginx 绑定配置：
+
+- 外部数据库：填写可被服务器访问的数据库 IP 或域名、端口、账号和密码
+- 本地数据库：仅在需要时启动 Docker 中的 MySQL 容器，并把它映射到宿主机端口
+- Nginx 绑定：直接输入服务器 IP 或域名，脚本会写入 `server_name`
+- 运行方式：前端构建后由宿主机 nginx 托管，后端打包后由 systemd 运行
+
 ## 4. 启动后端
 
 ```bash
@@ -151,7 +158,7 @@ mvn spring-boot:run
 
 ```bash
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
 
@@ -176,12 +183,16 @@ npm test
 
 ---
 
-## 部署优化说明
+## 部署说明
 
-- `deploy/server-bootstrap-ubuntu.sh` 现在会先判断系统依赖是否已安装，已安装时会跳过 `apt-get update`、Docker 源配置和重复安装。
-- 部署镜像会根据 `Dockerfile`、后端源码、前端源码和 `lockfile` 生成指纹，未变化时直接 `docker compose up -d --no-build`，只有代码或构建配置变化时才重新构建。
-- Docker 构建阶段已经内置 Maven 国内镜像源，`dependency:go-offline` 和后端打包都会优先走阿里云仓库，减少 `repo.maven.apache.org` 的等待时间。
-- `deploy/docker-compose.yml` 为 MySQL 和应用都补了更短的健康检查间隔，首次启动和部署后的等待时间会更短。
+- 使用 `sudo bash deploy/server-bootstrap-ubuntu.sh deploy` 可以直接完成构建、安装和启动；不带参数时会进入交互菜单。
+- 前端会在宿主机执行 `npm ci && npm run build`，构建结果同步到 `/opt/ytbx/web`，由宿主机 nginx 托管。
+- 后端会在宿主机执行 `mvn -DskipTests package`，产物复制到 `/opt/ytbx/backend/ytbx.jar`，并由 `systemd` 服务 `ytbx-backend` 启动。
+- 数据库默认使用外部数据库；只有在选择本地数据库模式时，才会启动 `deploy/docker-compose.yml` 里的 MySQL 容器。
+- Nginx 配置会同时代理 `/api/`、`/files/` 和 `/agreements/`，并把前端历史路由回退到 `index.html`。
+- 需要重新选择数据库模式或更换绑定地址时，运行脚本前设置 `FORCE_WRITE_ENV=1` 即可重新进入配置流程。
+- 外部数据库如果是空库，先把 `YTBX_SQL_INIT_MODE` 调成 `always`，或者手动导入 `init_db.sql`。
+- `deploy/docker-compose.yml` 现在只负责 MySQL 容器，不再包含应用服务。
 
 ---
 

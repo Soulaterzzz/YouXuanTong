@@ -12,6 +12,8 @@ services:
       MYSQL_USER: ${MYSQL_USER:-ytbx}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
       interval: 5s
@@ -21,42 +23,6 @@ services:
     volumes:
       - mysql-data:/var/lib/mysql
       - ../init_db.sql:/docker-entrypoint-initdb.d/01-init_db.sql:ro
-
-  ytbx-app:
-    build:
-      context: ..
-      dockerfile: Dockerfile
-      args:
-        DEPLOY_FINGERPRINT: ${DEPLOY_FINGERPRINT:-unknown}
-    image: ytbx-app:latest
-    container_name: ytbx-app
-    restart: unless-stopped
-    depends_on:
-      mysql:
-        condition: service_healthy
-    ports:
-      - ${APP_PORT:-8080}:8080
-    environment:
-      SPRING_PROFILES_ACTIVE: prod
-      MYSQL_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-ytbx}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
-      MYSQL_USERNAME: ${MYSQL_USER:-ytbx}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-      AUTH_TOKEN_SECRET: ${AUTH_TOKEN_SECRET}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
-      FILE_STORAGE_PATH: /data/ytbx/uploads
-      TEMPLATE_FILE_PATH: /data/ytbx/uploads/templates
-      PRODUCT_IMAGE_PATH: ${PRODUCT_IMAGE_PATH:-products}
-      MAX_FILE_SIZE: ${MAX_FILE_SIZE:-10485760}
-      ALLOWED_EXTENSIONS: ${ALLOWED_EXTENSIONS:-jpg,jpeg,png,gif,webp}
-      YTBX_SQL_INIT_MODE: ${YTBX_SQL_INIT_MODE:-never}
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/ >/dev/null || exit 1"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-      start_period: 20s
-    volumes:
-      - ${HOST_UPLOAD_DIR:-/data/ytbx/uploads}:/data/ytbx/uploads
 
 volumes:
   mysql-data:

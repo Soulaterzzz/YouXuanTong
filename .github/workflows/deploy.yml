@@ -17,158 +17,111 @@ jobs:
   deploy:
     runs-on: self-hosted
     environment: production
-    needs: [build-test]
-    if: success() || github.event_name == 'workflow_dispatch'
+    timeout-minutes: 90
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
 
       - name: Write deployment env file
+        shell: bash
         run: |
+          set -euo pipefail
+
+          quote_env_value() {
+            printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\"'\"'/g")"
+          }
+
           APP_PORT_VALUE="${{ vars.YTBX_APP_PORT }}"
           HOST_UPLOAD_DIR_VALUE="${{ vars.YTBX_HOST_UPLOAD_DIR }}"
+          USE_EXTERNAL_DB_VALUE="${{ vars.YTBX_USE_EXTERNAL_DB }}"
+          MYSQL_HOST_VALUE="${{ vars.YTBX_MYSQL_HOST }}"
+          MYSQL_PORT_VALUE="${{ vars.YTBX_MYSQL_PORT }}"
           MYSQL_DATABASE_VALUE="${{ vars.YTBX_MYSQL_DATABASE }}"
           MYSQL_USER_VALUE="${{ vars.YTBX_MYSQL_USER }}"
           MYSQL_PASSWORD_VALUE="${{ secrets.YTBX_MYSQL_PASSWORD }}"
           MYSQL_ROOT_PASSWORD_VALUE="${{ secrets.YTBX_MYSQL_ROOT_PASSWORD }}"
+          AUTH_TOKEN_SECRET_VALUE="${{ secrets.YTBX_AUTH_TOKEN_SECRET }}"
+          CORS_ALLOWED_ORIGINS_VALUE="${{ vars.YTBX_CORS_ALLOWED_ORIGINS }}"
           PRODUCT_IMAGE_PATH_VALUE="${{ vars.YTBX_PRODUCT_IMAGE_PATH }}"
           MAX_FILE_SIZE_VALUE="${{ vars.YTBX_MAX_FILE_SIZE }}"
           ALLOWED_EXTENSIONS_VALUE="${{ vars.YTBX_ALLOWED_EXTENSIONS }}"
           SQL_INIT_MODE_VALUE="${{ vars.YTBX_SQL_INIT_MODE }}"
+          ENABLE_NGINX_VALUE="${{ vars.YTBX_ENABLE_NGINX }}"
+          SERVER_NAME_VALUE="${{ vars.YTBX_SERVER_NAME }}"
 
           APP_PORT_VALUE="${APP_PORT_VALUE:-8080}"
           HOST_UPLOAD_DIR_VALUE="${HOST_UPLOAD_DIR_VALUE:-/data/ytbx/uploads}"
+          USE_EXTERNAL_DB_VALUE="${USE_EXTERNAL_DB_VALUE:-1}"
+          MYSQL_PORT_VALUE="${MYSQL_PORT_VALUE:-3306}"
           MYSQL_DATABASE_VALUE="${MYSQL_DATABASE_VALUE:-ytbx}"
           MYSQL_USER_VALUE="${MYSQL_USER_VALUE:-ytbx}"
           PRODUCT_IMAGE_PATH_VALUE="${PRODUCT_IMAGE_PATH_VALUE:-products}"
           MAX_FILE_SIZE_VALUE="${MAX_FILE_SIZE_VALUE:-10485760}"
           ALLOWED_EXTENSIONS_VALUE="${ALLOWED_EXTENSIONS_VALUE:-jpg,jpeg,png,gif,webp}"
           SQL_INIT_MODE_VALUE="${SQL_INIT_MODE_VALUE:-never}"
+          ENABLE_NGINX_VALUE="${ENABLE_NGINX_VALUE:-1}"
+          SERVER_NAME_VALUE="${SERVER_NAME_VALUE:-_}"
+          CORS_ALLOWED_ORIGINS_VALUE="${CORS_ALLOWED_ORIGINS_VALUE:-http://localhost:5173,http://127.0.0.1:5173}"
 
-          if [ -z "$MYSQL_PASSWORD_VALUE" ] || [ -z "$MYSQL_ROOT_PASSWORD_VALUE" ]; then
-            echo "缺少必需的 GitHub Secrets：YTBX_MYSQL_PASSWORD / YTBX_MYSQL_ROOT_PASSWORD" >&2
+          if [[ "${USE_EXTERNAL_DB_VALUE}" == "1" ]]; then
+            if [[ -z "${MYSQL_HOST_VALUE}" ]]; then
+              echo "USE_EXTERNAL_DB=1 时必须提供 YTBX_MYSQL_HOST" >&2
+              exit 1
+            fi
+            if [[ -z "${MYSQL_PASSWORD_VALUE}" ]]; then
+              echo "缺少必需的 GitHub Secret：YTBX_MYSQL_PASSWORD" >&2
+              exit 1
+            fi
+            MYSQL_ROOT_PASSWORD_VALUE=""
+          else
+            MYSQL_HOST_VALUE="127.0.0.1"
+            if [[ -z "${MYSQL_PASSWORD_VALUE}" || -z "${MYSQL_ROOT_PASSWORD_VALUE}" ]]; then
+              echo "USE_EXTERNAL_DB=0 时必须提供 YTBX_MYSQL_PASSWORD 和 YTBX_MYSQL_ROOT_PASSWORD" >&2
+              exit 1
+            fi
+          fi
+
+          if [[ -z "${AUTH_TOKEN_SECRET_VALUE}" ]]; then
+            echo "缺少必需的 GitHub Secret：YTBX_AUTH_TOKEN_SECRET" >&2
             exit 1
           fi
 
+          MYSQL_URL_VALUE="jdbc:mysql://${MYSQL_HOST_VALUE}:${MYSQL_PORT_VALUE}/${MYSQL_DATABASE_VALUE}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true"
+
           cat > deploy/.env <<EOF_ENV
-          APP_PORT=${APP_PORT_VALUE}
-          HOST_UPLOAD_DIR=${HOST_UPLOAD_DIR_VALUE}
-          MYSQL_DATABASE=${MYSQL_DATABASE_VALUE}
-          MYSQL_USER=${MYSQL_USER_VALUE}
-          MYSQL_PASSWORD=${MYSQL_PASSWORD_VALUE}
-          MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD_VALUE}
-          PRODUCT_IMAGE_PATH=${PRODUCT_IMAGE_PATH_VALUE}
-          MAX_FILE_SIZE=${MAX_FILE_SIZE_VALUE}
-          ALLOWED_EXTENSIONS=${ALLOWED_EXTENSIONS_VALUE}
-          YTBX_SQL_INIT_MODE=${SQL_INIT_MODE_VALUE}
+          APP_PORT=$(quote_env_value "${APP_PORT_VALUE}")
+          HOST_UPLOAD_DIR=$(quote_env_value "${HOST_UPLOAD_DIR_VALUE}")
+          USE_EXTERNAL_DB=$(quote_env_value "${USE_EXTERNAL_DB_VALUE}")
+          MYSQL_HOST=$(quote_env_value "${MYSQL_HOST_VALUE}")
+          MYSQL_PORT=$(quote_env_value "${MYSQL_PORT_VALUE}")
+          MYSQL_DATABASE=$(quote_env_value "${MYSQL_DATABASE_VALUE}")
+          MYSQL_USER=$(quote_env_value "${MYSQL_USER_VALUE}")
+          MYSQL_PASSWORD=$(quote_env_value "${MYSQL_PASSWORD_VALUE}")
+          MYSQL_ROOT_PASSWORD=$(quote_env_value "${MYSQL_ROOT_PASSWORD_VALUE}")
+          MYSQL_URL=$(quote_env_value "${MYSQL_URL_VALUE}")
+          AUTH_TOKEN_SECRET=$(quote_env_value "${AUTH_TOKEN_SECRET_VALUE}")
+          CORS_ALLOWED_ORIGINS=$(quote_env_value "${CORS_ALLOWED_ORIGINS_VALUE}")
+          PRODUCT_IMAGE_PATH=$(quote_env_value "${PRODUCT_IMAGE_PATH_VALUE}")
+          MAX_FILE_SIZE=$(quote_env_value "${MAX_FILE_SIZE_VALUE}")
+          ALLOWED_EXTENSIONS=$(quote_env_value "${ALLOWED_EXTENSIONS_VALUE}")
+          YTBX_SQL_INIT_MODE=$(quote_env_value "${SQL_INIT_MODE_VALUE}")
+          ENABLE_NGINX=$(quote_env_value "${ENABLE_NGINX_VALUE}")
+          SERVER_NAME=$(quote_env_value "${SERVER_NAME_VALUE}")
           EOF_ENV
 
+          chmod 600 deploy/.env
+
       - name: Prepare upload directory
+        shell: bash
         run: |
+          set -euo pipefail
           HOST_UPLOAD_DIR_VALUE="${{ vars.YTBX_HOST_UPLOAD_DIR }}"
           HOST_UPLOAD_DIR_VALUE="${HOST_UPLOAD_DIR_VALUE:-/data/ytbx/uploads}"
-          mkdir -p "$HOST_UPLOAD_DIR_VALUE/templates"
-
-      - name: Tag current image for rollback
-        run: |
-          if docker image inspect ytbx-app:latest >/dev/null 2>&1; then
-            docker tag ytbx-app:latest ytbx-app:rollback
-            echo "ROLLBACK_AVAILABLE=true" >> "$GITHUB_ENV"
-            echo "已标记当前镜像为 ytbx-app:rollback"
-          else
-            echo "ROLLBACK_AVAILABLE=false" >> "$GITHUB_ENV"
-            echo "首次部署，无回滚镜像"
-          fi
+          sudo mkdir -p "${HOST_UPLOAD_DIR_VALUE}/templates"
 
       - name: Deploy application
-        id: deploy
+        shell: bash
         run: |
           set -euo pipefail
-          PROJECT_ROOT="$PWD"
-          export PROJECT_ROOT
-          # shellcheck source=/dev/null
-          source deploy/deploy-utils.sh
-
-          DEPLOY_FINGERPRINT="$(compute_deploy_fingerprint)"
-          export DEPLOY_FINGERPRINT
-
-          START_TIME=$(date +%s)
-          echo "::group::构建并启动服务"
-
-          if deploy_image_needs_rebuild "${DEPLOY_FINGERPRINT}"; then
-            echo "部署指纹已变化，执行镜像构建"
-            if docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --build --remove-orphans; then
-              END_TIME=$(date +%s)
-              DEPLOY_DURATION=$((END_TIME - START_TIME))
-              echo "DEPLOY_DURATION=${DEPLOY_DURATION}" >> "$GITHUB_ENV"
-              echo "部署构建耗时: ${DEPLOY_DURATION} 秒"
-            else
-              echo "::error::部署构建失败"
-              exit 1
-            fi
-          else
-            echo "部署指纹未变化，跳过镜像构建，直接启动容器"
-            if docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --no-build --remove-orphans; then
-              END_TIME=$(date +%s)
-              DEPLOY_DURATION=$((END_TIME - START_TIME))
-              echo "DEPLOY_DURATION=${DEPLOY_DURATION}" >> "$GITHUB_ENV"
-              echo "部署耗时: ${DEPLOY_DURATION} 秒"
-            else
-              echo "::error::部署启动失败"
-              exit 1
-            fi
-          fi
-
-          echo "::endgroup::"
-
-      - name: Health check
-        id: health
-        if: steps.deploy.outcome == 'success'
-        run: |
-          set -euo pipefail
-          MAX_ATTEMPTS=30
-          ATTEMPT=0
-
-          echo "等待容器健康状态..."
-          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
-            STATUS=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' ytbx-app 2>/dev/null || true)
-            if [ "$STATUS" = "healthy" ]; then
-              echo "服务健康检查通过 (耗时 $((ATTEMPT * 2)) 秒)"
-              exit 0
-            fi
-            ATTEMPT=$((ATTEMPT + 1))
-            echo "等待中... ($ATTEMPT/$MAX_ATTEMPTS), 当前状态: ${STATUS:-unknown}"
-            sleep 2
-          done
-
-          echo "::error::服务健康检查超时"
-          exit 1
-
-      - name: Cleanup old images
-        if: steps.health.outcome == 'success'
-        run: docker image prune -f
-
-      - name: Deployment summary
-        if: steps.health.outcome == 'success'
-        run: |
-          echo "========================================="
-          echo "部署成功"
-          echo "========================================="
-          echo "提交: ${{ github.sha }}"
-          echo "分支: ${{ github.ref_name }}"
-          echo "触发: ${{ github.event_name }}"
-          echo "部署构建耗时: ${DEPLOY_DURATION} 秒"
-          echo "========================================="
-
-      - name: Rollback on failure
-        if: failure() && env.ROLLBACK_AVAILABLE == 'true'
-        run: |
-          echo "::group::回滚到上一版本"
-          if docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d ytbx-app \
-              && docker tag ytbx-app:rollback ytbx-app:latest; then
-            echo "回滚成功，已恢复到上一版本"
-          else
-            echo "::error::回滚失败，请手动检查"
-          fi
-          echo "::endgroup::"
+          sudo bash deploy/server-bootstrap-ubuntu.sh deploy
