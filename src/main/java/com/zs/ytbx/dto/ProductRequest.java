@@ -28,6 +28,8 @@ public class ProductRequest {
     @NotNull(message = "价格不能为空")
     @DecimalMin(value = "0.01", message = "价格必须大于0")
     private BigDecimal price;
+
+    private BigDecimal displayPrice;
     
     private Integer isNew = 0;
     

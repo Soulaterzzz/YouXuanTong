@@ -100,6 +100,7 @@
           @reject="openInsuranceReviewDialog($event, 'reject')"
           @underwriting="startInsuranceUnderwriting"
           @activate="activateInsuranceRecord"
+          @update-display-price="updateDisplayPrice"
           @page-change="handleInsurancePageChange"
           @size-change="handleInsuranceSizeChange"
         />

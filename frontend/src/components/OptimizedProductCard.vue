@@ -30,7 +30,7 @@
         </div>
         <div class="product-price-badge">
           <span class="price-symbol">¥</span>
-          <span class="price-amount">{{ formatMoney(product.price) }}</span>
+          <span class="price-amount">{{ formatMoney(isAdmin ? product.price : (product.displayPrice || product.price)) }}</span>
         </div>
       </div>
 

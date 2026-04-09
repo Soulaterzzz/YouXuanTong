@@ -101,13 +101,14 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
     public void activateProduct(ActivateRequest request, Long userId) {
         AxxProductEntity product = requireProduct(request.getProductId());
         int quantity = normalizeQuantity(request.getCount());
-        BigDecimal unitPrice = resolveDisplayPrice(request, product);
-        BigDecimal totalAmount = calculateTotalAmount(unitPrice, quantity);
+        BigDecimal premiumAmount = resolvePremiumAmount(product);
+        BigDecimal displayPrice = resolveDisplayPrice(request, product);
+        BigDecimal totalAmount = calculateTotalAmount(premiumAmount, quantity);
 
-        ExpenseRecordEntity expense = buildExpenseRecord(request, userId, product, unitPrice, quantity, totalAmount, InsuranceStatus.PENDING_REVIEW);
+        ExpenseRecordEntity expense = buildExpenseRecord(request, userId, product, premiumAmount, displayPrice, quantity, totalAmount, InsuranceStatus.PENDING_REVIEW);
         expenseRecordMapper.insert(expense);
 
-        InsuranceRecordEntity insurance = buildInsuranceRecord(request, userId, product, unitPrice, quantity, InsuranceStatus.PENDING_REVIEW, expense.getId());
+        InsuranceRecordEntity insurance = buildInsuranceRecord(request, userId, product, premiumAmount, displayPrice, quantity, InsuranceStatus.PENDING_REVIEW, expense.getId());
         insuranceRecordMapper.insert(insurance);
 
         deductBalanceWithOptimisticLock(userId, totalAmount, expense.getId(),
@@ -138,13 +139,14 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
     public void saveDraft(ActivateRequest request, Long userId) {
         AxxProductEntity product = requireProduct(request.getProductId());
         int quantity = normalizeQuantity(request.getCount());
-        BigDecimal unitPrice = resolveDisplayPrice(request, product);
-        BigDecimal totalAmount = calculateTotalAmount(unitPrice, quantity);
+        BigDecimal premiumAmount = resolvePremiumAmount(product);
+        BigDecimal displayPrice = resolveDisplayPrice(request, product);
+        BigDecimal totalAmount = calculateTotalAmount(premiumAmount, quantity);
 
-        ExpenseRecordEntity expense = buildExpenseRecord(request, userId, product, unitPrice, quantity, totalAmount, InsuranceStatus.DRAFT);
+        ExpenseRecordEntity expense = buildExpenseRecord(request, userId, product, premiumAmount, displayPrice, quantity, totalAmount, InsuranceStatus.DRAFT);
         expenseRecordMapper.insert(expense);
 
-        InsuranceRecordEntity insurance = buildInsuranceRecord(request, userId, product, unitPrice, quantity, InsuranceStatus.DRAFT, expense.getId());
+        InsuranceRecordEntity insurance = buildInsuranceRecord(request, userId, product, premiumAmount, displayPrice, quantity, InsuranceStatus.DRAFT, expense.getId());
         insuranceRecordMapper.insert(insurance);
     }
 
@@ -401,6 +403,27 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
         transactionRecordMapper.insert(transaction);
     }
 
+    @Override
+    public void updateDisplayPrice(Long insuranceId, BigDecimal displayPrice, Long userId) {
+        InsuranceRecordEntity insurance = insuranceRecordMapper.selectById(insuranceId);
+        if (insurance == null || !userId.equals(insurance.getUserId())) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "保险记录不存在");
+        }
+        insurance.setDisplayPrice(displayPrice);
+        insurance.setUpdateTime(LocalDateTime.now());
+        insuranceRecordMapper.updateById(insurance);
+
+        // 同步更新关联的费用记录
+        if (insurance.getExpenseId() != null) {
+            ExpenseRecordEntity expense = expenseRecordMapper.selectById(insurance.getExpenseId());
+            if (expense != null && userId.equals(expense.getUserId())) {
+                expense.setDisplayPrice(displayPrice);
+                expense.setUpdateTime(LocalDateTime.now());
+                expenseRecordMapper.updateById(expense);
+            }
+        }
+    }
+
     public BigDecimal getBalance(Long userId) {
         AccountBalanceEntity balance = accountBalanceMapper.selectOne(
                 new LambdaQueryWrapper<AccountBalanceEntity>()
@@ -462,10 +485,18 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
         return count == null || count <= 0 ? 1 : count;
     }
 
+    private BigDecimal resolvePremiumAmount(AxxProductEntity product) {
+        BigDecimal price = product.getPrice();
+        if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "产品原始价格必须大于0");
+        }
+        return price.setScale(2, RoundingMode.HALF_UP);
+    }
+
     private BigDecimal resolveDisplayPrice(ActivateRequest request, AxxProductEntity product) {
         BigDecimal displayPrice = request.getDisplayPrice();
         if (displayPrice == null) {
-            displayPrice = product.getPrice();
+            displayPrice = product.getDisplayPrice() != null ? product.getDisplayPrice() : product.getPrice();
         }
         if (displayPrice == null || displayPrice.compareTo(BigDecimal.ZERO) <= 0) {
             throw new BusinessException(ResultCode.INVALID_PARAM, "显示价格必须大于0");
@@ -480,7 +511,8 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
     private ExpenseRecordEntity buildExpenseRecord(ActivateRequest request,
                                                    Long userId,
                                                    AxxProductEntity product,
-                                                   BigDecimal unitPrice,
+                                                   BigDecimal premiumAmount,
+                                                   BigDecimal displayPrice,
                                                    int quantity,
                                                    BigDecimal totalAmount,
                                                    InsuranceStatus status) {
@@ -493,7 +525,8 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
         expense.setContactName(request.getBeneficiaryName());
         expense.setExpenseStatus(status.getCode());
         expense.setPolicyNo(null);
-        expense.setPremiumAmount(unitPrice);
+        expense.setPremiumAmount(premiumAmount);
+        expense.setDisplayPrice(displayPrice);
         expense.setQuantity(quantity);
         expense.setTotalAmount(totalAmount);
         expense.setEffectiveDate(null);
@@ -507,7 +540,8 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
     private InsuranceRecordEntity buildInsuranceRecord(ActivateRequest request,
                                                        Long userId,
                                                        AxxProductEntity product,
-                                                       BigDecimal unitPrice,
+                                                       BigDecimal premiumAmount,
+                                                       BigDecimal displayPrice,
                                                        int quantity,
                                                        InsuranceStatus status,
                                                        Long expenseId) {
@@ -533,7 +567,8 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
         insurance.setUnderwritingTime(null);
         insurance.setActivateTime(null);
         insurance.setPolicyNo(null);
-        insurance.setPremiumAmount(unitPrice);
+        insurance.setPremiumAmount(premiumAmount);
+        insurance.setDisplayPrice(displayPrice);
         insurance.setQuantity(quantity);
         insurance.setEffectiveDate(null);
         insurance.setExpiryDate(null);
@@ -579,6 +614,7 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
                 .description(entity.getDescription())
                 .features(entity.getFeatures())
                 .price(entity.getPrice())
+                .displayPrice(entity.getDisplayPrice())
                 .isNew(entity.getIsNew() == 1)
                 .isHot(entity.getIsHot() == 1)
                 .categoryCode(entity.getCategoryCode())
@@ -598,6 +634,7 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
                 .description(entity.getDescription())
                 .features(entity.getFeatures())
                 .price(entity.getPrice())
+                .displayPrice(entity.getDisplayPrice())
                 .isNew(entity.getIsNew() == 1)
                 .categoryCode(entity.getCategoryCode())
                 .companyName(entity.getCompanyName())
@@ -618,6 +655,7 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
                 .endDate(entity.getExpiryDate() != null ? entity.getExpiryDate().toString() : "")
                 .count(entity.getQuantity())
                 .price(entity.getPremiumAmount())
+                .displayPrice(entity.getDisplayPrice())
                 .total(entity.getTotalAmount())
                 .build();
     }
@@ -648,6 +686,7 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
                 .activateTime(entity.getActivateTime() != null ? entity.getActivateTime().toString() : "")
                 .count(entity.getQuantity())
                 .premiumAmount(entity.getPremiumAmount())
+                .displayPrice(entity.getDisplayPrice())
                 .build();
     }
 
@@ -810,7 +849,7 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
                 new SimplePdfWriter.FieldLine("起保日期", entity.getEffectiveDate() == null ? "" : entity.getEffectiveDate().toString()),
                 new SimplePdfWriter.FieldLine("结束日期", entity.getExpiryDate() == null ? "" : entity.getExpiryDate().toString()),
                 new SimplePdfWriter.FieldLine("份数", entity.getQuantity() == null ? "" : String.valueOf(entity.getQuantity())),
-                new SimplePdfWriter.FieldLine("显示价格", entity.getPremiumAmount() == null ? "" : entity.getPremiumAmount().toPlainString()),
+                new SimplePdfWriter.FieldLine("显示价格", entity.getDisplayPrice() != null ? entity.getDisplayPrice().toPlainString() : (entity.getPremiumAmount() == null ? "" : entity.getPremiumAmount().toPlainString())),
                 new SimplePdfWriter.FieldLine("审核人", defaultText(entity.getReviewerName())),
                 new SimplePdfWriter.FieldLine("审核时间", entity.getReviewTime() == null ? "" : entity.getReviewTime().toString()),
                 new SimplePdfWriter.FieldLine("承保时间", entity.getUnderwritingTime() == null ? "" : entity.getUnderwritingTime().toString()),

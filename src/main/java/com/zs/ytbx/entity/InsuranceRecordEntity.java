@@ -59,6 +59,8 @@ public class InsuranceRecordEntity extends BaseEntity {
 
     private BigDecimal premiumAmount;
 
+    private BigDecimal displayPrice;
+
     private Integer quantity;
 
     private LocalDate effectiveDate;

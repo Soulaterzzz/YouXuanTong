@@ -86,6 +86,9 @@
           </template>
         </el-table-column>
         <el-table-column prop="count" label="份数" width="68" align="center" />
+        <el-table-column label="单价" width="100" align="right">
+          <template #default="scope">¥{{ formatAmount(isAdmin ? scope.row.price : (scope.row.displayPrice || scope.row.price)) }}</template>
+        </el-table-column>
         <el-table-column prop="total" label="金额" width="96" align="right">
           <template #default="scope">¥{{ formatAmount(scope.row.total) }}</template>
         </el-table-column>

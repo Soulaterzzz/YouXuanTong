@@ -4,6 +4,7 @@ import com.zs.ytbx.common.api.PageResponse;
 import com.zs.ytbx.dto.*;
 import com.zs.ytbx.vo.anxinxuan.*;
 import org.springframework.web.multipart.MultipartFile;
+import java.math.BigDecimal;
 import java.util.List;
 
 public interface AnXinXuanService {
@@ -25,4 +26,6 @@ public interface AnXinXuanService {
 
     PageResponse<RechargeVO> listRecharges(RechargeQuery query, Long userId);
     void createRecharge(CreateRechargeRequest request, Long userId);
+
+    void updateDisplayPrice(Long insuranceId, BigDecimal displayPrice, Long userId);
 }

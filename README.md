@@ -190,6 +190,7 @@ npm test
 - 后端会在宿主机执行 `mvn -DskipTests package`，产物复制到 `/opt/ytbx/backend/ytbx.jar`，并由 `systemd` 服务 `ytbx-backend` 启动。
 - 数据库默认使用外部数据库；只有在选择本地数据库模式时，才会启动 `deploy/docker-compose.yml` 里的 MySQL 容器。
 - Nginx 配置会同时代理 `/api/`、`/files/` 和 `/agreements/`，并把前端历史路由回退到 `index.html`。
+- 上传目录默认使用项目根目录下的 `uploads/`，部署脚本会自动创建并写入运行时环境变量。
 - 需要重新选择数据库模式或更换绑定地址时，运行脚本前设置 `FORCE_WRITE_ENV=1` 即可重新进入配置流程。
 - 外部数据库如果是空库，先把 `YTBX_SQL_INIT_MODE` 调成 `always`，或者手动导入 `init_db.sql`。
 - `deploy/docker-compose.yml` 现在只负责 MySQL 容器，不再包含应用服务。
@@ -305,6 +306,6 @@ ytbx/
 ## 说明
 
 - `target/` 下的编译产物不建议手动提交
-- 本地上传目录默认位于 `uploads/`
+- 部署上传目录默认位于项目根目录下的 `uploads/`
 - 如果使用已有数据库，建议先备份，再执行初始化脚本或迁移脚本
 - 后续开发规范文档见：`docs/development-guide.md`

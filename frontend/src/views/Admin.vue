@@ -197,6 +197,9 @@
               <el-table-column prop="price" label="价格" width="100">
                 <template #default="scope">¥{{ scope.row.price }}</template>
               </el-table-column>
+              <el-table-column prop="displayPrice" label="显示价格" width="100">
+                <template #default="scope">{{ scope.row.displayPrice ? '¥' + scope.row.displayPrice : '-' }}</template>
+              </el-table-column>
               <el-table-column prop="saleStatus" label="状态" width="100">
                 <template #default="scope">
                   <el-tag :type="scope.row.saleStatus === 'ON_SALE' ? 'success' : 'danger'">
@@ -327,6 +330,10 @@
         </el-form-item>
         <el-form-item label="价格">
           <el-input-number v-model="productForm.price" :min="0" :precision="2" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="显示价格">
+          <el-input-number v-model="productForm.displayPrice" :min="0" :precision="2" style="width: 100%" placeholder="对客户展示的价格" />
+          <div style="margin-top: 2px; color: #909399; font-size: 12px;">留空则使用价格</div>
         </el-form-item>
         <el-form-item label="产品描述">
           <el-input v-model="productForm.description" type="textarea" :rows="3" />
@@ -540,7 +547,7 @@ export default {
     const productDialogVisible = ref(false)
     const productDialogTitle = ref('新增产品')
     const productDialogLoading = ref(false)
-    const productForm = reactive({ id: null, productName: '', categoryCode: '1-3', companyName: '', price: 0, description: '', features: '', alias: '' })
+    const productForm = reactive({ id: null, productName: '', categoryCode: '1-3', companyName: '', price: 0, displayPrice: null, description: '', features: '', alias: '' })
 
     const loadProducts = async () => {
       productLoading.value = true
@@ -571,10 +578,10 @@ export default {
     const openProductDialog = (type, row = null) => {
       if (type === 'create') {
         productDialogTitle.value = '新增产品'
-        Object.assign(productForm, { id: null, productName: '', categoryCode: '1-3', companyName: '', price: 0, description: '', features: '', alias: '' })
+        Object.assign(productForm, { id: null, productName: '', categoryCode: '1-3', companyName: '', price: 0, displayPrice: null, description: '', features: '', alias: '' })
       } else {
         productDialogTitle.value = '编辑产品'
-        Object.assign(productForm, { id: row.id, productName: row.name, categoryCode: row.categoryCode, companyName: row.companyName, price: row.price, description: row.description, features: row.features, alias: row.alias || '' })
+        Object.assign(productForm, { id: row.id, productName: row.name, categoryCode: row.categoryCode, companyName: row.companyName, price: row.price, displayPrice: row.displayPrice || null, description: row.description, features: row.features, alias: row.alias || '' })
       }
       productDialogVisible.value = true
     }

@@ -93,7 +93,7 @@
         <OptimizedProductCard
           v-for="product in products"
           :key="product.id"
-          v-memo="[isAdmin, product.id, product.name, product.alias, product.categoryCode, product.companyName, product.saleStatus, product.price, product.isNew, product.isHot, product.description, product.features, product.imageUrl, product.templateFileName]"
+          v-memo="[isAdmin, product.id, product.name, product.alias, product.categoryCode, product.companyName, product.saleStatus, product.price, product.displayPrice, product.isNew, product.isHot, product.description, product.features, product.imageUrl, product.templateFileName]"
           :product="product"
           :is-admin="isAdmin"
           @preview-image="$emit('preview-image', $event)"

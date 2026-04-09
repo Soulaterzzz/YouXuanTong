@@ -19,5 +19,6 @@ public class ExpenseVO {
     private String endDate;
     private Integer count;
     private BigDecimal price;
+    private BigDecimal displayPrice;
     private BigDecimal total;
 }

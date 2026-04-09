@@ -101,6 +101,32 @@
         <el-table-column prop="product" label="产品名称" min-width="140" show-overflow-tooltip />
         <el-table-column prop="insuredName" label="投保人" width="84" show-overflow-tooltip />
         <el-table-column prop="beneficiaryName" label="被保人" width="84" show-overflow-tooltip />
+        <el-table-column label="单价" width="120" align="right">
+          <template #default="scope">
+            <template v-if="isAdmin">
+              ¥{{ formatAmount(scope.row.premiumAmount) }}
+            </template>
+            <template v-else>
+              <span v-if="editingDisplayPriceId === scope.row.id" class="display-price-edit">
+                <el-input-number
+                  v-model="editingDisplayPriceValue"
+                  :min="0.01"
+                  :precision="2"
+                  :step="1"
+                  size="small"
+                  style="width: 90px"
+                  controls-position="right"
+                />
+                <el-button link type="success" size="small" @click="saveDisplayPrice(scope.row)">✓</el-button>
+                <el-button link type="danger" size="small" @click="cancelDisplayPriceEdit()">✗</el-button>
+              </span>
+              <span v-else class="display-price-cell" @click="startDisplayPriceEdit(scope.row)">
+                ¥{{ formatAmount(scope.row.displayPrice || scope.row.premiumAmount) }}
+                <el-icon class="edit-icon"><Edit /></el-icon>
+              </span>
+            </template>
+          </template>
+        </el-table-column>
         <el-table-column prop="status" label="状态" width="84" align="center">
           <template #default="scope">
             <el-tag :type="getStatusType(scope.row.statusCode || scope.row.status)" effect="light" round>
@@ -184,7 +210,8 @@
 </template>
 
 <script setup>
-import { Refresh, Download, Search, Lightning } from '@element-plus/icons-vue'
+import { ref } from 'vue'
+import { Refresh, Download, Search, Lightning, Edit } from '@element-plus/icons-vue'
 
 defineProps({
   isAdmin: { type: Boolean, default: false },
@@ -196,7 +223,7 @@ defineProps({
   selectedInsurances: { type: Array, default: () => [] }
 })
 
-defineEmits([
+const emit = defineEmits([
   'reset-filter',
   'download-export',
   'query',
@@ -208,9 +235,35 @@ defineEmits([
   'reject',
   'underwriting',
   'activate',
+  'update-display-price',
   'page-change',
   'size-change'
 ])
+
+const editingDisplayPriceId = ref(null)
+const editingDisplayPriceValue = ref(0)
+
+const startDisplayPriceEdit = (row) => {
+  editingDisplayPriceId.value = row.id
+  editingDisplayPriceValue.value = Number(row.displayPrice || row.premiumAmount || 0)
+}
+
+const cancelDisplayPriceEdit = () => {
+  editingDisplayPriceId.value = null
+}
+
+const saveDisplayPrice = (row) => {
+  emit('update-display-price', { id: row.id, displayPrice: editingDisplayPriceValue.value })
+  editingDisplayPriceId.value = null
+}
+
+const formatAmount = (value) => {
+  if (value === null || value === undefined || value === '') {
+    return '0.00'
+  }
+  const num = Number(value)
+  return Number.isFinite(num) ? num.toFixed(2) : String(value)
+}
 
 const getStatusType = (status) => {
   const normalized = String(status ?? '').trim().toUpperCase()
@@ -281,3 +334,26 @@ const canDownloadPolicyPdf = (status) => {
   return normalized === 'ACTIVE' || normalized === 'EXPIRED' || normalized === 'INSURED' || status === '已生效' || status === '已过期'
 }
 </script>
+
+<style scoped>
+.display-price-cell {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.display-price-cell .edit-icon {
+  font-size: 12px;
+  color: #909399;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.display-price-cell:hover .edit-icon {
+  opacity: 1;
+}
+.display-price-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+</style>

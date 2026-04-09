@@ -106,6 +106,15 @@ public class AnXinXuanController {
         return ApiResponse.success(null);
     }
 
+    @PutMapping("/insurances/{insuranceId}/display-price")
+    public ApiResponse<Void> updateDisplayPrice(@PathVariable("insuranceId") Long insuranceId,
+                                                 @RequestBody Map<String, BigDecimal> body) {
+        Long userId = getCurrentUserId();
+        BigDecimal displayPrice = body.get("displayPrice");
+        anxinXuanService.updateDisplayPrice(insuranceId, displayPrice, userId);
+        return ApiResponse.success(null);
+    }
+
     @GetMapping("/expenses")
     public ApiResponse<PageResponse<ExpenseVO>> listExpenses(@Valid @ModelAttribute ExpenseQuery query) {
         Long userId = getCurrentUserId();

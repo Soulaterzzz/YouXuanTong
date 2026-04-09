@@ -31,6 +31,8 @@ public class ExpenseRecordEntity extends BaseEntity {
 
     private BigDecimal premiumAmount;
 
+    private BigDecimal displayPrice;
+
     private Integer quantity;
 
     private BigDecimal totalAmount;

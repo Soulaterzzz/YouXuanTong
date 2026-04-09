@@ -252,6 +252,7 @@ public class AdminServiceImpl implements AdminService {
         product.setDescription(request.getDescription());
         product.setFeatures(request.getFeatures());
         product.setPrice(request.getPrice());
+        product.setDisplayPrice(request.getDisplayPrice());
         product.setIsNew(request.getIsNew() != null ? request.getIsNew() : 0);
         product.setIsHot(request.getIsHot() != null ? request.getIsHot() : 0);
         product.setSaleStatus(request.getSaleStatus() != null ? request.getSaleStatus() : "ON_SALE");
@@ -302,6 +303,9 @@ public class AdminServiceImpl implements AdminService {
         }
         if (request.getPrice() != null) {
             product.setPrice(request.getPrice());
+        }
+        if (request.getDisplayPrice() != null) {
+            product.setDisplayPrice(request.getDisplayPrice());
         }
         if (request.getIsNew() != null) {
             product.setIsNew(request.getIsNew());
@@ -722,6 +726,7 @@ public class AdminServiceImpl implements AdminService {
                 .description(entity.getDescription())
                 .features(entity.getFeatures())
                 .price(entity.getPrice())
+                .displayPrice(entity.getDisplayPrice())
                 .isNew(entity.getIsNew() == 1)
                 .isHot(entity.getIsHot() == 1)
                 .categoryCode(entity.getCategoryCode())
@@ -742,6 +747,7 @@ public class AdminServiceImpl implements AdminService {
                 .description(entity.getDescription())
                 .features(entity.getFeatures())
                 .price(entity.getPrice())
+                .displayPrice(entity.getDisplayPrice())
                 .isNew(entity.getIsNew() == 1)
                 .categoryCode(entity.getCategoryCode())
                 .companyName(entity.getCompanyName())
@@ -763,6 +769,7 @@ public class AdminServiceImpl implements AdminService {
                 .endDate(entity.getExpiryDate() != null ? entity.getExpiryDate().toString() : "")
                 .count(entity.getQuantity())
                 .price(entity.getPremiumAmount())
+                .displayPrice(entity.getDisplayPrice())
                 .total(entity.getTotalAmount())
                 .build();
     }
@@ -793,6 +800,7 @@ public class AdminServiceImpl implements AdminService {
                 .activateTime(entity.getActivateTime() != null ? entity.getActivateTime().toString() : "")
                 .count(entity.getQuantity())
                 .premiumAmount(entity.getPremiumAmount())
+                .displayPrice(entity.getDisplayPrice())
                 .build();
     }
 

@@ -24,6 +24,7 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+PROJECT_UPLOAD_DIR="./uploads"
 DEPLOY_ENV_FILE="${PROJECT_ROOT}/deploy/.env"
 LOG_FILE="${PROJECT_ROOT}/deploy/deploy-$(date +%Y%m%d_%H%M%S).log"
 DEPLOY_BASE_DIR="${DEPLOY_BASE_DIR:-/opt/ytbx}"
@@ -35,7 +36,7 @@ MYSQL_COMPOSE_FILE="${PROJECT_ROOT}/deploy/docker-compose.yml"
 SERVICE_USER="${SERVICE_USER:-ytbx}"
 SERVICE_GROUP="${SERVICE_GROUP:-${SERVICE_USER}}"
 APP_PORT="${APP_PORT:-8080}"
-HOST_UPLOAD_DIR="${HOST_UPLOAD_DIR:-/data/ytbx/uploads}"
+HOST_UPLOAD_DIR="${HOST_UPLOAD_DIR:-${PROJECT_UPLOAD_DIR}}"
 USE_EXTERNAL_DB="${USE_EXTERNAL_DB:-1}"
 MYSQL_HOST="${MYSQL_HOST:-}"
 MYSQL_PORT="${MYSQL_PORT:-3306}"
@@ -286,8 +287,8 @@ validate_host_upload_dir() {
     return 1
   fi
 
-  if [[ "${value}" != /* ]]; then
-    VALIDATION_ERROR="上传目录必须是绝对路径，例如 /data/ytbx/uploads"
+  if [[ "${value}" == /* ]]; then
+    VALIDATION_ERROR="请使用相对路径，例如 ./uploads"
     return 1
   fi
 
@@ -783,7 +784,7 @@ prompt_for_configuration() {
     fi
 
     prompt_text_input APP_PORT "后端服务端口（nginx 反代到该端口）" validate_app_port
-    prompt_text_input HOST_UPLOAD_DIR "上传目录（绝对路径）" validate_host_upload_dir
+    prompt_text_input HOST_UPLOAD_DIR "上传目录（相对路径，默认 ./uploads）" validate_host_upload_dir
     prompt_text_input PRODUCT_IMAGE_PATH "商品图片子目录（相对路径）" validate_product_image_path
     prompt_text_input MAX_FILE_SIZE "最大上传大小（字节）" validate_max_file_size
     prompt_text_input ALLOWED_EXTENSIONS "允许扩展名（逗号分隔）" validate_allowed_extensions
@@ -979,14 +980,15 @@ build_backend_package() {
 write_backend_runtime_files() {
   cat > "${BACKEND_DIR}/ytbx.env" <<EOF
 SPRING_PROFILES_ACTIVE=prod
+PROJECT_ROOT=$(quote_env_value "${PROJECT_ROOT}")
 SERVER_PORT=$(quote_env_value "${APP_PORT}")
 MYSQL_URL=$(quote_env_value "${MYSQL_URL}")
 MYSQL_USERNAME=$(quote_env_value "${MYSQL_USER}")
 MYSQL_PASSWORD=$(quote_env_value "${MYSQL_PASSWORD}")
 AUTH_TOKEN_SECRET=$(quote_env_value "${AUTH_TOKEN_SECRET}")
 CORS_ALLOWED_ORIGINS=$(quote_env_value "${CORS_ALLOWED_ORIGINS}")
-FILE_STORAGE_PATH=$(quote_env_value "${HOST_UPLOAD_DIR}")
-TEMPLATE_FILE_PATH=$(quote_env_value "${HOST_UPLOAD_DIR}/templates")
+FILE_STORAGE_PATH=./uploads
+TEMPLATE_FILE_PATH=./uploads/templates
 PRODUCT_IMAGE_PATH=$(quote_env_value "${PRODUCT_IMAGE_PATH}")
 MAX_FILE_SIZE=$(quote_env_value "${MAX_FILE_SIZE}")
 ALLOWED_EXTENSIONS=$(quote_env_value "${ALLOWED_EXTENSIONS}")
@@ -1014,6 +1016,8 @@ fi
 JAVA_BIN="${JAVA_BIN:-$(command -v java)}"
 JAVA_OPTS="${JAVA_OPTS:--Xms256m -Xmx512m -XX:+UseG1GC -XX:+UseStringDeduplication}"
 
+# 切换到项目根目录，使 ./uploads 等相对路径正确解析
+cd "${PROJECT_ROOT:-/opt/ytbx}"
 exec "${JAVA_BIN}" ${JAVA_OPTS} -jar "${JAR_FILE}"
 EOF
   chmod 755 "${BACKEND_DIR}/run.sh"
@@ -1131,13 +1135,13 @@ wait_for_mysql_container() {
         return 0
         ;;
       unhealthy)
-        log "WARN" "MySQL 容器健康状态异常，继续等待... (${attempt + 1}/${max_attempts})"
+        log "WARN" "MySQL 容器健康状态异常，继续等待... ($((attempt + 1))/${max_attempts})"
         ;;
       running|starting|created|"")
-        log "INFO" "等待 MySQL 容器就绪... (${attempt + 1}/${max_attempts})"
+        log "INFO" "等待 MySQL 容器就绪... ($((attempt + 1))/${max_attempts})"
         ;;
       *)
-        log "INFO" "MySQL 当前状态: ${status}，继续等待... (${attempt + 1}/${max_attempts})"
+        log "INFO" "MySQL 当前状态: ${status}，继续等待... ($((attempt + 1))/${max_attempts})"
         ;;
     esac
 

@@ -30,4 +30,5 @@ public class InsuranceVO {
     private String activateTime;
     private Integer count;
     private BigDecimal premiumAmount;
+    private BigDecimal displayPrice;
 }

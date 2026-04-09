@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS axx_expense_record (
     expense_status VARCHAR(32) NOT NULL DEFAULT 'PENDING_REVIEW' COMMENT '状态：DRAFT-待提交，PENDING_REVIEW-待审核，APPROVED-审核通过，REVIEW_REJECTED-审核驳回，UNDERWRITING-承保中，ACTIVE-已生效，CANCELLED-已取消',
     policy_no VARCHAR(64) DEFAULT NULL COMMENT '电子保单号',
     premium_amount DECIMAL(18,2) NOT NULL COMMENT '保费金额',
+    display_price DECIMAL(18,2) DEFAULT NULL COMMENT '显示价格（用户自定义分销价格，为空时使用 premium_amount）',
     quantity INT NOT NULL DEFAULT 1 COMMENT '份数',
     total_amount DECIMAL(18,2) NOT NULL COMMENT '总金额',
     effective_date DATE DEFAULT NULL COMMENT '起保日期',
@@ -118,6 +119,7 @@ CREATE TABLE IF NOT EXISTS axx_insurance_record (
     activate_time DATETIME DEFAULT NULL COMMENT '保单生效操作时间',
     policy_no VARCHAR(64) DEFAULT NULL COMMENT '电子保单号',
     premium_amount DECIMAL(18,2) NOT NULL COMMENT '保费金额',
+    display_price DECIMAL(18,2) DEFAULT NULL COMMENT '显示价格（用户自定义分销价格，为空时使用 premium_amount）',
     quantity INT NOT NULL DEFAULT 1 COMMENT '份数',
     effective_date DATE DEFAULT NULL COMMENT '起保日期',
     expiry_date DATE DEFAULT NULL COMMENT '结束日期',
@@ -144,6 +146,7 @@ CREATE TABLE IF NOT EXISTS axx_product (
     description VARCHAR(500) DEFAULT NULL COMMENT '产品描述',
     features VARCHAR(500) DEFAULT NULL COMMENT '产品特点',
     price DECIMAL(18,2) NOT NULL COMMENT '价格',
+    display_price DECIMAL(18,2) DEFAULT NULL COMMENT '显示价格（分销商对外展示价格，为空时使用 price）',
     is_new TINYINT NOT NULL DEFAULT 0 COMMENT '是否新品',
     is_hot TINYINT NOT NULL DEFAULT 0 COMMENT '是否热门',
     sale_status VARCHAR(32) NOT NULL DEFAULT 'ON_SALE' COMMENT '销售状态',
@@ -198,15 +201,15 @@ SET FOREIGN_KEY_CHECKS = 1;
 -- ================================================
 -- 1. 产品数据（8款保险产品）
 -- ================================================
-INSERT INTO axx_product (product_code, product_name, category_code, company_name, description, features, price, is_new, is_hot, sale_status, sort_no, create_time, update_time) VALUES
-('GS-001', '国寿财1-3类10+5+5+50（青柑）', '1-3', '国寿财险', '个单：18-63周岁；可投保：1-3类职业；T+1生效；每周一三五十点截单', '无门诊免赔额；承保动物伤害；意外医疗全额赔付', 55.00, 1, 1, 'ON_SALE', 1, NOW(), NOW()),
-('PA-001', '平安财意外10+1+50+10（含意保）', '1-3', '平安财险', '1-3类职业可投；每周一三五十十点截单', '限投一份；正常1+6生效；包含住院津贴', 60.00, 0, 1, 'ON_SALE', 2, NOW(), NOW()),
-('ZA-001', '少儿门诊医疗险', 'child', '众安保险', '0-17岁可投保；门急诊可报销；等待期短', '门急诊保障；住院医疗；特定疾病额外赔付；不限社保', 380.00, 1, 0, 'ON_SALE', 3, NOW(), NOW()),
-('RB-001', '老年意外险（尊享版）', 'elder', '人保财险', '50-80岁可投保；综合意外保障；高龄专属', '意外医疗；骨折津贴；救护车费用；住院护理', 200.00, 0, 1, 'ON_SALE', 4, NOW(), NOW()),
-('GS-002', '国寿财1-4类意外险', '1-4', '国寿财险', '1-4类职业可投；保障全面；性价比高', '意外身故伤残；意外医疗；住院津贴', 80.00, 0, 0, 'ON_SALE', 5, NOW(), NOW()),
-('PA-002', '平安财高危职业意外险', '5-6', '平安财险', '5-6类高危职业专属；保障力度强', '高危职业可投；意外身故伤残；意外医疗', 150.00, 1, 0, 'ON_SALE', 6, NOW(), NOW()),
-('TP-001', '太保百万医疗险', 'medical', '太平洋保险', '一般医疗+重疾医疗；保额高达600万', '重疾绿通；住院垫付；质子重离子', 300.00, 0, 1, 'ON_SALE', 7, NOW(), NOW()),
-('ZA-002', '众安出行意外险', 'travel', '众安保险', '出行保障；飞机/火车/轮船/汽车全覆盖', '交通工具意外；航班延误；行李丢失', 50.00, 0, 0, 'ON_SALE', 8, NOW(), NOW());
+INSERT INTO axx_product (product_code, product_name, category_code, company_name, description, features, price, display_price, is_new, is_hot, sale_status, sort_no, create_time, update_time) VALUES
+('GS-001', '国寿财1-3类10+5+5+50（青柑）', '1-3', '国寿财险', '个单：18-63周岁；可投保：1-3类职业；T+1生效；每周一三五十点截单', '无门诊免赔额；承保动物伤害；意外医疗全额赔付', 55.00, 68.00, 1, 1, 'ON_SALE', 1, NOW(), NOW()),
+('PA-001', '平安财意外10+1+50+10（含意保）', '1-3', '平安财险', '1-3类职业可投；每周一三五十十点截单', '限投一份；正常1+6生效；包含住院津贴', 60.00, 75.00, 0, 1, 'ON_SALE', 2, NOW(), NOW()),
+('ZA-001', '少儿门诊医疗险', 'child', '众安保险', '0-17岁可投保；门急诊可报销；等待期短', '门急诊保障；住院医疗；特定疾病额外赔付；不限社保', 380.00, 420.00, 1, 0, 'ON_SALE', 3, NOW(), NOW()),
+('RB-001', '老年意外险（尊享版）', 'elder', '人保财险', '50-80岁可投保；综合意外保障；高龄专属', '意外医疗；骨折津贴；救护车费用；住院护理', 200.00, 258.00, 0, 1, 'ON_SALE', 4, NOW(), NOW()),
+('GS-002', '国寿财1-4类意外险', '1-4', '国寿财险', '1-4类职业可投；保障全面；性价比高', '意外身故伤残；意外医疗；住院津贴', 80.00, 98.00, 0, 0, 'ON_SALE', 5, NOW(), NOW()),
+('PA-002', '平安财高危职业意外险', '5-6', '平安财险', '5-6类高危职业专属；保障力度强', '高危职业可投；意外身故伤残；意外医疗', 150.00, 188.00, 1, 0, 'ON_SALE', 6, NOW(), NOW()),
+('TP-001', '太保百万医疗险', 'medical', '太平洋保险', '一般医疗+重疾医疗；保额高达600万', '重疾绿通；住院垫付；质子重离子', 300.00, 360.00, 0, 1, 'ON_SALE', 7, NOW(), NOW()),
+('ZA-002', '众安出行意外险', 'travel', '众安保险', '出行保障；飞机/火车/轮船/汽车全覆盖', '交通工具意外；航班延误；行李丢失', 50.00, 66.00, 0, 0, 'ON_SALE', 8, NOW(), NOW());
 
 -- ================================================
 -- 2. 用户数据（1管理员 + 13普通用户）

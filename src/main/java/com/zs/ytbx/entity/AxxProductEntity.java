@@ -25,6 +25,8 @@ public class AxxProductEntity extends BaseEntity {
 
     private BigDecimal price;
 
+    private BigDecimal displayPrice;
+
     private Integer isNew;
 
     private Integer isHot;

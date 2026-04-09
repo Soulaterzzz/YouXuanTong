@@ -50,6 +50,12 @@
             </el-form-item>
           </el-col>
           <el-col :span="8">
+            <el-form-item label="显示价格">
+              <el-input-number v-model="productForm.displayPrice" :min="0.01" :precision="2" style="width: 100%" placeholder="对客户展示的价格" />
+              <div style="margin-top: 2px; color: #909399; font-size: 12px;">留空则使用价格</div>
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
             <el-form-item label="排序号">
               <el-input-number v-model="productForm.sortNo" :min="0" style="width: 100%" />
             </el-form-item>
@@ -97,7 +103,7 @@
               :on-error="handleImageUploadError"
               :before-upload="beforeImageUpload"
               accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-              :with-credentials="true"
+              :headers="uploadHeaders"
             >
               <div v-if="productForm.imageUrl" class="image-preview-wrapper">
                 <img :src="productForm.imageUrl" class="product-image-preview" />
@@ -126,7 +132,7 @@
               :on-error="handleTemplateUploadError"
               :before-upload="beforeTemplateUpload"
               accept=".pdf,.doc,.docx,.xls,.xlsx,.txt"
-              :with-credentials="true"
+              :headers="uploadHeaders"
               method="post"
             >
               <el-button type="primary">
@@ -354,33 +360,24 @@
           <div class="info-item">
             <span class="label">原始单价：</span>
             <span class="value price">¥{{ Number(selectedProduct.price || 0).toFixed(2) }}</span>
+            <span class="label" style="margin-left: 12px;">显示价格：</span>
+            <el-input-number
+              v-model="activeForm.displayPrice"
+              :min="0.01"
+              :precision="2"
+              :step="0.01"
+              controls-position="right"
+              style="width: 110px;"
+              size="small"
+            />
+            <el-tooltip content="打印 PDF 凭证时将使用此价格" placement="top">
+              <el-icon style="margin-left: 4px; color: #909399; cursor: help;"><InfoFilled /></el-icon>
+            </el-tooltip>
           </div>
         </el-col>
       </el-row>
     </div>
     <el-form :model="activeForm" :rules="activeFormRules" ref="activeFormRef" label-width="100px">
-      <el-form-item label="方案名称" prop="planName">
-        <el-select v-model="activeForm.planName" placeholder="请选择方案名称" style="width: 100%;">
-          <el-option v-if="selectedProduct" :label="selectedProduct.name" :value="String(selectedProduct.id)"></el-option>
-          <el-option label="国寿财意外险（1-3类）" value="guoshou-3"></el-option>
-          <el-option label="平安财意外险" value="pingan-10"></el-option>
-          <el-option label="少儿医疗险" value="child-med"></el-option>
-          <el-option label="老年意外险" value="elder-acc"></el-option>
-          <el-option label="旅游险" value="travel"></el-option>
-          <el-option label="驾乘险" value="maternity"></el-option>
-        </el-select>
-      </el-form-item>
-      <el-form-item label="显示价格" prop="displayPrice">
-        <el-input-number
-          v-model="activeForm.displayPrice"
-          :min="0.01"
-          :precision="2"
-          :step="0.01"
-          controls-position="right"
-          style="width: 100%;"
-        />
-        <div style="margin-top: 4px; color: #909399; font-size: 12px;">打印 PDF 凭证时将使用此价格</div>
-      </el-form-item>
       <el-form-item label="被保人姓名" prop="beneficiaryName">
         <el-input v-model="activeForm.beneficiaryName" placeholder="请输入被保人姓名"></el-input>
       </el-form-item>
@@ -421,6 +418,7 @@
         <div class="summary-row" v-if="selectedProduct">
           <span>应付金额：</span>
           <span class="amount">¥{{ getActiveTotalAmount().toFixed(2) }}</span>
+          <span style="color: #909399; font-size: 12px; margin-left: 4px;">（按原始单价 ¥{{ Number(selectedProduct.price || 0).toFixed(2) }} × {{ activeForm.count || 1 }} 份）</span>
         </div>
         <div class="summary-row" v-if="selectedProduct">
           <span>余额不足：</span>
@@ -468,6 +466,7 @@ import {
   Check
 } from '@element-plus/icons-vue'
 import { useHomeDialogBridge } from '@/composables/home/useHomeDialogBridge.js'
+import { computed } from 'vue'
 
 export default {
   name: 'ProductDialogs',
@@ -483,6 +482,10 @@ export default {
   },
   setup() {
     const { bridge } = useHomeDialogBridge(['productInsuranceBatchUploadRef', 'activeFormRef'])
+    bridge.uploadHeaders = computed(() => {
+      const token = sessionStorage.getItem('authToken')
+      return token ? { Authorization: `Bearer ${token}` } : {}
+    })
     return bridge
   }
 }

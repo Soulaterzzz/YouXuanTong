@@ -77,6 +77,7 @@ export default {
         description: '',
         features: '',
         price: 0.01,
+        displayPrice: null,
         isNew: 0,
         isHot: 0,
         saleStatus: 'ON_SALE',
@@ -184,7 +185,6 @@ export default {
         agent: ''
       },
       activeFormRules: {
-        planName: [{ required: true, message: '请选择方案名称', trigger: 'change' }],
         displayPrice: [{
           validator: (_, value, callback) => {
             const price = Number(value)
@@ -1000,6 +1000,7 @@ export default {
         description: '',
         features: '',
         price: 0.01,
+        displayPrice: null,
         isNew: 0,
         isHot: 0,
         saleStatus: 'ON_SALE',
@@ -1022,6 +1023,7 @@ export default {
           description: product.description || '',
           features: product.features || '',
           price: product.price || 0.01,
+          displayPrice: product.displayPrice || null,
           isNew: product.isNew ? 1 : 0,
           isHot: product.isHot ? 1 : 0,
           saleStatus: product.saleStatus || 'ON_SALE',
@@ -1054,6 +1056,7 @@ export default {
         description: this.productForm.description,
         features: this.productForm.features,
         price: this.productForm.price,
+        displayPrice: this.productForm.displayPrice || null,
         isNew: this.productForm.isNew,
         isHot: this.productForm.isHot,
         saleStatus: this.productForm.saleStatus,
@@ -1350,8 +1353,8 @@ export default {
       this.selectedProduct = product
       this.activeForm = {
         productId: product.id,
-        planName: '',
-        displayPrice: Number(product.price ?? 0),
+        planName: String(product.id),
+        displayPrice: Number(product.displayPrice != null ? product.displayPrice : (product.price || 0)),
         beneficiaryName: '',
         beneficiaryId: '',
         beneficiaryJob: '',
@@ -1374,8 +1377,8 @@ export default {
 
     getActiveTotalAmount() {
       const quantity = Number(this.activeForm?.count ?? 0)
-      const unitPrice = this.getActiveDisplayPrice()
-      return unitPrice * (Number.isFinite(quantity) && quantity > 0 ? quantity : 0)
+      const unitPrice = Number(this.selectedProduct?.price ?? 0)
+      return (Number.isFinite(unitPrice) && unitPrice > 0 ? unitPrice : 0) * (Number.isFinite(quantity) && quantity > 0 ? quantity : 0)
     },
 
     async submitActiveForm() {
@@ -1773,6 +1776,22 @@ export default {
           console.error('提交审核失败:', error)
           this.$message.error(error.response?.data?.message || '提交审核失败')
         }
+      }
+    },
+
+    async updateDisplayPrice({ id, displayPrice }) {
+      try {
+        const res = await this.$axios.put(`/api/anxinxuan/insurances/${id}/display-price`, { displayPrice })
+        if (this.isSuccess(res)) {
+          this.$message.success('显示价格已更新')
+          this.loadInsurances()
+          this.loadExpenses()
+        } else {
+          this.$message.error(res.data?.message || '更新显示价格失败')
+        }
+      } catch (error) {
+        console.error('更新显示价格失败:', error)
+        this.$message.error(error.response?.data?.message || '更新显示价格失败')
       }
     },
 
