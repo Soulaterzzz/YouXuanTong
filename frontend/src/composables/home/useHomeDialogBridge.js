@@ -10,6 +10,37 @@ function defineBridgeProperty(target, key, getter, setter) {
   })
 }
 
+function shouldSkipKey(key) {
+  return typeof key === 'string' && (key.startsWith('$') || key.startsWith('_'))
+}
+
+function bridgeSourceKeys(source, bridge, home) {
+  if (!source) {
+    return
+  }
+
+  Reflect.ownKeys(source).forEach((key) => {
+    if (shouldSkipKey(key)) {
+      return
+    }
+    if (key === 'dialogRef' || key === 'handleDialogOpen' || key === 'handleDialogClose') {
+      return
+    }
+    if (Object.prototype.hasOwnProperty.call(bridge, key)) {
+      return
+    }
+
+    defineBridgeProperty(
+      bridge,
+      key,
+      () => home[key],
+      (value) => {
+        home[key] = value
+      }
+    )
+  })
+}
+
 export function useHomeDialogBridge(syncRefKeys = []) {
   const home = inject('homeDialogContext')
   if (!home) throw new Error('Home dialog bridge requires homeDialogContext')
@@ -44,26 +75,8 @@ export function useHomeDialogBridge(syncRefKeys = []) {
     )
   })
 
-  Reflect.ownKeys(home).forEach((key) => {
-    if (typeof key === 'string' && (key.startsWith('$') || key.startsWith('_'))) {
-      return
-    }
-    if (key === 'dialogRef' || key === 'handleDialogOpen' || key === 'handleDialogClose') {
-      return
-    }
-    if (Object.prototype.hasOwnProperty.call(bridge, key)) {
-      return
-    }
-
-    defineBridgeProperty(
-      bridge,
-      key,
-      () => home[key],
-      (value) => {
-        home[key] = value
-      }
-    )
-  })
+  bridgeSourceKeys(home, bridge, home)
+  bridgeSourceKeys(home.$data, bridge, home)
 
   return {
     home,
