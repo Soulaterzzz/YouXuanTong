@@ -24,6 +24,8 @@ public class ProductRequest {
     private String description;
     
     private String features;
+
+    private String detailText;
     
     @NotNull(message = "价格不能为空")
     @DecimalMin(value = "0.01", message = "价格必须大于0")

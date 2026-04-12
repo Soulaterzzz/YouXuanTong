@@ -613,6 +613,7 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
                 .name(entity.getProductName())
                 .description(entity.getDescription())
                 .features(entity.getFeatures())
+                .detailText(entity.getDetailText())
                 .price(entity.getPrice())
                 .displayPrice(entity.getDisplayPrice())
                 .isNew(entity.getIsNew() == 1)
@@ -633,6 +634,7 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
                 .name(entity.getProductName())
                 .description(entity.getDescription())
                 .features(entity.getFeatures())
+                .detailText(entity.getDetailText())
                 .price(entity.getPrice())
                 .displayPrice(entity.getDisplayPrice())
                 .isNew(entity.getIsNew() == 1)
@@ -736,6 +738,9 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
         }
         if (query.getStatus() != null && !query.getStatus().isBlank() && !"all".equalsIgnoreCase(query.getStatus())) {
             applyExpenseStatusFilter(wrapper, query.getStatus());
+        }
+        if (query.getUsername() != null && !query.getUsername().isBlank()) {
+            wrapper.like(ExpenseRecordEntity::getContactName, query.getUsername().trim());
         }
         if (query.getSerialNo() != null && !query.getSerialNo().isBlank()) {
             wrapper.like(ExpenseRecordEntity::getSerialNo, query.getSerialNo().trim());

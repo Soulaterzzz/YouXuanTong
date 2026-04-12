@@ -27,6 +27,7 @@ public class DatabaseMigrationRunner implements ApplicationRunner {
         try {
             ensureNoticeTable();
             ensureProductTemplateColumns();
+            ensureDisplayPriceColumns();
             ensureProductCodeUniqueIndex();
             ensureAccountBalanceVersionColumn();
             ensureInsuranceWorkflowColumns();
@@ -77,12 +78,23 @@ public class DatabaseMigrationRunner implements ApplicationRunner {
     }
 
     private void ensureProductTemplateColumns() {
+        ensureColumnExists("axx_product", "display_price",
+                "ALTER TABLE axx_product ADD COLUMN display_price DECIMAL(18,2) DEFAULT NULL COMMENT '显示价格（分销商对外展示价格，为空时使用 price）' AFTER price");
         ensureColumnExists("axx_product", "alias",
                 "ALTER TABLE axx_product ADD COLUMN alias VARCHAR(128) DEFAULT NULL COMMENT '产品别名' AFTER product_name");
+        ensureColumnExists("axx_product", "detail_text",
+                "ALTER TABLE axx_product ADD COLUMN detail_text LONGTEXT DEFAULT NULL COMMENT '产品详情正文' AFTER features");
         ensureColumnExists("axx_product", "template_file_name",
                 "ALTER TABLE axx_product ADD COLUMN template_file_name VARCHAR(255) DEFAULT NULL COMMENT '模板文件名'");
         ensureColumnExists("axx_product", "template_file_path",
                 "ALTER TABLE axx_product ADD COLUMN template_file_path VARCHAR(500) DEFAULT NULL COMMENT '模板文件路径'");
+    }
+
+    private void ensureDisplayPriceColumns() {
+        ensureColumnExists("axx_expense_record", "display_price",
+                "ALTER TABLE axx_expense_record ADD COLUMN display_price DECIMAL(18,2) DEFAULT NULL COMMENT '显示价格（用户自定义的分销价格，为空时使用 premium_amount）' AFTER premium_amount");
+        ensureColumnExists("axx_insurance_record", "display_price",
+                "ALTER TABLE axx_insurance_record ADD COLUMN display_price DECIMAL(18,2) DEFAULT NULL COMMENT '显示价格（用户自定义的分销价格，为空时使用 premium_amount）' AFTER premium_amount");
     }
 
     private void ensureProductCodeUniqueIndex() {

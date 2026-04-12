@@ -1125,21 +1125,13 @@ body {
 }
 
 .records-filter-grid.expense-filter-grid {
-  grid-template-columns: minmax(180px, 1.4fr) minmax(140px, 1fr) minmax(130px, 0.9fr) minmax(200px, 1.4fr);
+  grid-template-columns: minmax(180px, 1.25fr) minmax(150px, 1fr) minmax(130px, 0.9fr) minmax(140px, 0.95fr) minmax(220px, 1.5fr);
 }
 
 .records-filter-grid.insurance-filter-grid {
-  grid-template-columns:
-    minmax(170px, 1.1fr)
-    minmax(120px, 0.8fr)
-    minmax(130px, 0.75fr)
-    minmax(130px, 0.75fr)
-    minmax(250px, 1.65fr)
-    minmax(190px, 1.18fr)
-    minmax(190px, 1.18fr)
-    minmax(120px, 0.8fr);
-  overflow-x: auto;
-  padding-bottom: 4px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  overflow-x: visible;
+  padding-bottom: 0;
 }
 
 .records-filter-grid.recharge-filter-grid {
@@ -1204,16 +1196,44 @@ body {
   background: var(--color-bg-surface);
 }
 
+.content .records-table.insurance-records-table,
+.content .records-table.expense-records-table {
+  table-layout: auto;
+}
+
 .content .records-table .el-table__cell {
   padding-top: 8px;
   padding-bottom: 8px;
   border-bottom-color: #eef2f7;
 }
 
+.content .records-table.insurance-records-table .el-table__cell,
+.content .records-table.expense-records-table .el-table__cell {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 10px;
+  padding-right: 10px;
+  font-size: 13px;
+}
+
 .content .records-table .el-table__header-wrapper th {
   background: #f7f9fc;
   color: var(--color-text-primary);
   font-weight: 700;
+}
+
+.content .records-table.insurance-records-table .el-table__header-wrapper th .cell,
+.content .records-table.expense-records-table .el-table__header-wrapper th .cell {
+  white-space: normal;
+  line-height: 1.15;
+  word-break: break-all;
+}
+
+.content .records-table.insurance-records-table .el-tag,
+.content .records-table.expense-records-table .el-tag {
+  padding: 0 6px;
+  font-size: 11px;
+  line-height: 20px;
 }
 
 .content .records-table .el-table__row:hover > td {
@@ -1239,6 +1259,13 @@ body {
   flex-wrap: wrap;
   justify-content: center;
   gap: 2px 8px;
+}
+
+.content .records-table.insurance-records-table .records-row-actions,
+.content .records-table.expense-records-table .records-row-actions {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 2px;
 }
 
 .records-row-actions .el-button {

@@ -23,6 +23,8 @@ public class AxxProductEntity extends BaseEntity {
 
     private String features;
 
+    private String detailText;
+
     private BigDecimal price;
 
     private BigDecimal displayPrice;

@@ -251,6 +251,7 @@ public class AdminServiceImpl implements AdminService {
         product.setCompanyName(request.getCompanyName());
         product.setDescription(request.getDescription());
         product.setFeatures(request.getFeatures());
+        product.setDetailText(request.getDetailText());
         product.setPrice(request.getPrice());
         product.setDisplayPrice(request.getDisplayPrice());
         product.setIsNew(request.getIsNew() != null ? request.getIsNew() : 0);
@@ -300,6 +301,9 @@ public class AdminServiceImpl implements AdminService {
         }
         if (request.getFeatures() != null) {
             product.setFeatures(request.getFeatures());
+        }
+        if (request.getDetailText() != null) {
+            product.setDetailText(request.getDetailText());
         }
         if (request.getPrice() != null) {
             product.setPrice(request.getPrice());
@@ -725,6 +729,7 @@ public class AdminServiceImpl implements AdminService {
                 .name(entity.getProductName())
                 .description(entity.getDescription())
                 .features(entity.getFeatures())
+                .detailText(entity.getDetailText())
                 .price(entity.getPrice())
                 .displayPrice(entity.getDisplayPrice())
                 .isNew(entity.getIsNew() == 1)
@@ -746,6 +751,7 @@ public class AdminServiceImpl implements AdminService {
                 .name(entity.getProductName())
                 .description(entity.getDescription())
                 .features(entity.getFeatures())
+                .detailText(entity.getDetailText())
                 .price(entity.getPrice())
                 .displayPrice(entity.getDisplayPrice())
                 .isNew(entity.getIsNew() == 1)
@@ -1165,6 +1171,9 @@ public class AdminServiceImpl implements AdminService {
         }
         if (query.getStatus() != null && !query.getStatus().isBlank() && !"all".equalsIgnoreCase(query.getStatus())) {
             applyExpenseStatusFilter(wrapper, query.getStatus());
+        }
+        if (query.getUsername() != null && !query.getUsername().isBlank()) {
+            wrapper.like(ExpenseRecordEntity::getContactName, query.getUsername().trim());
         }
         if (query.getSerialNo() != null && !query.getSerialNo().isBlank()) {
             wrapper.like(ExpenseRecordEntity::getSerialNo, query.getSerialNo().trim());

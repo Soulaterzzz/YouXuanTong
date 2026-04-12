@@ -76,6 +76,7 @@ export default {
         companyName: '',
         description: '',
         features: '',
+        detailText: '',
         price: 0.01,
         displayPrice: null,
         isNew: 0,
@@ -94,6 +95,7 @@ export default {
       expenseFilter: {
         plan: 'all',
         status: 'all',
+        username: '',
         serial: '',
         dateRange: []
       },
@@ -292,7 +294,7 @@ export default {
     },
     noticeManageEditDialogTitle() {
       return this.noticeManageEditIndex >= 0 ? '编辑通知' : '新建通知'
-    },
+    }
   },
   watch: {
     activeMenu(newVal, oldVal) {
@@ -307,12 +309,19 @@ export default {
       this.$router.push('/login')
       return
     }
+    const initialMenu = this.getRouteMenu()
+    if (initialMenu && initialMenu !== 'home') {
+      this.activeMenu = initialMenu
+    }
     this.loadStats()
-    this.loadProducts()
     this.loadBalance()
     this.loadCategories()
     this.loadCompanies()
-    this.showHomeNoticeDialog()
+    if (initialMenu && initialMenu !== 'home') {
+      await this.handleMenuSelect(initialMenu)
+    } else {
+      this.showHomeNoticeDialog()
+    }
   },
   methods: {
     isSuccess(res) {
@@ -329,6 +338,28 @@ export default {
 
     cloneNoticeList(list = []) {
       return cloneNoticeListUtil(list)
+    },
+
+    getRouteMenu() {
+      const menu = String(this.$route?.query?.menu || '').trim()
+      const allowedMenus = ['home', 'product', 'expense', 'insurance', 'recharge', 'userAdmin']
+      return allowedMenus.includes(menu) ? menu : 'home'
+    },
+
+    syncHomeRouteMenu(key) {
+      if (!this.$router || !this.$route || this.$route.path !== '/') {
+        return
+      }
+
+      const normalizedKey = key === 'notice' ? 'home' : key
+      const currentMenu = this.getRouteMenu()
+      const nextMenu = normalizedKey && normalizedKey !== 'home' ? normalizedKey : 'home'
+      if (currentMenu === nextMenu) {
+        return
+      }
+
+      const query = nextMenu === 'home' ? {} : { menu: nextMenu }
+      this.$router.replace({ path: '/', query }).catch(() => {})
     },
 
     async refreshPublishedNotices() {
@@ -674,6 +705,7 @@ export default {
 
     async handleMenuSelect(key) {
       this.activeMenu = key
+      this.syncHomeRouteMenu(key)
 
       switch (key) {
         case 'home':
@@ -989,6 +1021,15 @@ export default {
       this.loadProducts()
     },
 
+    openProductDetail(product) {
+      if (!product?.id) {
+        this.$message.warning('请选择需要查看详情的产品')
+        return
+      }
+
+      this.$router.push(`/products/${product.id}`)
+    },
+
     getDefaultProductForm() {
       return {
         id: null,
@@ -999,6 +1040,7 @@ export default {
         companyName: '',
         description: '',
         features: '',
+        detailText: '',
         price: 0.01,
         displayPrice: null,
         isNew: 0,
@@ -1022,6 +1064,7 @@ export default {
           companyName: product.companyName || '',
           description: product.description || '',
           features: product.features || '',
+          detailText: product.detailText || '',
           price: product.price || 0.01,
           displayPrice: product.displayPrice || null,
           isNew: product.isNew ? 1 : 0,
@@ -1055,6 +1098,7 @@ export default {
         companyName: this.getCompanyName(this.productForm.companyCode),
         description: this.productForm.description,
         features: this.productForm.features,
+        detailText: this.productForm.detailText,
         price: this.productForm.price,
         displayPrice: this.productForm.displayPrice || null,
         isNew: this.productForm.isNew,
@@ -1444,6 +1488,7 @@ export default {
       this.expenseFilter = {
         plan: 'all',
         status: 'all',
+        username: '',
         serial: '',
         dateRange: []
       }
@@ -1460,6 +1505,7 @@ export default {
           size: this.expensePageSize,
           plan: this.expenseFilter.plan === 'all' ? '' : this.expenseFilter.plan,
           status: this.expenseFilter.status === 'all' ? '' : this.expenseFilter.status,
+          username: this.expenseFilter.username,
           serialNo: this.expenseFilter.serial,
           startDate,
           endDate
@@ -1606,6 +1652,7 @@ export default {
       const query = this.buildQueryParams({
         plan: this.expenseFilter.plan,
         status: this.expenseFilter.status,
+        username: this.expenseFilter.username,
         serialNo: this.expenseFilter.serial,
         startDate,
         endDate
@@ -1776,22 +1823,6 @@ export default {
           console.error('提交审核失败:', error)
           this.$message.error(error.response?.data?.message || '提交审核失败')
         }
-      }
-    },
-
-    async updateDisplayPrice({ id, displayPrice }) {
-      try {
-        const res = await this.$axios.put(`/api/anxinxuan/insurances/${id}/display-price`, { displayPrice })
-        if (this.isSuccess(res)) {
-          this.$message.success('显示价格已更新')
-          this.loadInsurances()
-          this.loadExpenses()
-        } else {
-          this.$message.error(res.data?.message || '更新显示价格失败')
-        }
-      } catch (error) {
-        console.error('更新显示价格失败:', error)
-        this.$message.error(error.response?.data?.message || '更新显示价格失败')
       }
     },
 

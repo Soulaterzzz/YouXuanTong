@@ -83,6 +83,15 @@
         <el-form-item label="产品特点">
           <el-input v-model="productForm.features" type="textarea" :rows="2" placeholder="请输入产品特点，如：保额高、保障全、理赔快" />
         </el-form-item>
+        <el-form-item label="详情正文">
+          <el-input
+            v-model="productForm.detailText"
+            type="textarea"
+            :rows="12"
+            placeholder="请输入产品独立详情正文，支持换行。建议按“承保公司 / 客服电话 / 重点提示 / 保障内容 / 方案说明”分段。"
+          />
+          <div style="margin-top: 2px; color: #909399; font-size: 12px;">该内容会显示在独立详情页中，支持复制截图里的长文案样式。</div>
+        </el-form-item>
       </div>
 
       <!-- 图片与模板区 -->

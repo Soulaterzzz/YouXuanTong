@@ -46,6 +46,10 @@
       </div>
 
       <div class="product-actions">
+        <el-button type="info" plain size="small" @click="$emit('open-product-detail', product)">
+          <el-icon><Document /></el-icon>
+          详情
+        </el-button>
         <el-button v-if="isAdmin" type="primary" size="small" @click="$emit('open-product-dialog', product)">
           <el-icon><Edit /></el-icon>
           编辑
@@ -98,7 +102,7 @@
 </template>
 
 <script setup>
-import { ZoomIn, Edit, Switch, Delete, Upload, Download, Lightning } from '@element-plus/icons-vue'
+import { ZoomIn, Edit, Switch, Delete, Upload, Download, Lightning, Document } from '@element-plus/icons-vue'
 import { formatMoney, getProductImage } from '@/utils/home/product.js'
 
 const INTRO_SPLIT_RE = /[；;。！？!?，,]+/
@@ -213,6 +217,7 @@ defineProps({
 
 defineEmits([
   'preview-image',
+  'open-product-detail',
   'open-product-dialog',
   'toggle-product-status',
   'delete-product',

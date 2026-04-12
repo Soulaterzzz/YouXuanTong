@@ -12,6 +12,7 @@ public class ProductDetailVO {
     private String name;
     private String description;
     private String features;
+    private String detailText;
     private BigDecimal price;
     private BigDecimal displayPrice;
     private boolean isNew;

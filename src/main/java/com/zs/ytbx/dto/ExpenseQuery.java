@@ -12,6 +12,7 @@ public class ExpenseQuery {
     private String plan;
     private String productName;
     private String status;
+    private String username;
     private String serialNo;
 
     @DateTimeFormat(pattern = "yyyy-MM-dd")

@@ -41,6 +41,9 @@
             <el-option label="已取消" value="cancelled" />
           </el-select>
         </el-form-item>
+        <el-form-item label="用户名" class="records-field">
+          <el-input v-model="expenseFilter.username" placeholder="请输入用户名" clearable class="records-control" />
+        </el-form-item>
         <el-form-item label="序列号" class="records-field">
           <el-input v-model="expenseFilter.serial" placeholder="请输入序列号" clearable class="records-control" />
         </el-form-item>
@@ -66,7 +69,7 @@
 
       <el-table
         :data="expenseList"
-        class="records-table"
+        class="records-table expense-records-table"
         style="width: 100%"
         v-loading="expenseLoading"
         stripe
@@ -74,25 +77,31 @@
         size="small"
         highlight-current-row
       >
-        <el-table-column prop="serial" label="序列号" width="150" show-overflow-tooltip />
-        <el-table-column prop="product" label="产品名称" min-width="170" show-overflow-tooltip />
-        <el-table-column prop="contact" label="联系人" width="100" show-overflow-tooltip />
-        <el-table-column prop="createTime" label="创建时间" width="128" />
-        <el-table-column prop="status" label="状态" width="92" align="center">
+        <el-table-column prop="serial" label="序列号" width="88" show-overflow-tooltip />
+        <el-table-column prop="contact" label="联系人" width="72" show-overflow-tooltip />
+        <el-table-column prop="product" label="产品名称" min-width="150" show-overflow-tooltip />
+        <el-table-column prop="createTime" label="创建时间" width="96" show-overflow-tooltip />
+        <el-table-column prop="exportTime" label="导出时间" width="96" show-overflow-tooltip />
+        <el-table-column prop="status" label="状态" width="80" align="center">
           <template #default="scope">
             <el-tag :type="getStatusType(scope.row.status)" effect="light" round>
               {{ getStatusLabel(scope.row.status) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="count" label="份数" width="68" align="center" />
-        <el-table-column label="单价" width="100" align="right">
-          <template #default="scope">¥{{ formatAmount(isAdmin ? scope.row.price : (scope.row.displayPrice || scope.row.price)) }}</template>
+        <el-table-column prop="policyNo" label="电子保单号" min-width="150" show-overflow-tooltip />
+        <el-table-column prop="startDate" label="起保日期" width="72" align="center" show-overflow-tooltip />
+        <el-table-column prop="endDate" label="结束日期" width="72" align="center" show-overflow-tooltip />
+        <el-table-column prop="count" label="份数" width="44" align="center" />
+        <el-table-column label="价格" width="80" align="right">
+          <template #default="scope">
+            ¥{{ formatAmount(isAdmin ? scope.row.price : (scope.row.displayPrice || scope.row.price)) }}
+          </template>
         </el-table-column>
-        <el-table-column prop="total" label="金额" width="96" align="right">
+        <el-table-column prop="total" label="小计" width="80" align="right">
           <template #default="scope">¥{{ formatAmount(scope.row.total) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="90" fixed="right" align="center">
+        <el-table-column label="操作" width="72" fixed="right" align="center">
           <template #default="scope">
             <div class="records-row-actions">
               <el-button link type="primary" @click="$emit('view-detail', scope.row)">详情</el-button>
