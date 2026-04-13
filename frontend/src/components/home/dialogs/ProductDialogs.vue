@@ -417,6 +417,12 @@
       </el-row>
     </div>
     <el-form :model="activeForm" :rules="activeFormRules" ref="activeFormRef" label-width="100px">
+      <el-form-item label="投保人姓名" prop="insuredName">
+        <el-input v-model="activeForm.insuredName" placeholder="请输入投保人姓名"></el-input>
+      </el-form-item>
+      <el-form-item label="投保人证件号" prop="insuredId">
+        <el-input v-model="activeForm.insuredId" placeholder="请输入投保人证件号"></el-input>
+      </el-form-item>
       <el-form-item label="被保人姓名" prop="beneficiaryName">
         <el-input v-model="activeForm.beneficiaryName" placeholder="请输入被保人姓名"></el-input>
       </el-form-item>
@@ -441,9 +447,6 @@
           <el-option label="5份" :value="5"></el-option>
           <el-option label="10份" :value="10"></el-option>
         </el-select>
-      </el-form-item>
-      <el-form-item label="地址">
-        <el-input v-model="activeForm.address" placeholder="请输入地址"></el-input>
       </el-form-item>
       <el-form-item label="业务员">
         <el-input v-model="activeForm.agent" placeholder="请输入业务员"></el-input>

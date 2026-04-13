@@ -17,6 +17,5 @@ public class ActivateRequest {
     private String beneficiaryId;
     private String beneficiaryJob;
     private Integer count;
-    private String address;
     private String agent;
 }

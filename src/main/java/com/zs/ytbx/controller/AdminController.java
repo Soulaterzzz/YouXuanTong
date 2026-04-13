@@ -237,7 +237,7 @@ public class AdminController {
 
     @PostMapping("/recharges")
     public ApiResponse<Void> rechargeUser(@Valid @RequestBody CreateRechargeRequest request) {
-        SessionUser admin = requireAdmin();
+        requireAdmin();
         adminService.rechargeUser(request.getUserId(), request.getAmount(), request.getMethod(), request.getRemark());
         return ApiResponse.success(null);
     }

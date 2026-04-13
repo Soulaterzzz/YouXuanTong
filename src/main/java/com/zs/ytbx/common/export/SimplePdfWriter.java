@@ -4,11 +4,18 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.DeflaterOutputStream;
+
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.font.PDType0Font;
 
 public final class SimplePdfWriter {
 
@@ -36,6 +43,309 @@ public final class SimplePdfWriter {
         } catch (IOException e) {
             throw new IllegalStateException("生成PDF失败", e);
         }
+    }
+
+    public static byte[] writePolicyPages(List<PolicyPage> pages) {
+        if (pages == null || pages.isEmpty()) {
+            throw new IllegalArgumentException("PDF页不能为空");
+        }
+
+        try (PDDocument document = new PDDocument()) {
+            PDType0Font font = loadChineseFont(document);
+            for (PolicyPage pageData : pages) {
+                BufferedImage image = pageData.image();
+                PDPage page = new PDPage(new PDRectangle(image.getWidth(), image.getHeight()));
+                document.addPage(page);
+                try (PDPageContentStream contentStream = new PDPageContentStream(document, page)) {
+                    drawPolicyTextPage(contentStream, font, pageData.hiddenText(), image.getWidth(), image.getHeight());
+                }
+            }
+
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            document.save(outputStream);
+            return outputStream.toByteArray();
+        } catch (IOException e) {
+            throw new IllegalStateException("生成PDF失败", e);
+        }
+    }
+
+    private static void drawPolicyTextPage(PDPageContentStream cs,
+                                           PDType0Font font,
+                                           List<String> lines,
+                                           int pageWidth,
+                                           int pageHeight) throws IOException {
+        final float left = 72f;
+        final float right = 72f;
+        final float top = 76f;
+
+        List<String> safeLines = lines == null ? List.of() : lines;
+        List<String> introLines = new ArrayList<>();
+        List<String> summaryLines = new ArrayList<>();
+        List<String> coverageLines = new ArrayList<>();
+        List<String> noteLines = new ArrayList<>();
+        String title = "";
+        String subtitle = "";
+        String introLabel = "尊敬的客户：";
+        int mode = 0;
+
+        for (String raw : safeLines) {
+            if (raw == null) continue;
+            String line = raw.trim();
+            if (line.isEmpty()) continue;
+            if (line.startsWith("__TITLE__:")) { title = line.substring(10); continue; }
+            if (line.startsWith("__SUBTITLE__:")) { subtitle = line.substring(13); continue; }
+            if (line.startsWith("__INTRO_LABEL__:")) { introLabel = line.substring(16); continue; }
+            if (line.equals("__SECTION_SUMMARY__")) { mode = 1; continue; }
+            if (line.equals("__SECTION_COVERAGE__")) { mode = 2; continue; }
+            if (line.equals("__SECTION_NOTES__")) { mode = 3; continue; }
+            if (line.equals("__SECTION_FOOTER__")) { mode = 4; continue; }
+            switch (mode) {
+                case 0 -> introLines.add(line);
+                case 1 -> summaryLines.add(line);
+                case 2 -> coverageLines.add(line);
+                case 3, 4 -> noteLines.add(line);
+                default -> noteLines.add(line);
+            }
+        }
+
+        cs.setNonStrokingColor(Color.WHITE);
+        cs.addRect(0, 0, pageWidth, pageHeight);
+        cs.fill();
+
+        float y = pageHeight - top;
+        drawCenteredText(cs, font, 20, title, pageWidth / 2f, y, new Color(0x0F, 0x1F, 0x33));
+        y -= 26f;
+        cs.setStrokingColor(new Color(0xE6, 0x10, 0x21));
+        cs.setLineWidth(3f);
+        cs.moveTo(left, y);
+        cs.lineTo(pageWidth - right, y);
+        cs.stroke();
+        y -= 22f;
+        drawCenteredText(cs, font, 11.5f, subtitle, pageWidth / 2f, y, new Color(0x33, 0x33, 0x33));
+        y -= 26f;
+
+        y = drawWrappedParagraph(cs, font, 12, introLabel, left, y, pageWidth - left - right, true, new Color(0, 0, 0));
+        y = drawWrappedParagraph(cs, font, 11, String.join("\n", introLines), left + 28f, y - 4f, pageWidth - left - right - 28f, false, new Color(0, 0, 0));
+
+        y -= 10f;
+        cs.setStrokingColor(new Color(0x22, 0x22, 0x22));
+        cs.setLineWidth(1f);
+        cs.moveTo(left, y);
+        cs.lineTo(pageWidth - right, y);
+        cs.stroke();
+        y -= 22f;
+
+        y = drawSectionTitle(cs, font, "保单信息", left, y, 13, new Color(0x0F, 0x1F, 0x33));
+        y = drawSummaryBlock(cs, font, summaryLines, left, y, pageWidth - left - right);
+
+        y -= 8f;
+        y = drawSectionTitle(cs, font, "保障说明", left, y, 13, new Color(0x0F, 0x1F, 0x33));
+        y = drawCoverageBlock(cs, font, coverageLines, left, y, pageWidth - left - right);
+
+        y -= 10f;
+        y = drawNotesBlock(cs, font, noteLines, left, y, pageWidth - left - right);
+    }
+
+    private static float drawSummaryBlock(PDPageContentStream cs, PDType0Font font, List<String> lines, float left, float y, float width) throws IOException {
+        if (lines.isEmpty()) return y;
+        List<String> rendered = new ArrayList<>();
+        for (String line : lines) {
+            rendered.add(line);
+        }
+        float rowHeight = 23f;
+        float colGap = 24f;
+        float colWidth = (width - colGap) / 2f;
+        float labelWidth = 108f;
+        for (int i = 0; i < rendered.size(); i += 2) {
+            String leftLine = rendered.get(i);
+            String rightLine = i + 1 < rendered.size() ? rendered.get(i + 1) : null;
+            float blockHeight = rowHeight;
+            if (leftLine.contains("：")) {
+                String[] kv = leftLine.split("：", 2);
+                blockHeight = Math.max(blockHeight, measureWrappedHeight(font, 11, kv[1], colWidth - labelWidth));
+            }
+            if (rightLine != null && rightLine.contains("：")) {
+                String[] kv = rightLine.split("：", 2);
+                blockHeight = Math.max(blockHeight, measureWrappedHeight(font, 11, kv[1], colWidth - labelWidth));
+            }
+            drawKeyValue(cs, font, 11, leftLine, left, y, labelWidth, colWidth - labelWidth);
+            if (rightLine != null) {
+                drawKeyValue(cs, font, 11, rightLine, left + colWidth + colGap, y, labelWidth, colWidth - labelWidth);
+            }
+            y -= blockHeight + 4f;
+        }
+        return y;
+    }
+
+    private static float drawCoverageBlock(PDPageContentStream cs, PDType0Font font, List<String> lines, float left, float y, float width) throws IOException {
+        if (lines.isEmpty()) return y;
+        float tableLabelWidth = width * 0.60f;
+        float tableValueWidth = width - tableLabelWidth;
+        float headerHeight = 24f;
+        cs.setNonStrokingColor(new Color(0xF5, 0xF6, 0xF8));
+        cs.addRect(left, y - headerHeight, width, headerHeight);
+        cs.fill();
+        cs.setStrokingColor(new Color(0x55, 0x55, 0x55));
+        cs.addRect(left, y - headerHeight, width, headerHeight);
+        cs.stroke();
+        cs.moveTo(left + tableLabelWidth, y - headerHeight);
+        cs.lineTo(left + tableLabelWidth, y);
+        cs.stroke();
+        drawText(cs, font, 11.5f, "保障内容", left + 12, y - 16, new Color(0x0F, 0x1F, 0x33));
+        drawText(cs, font, 11.5f, "保险金额", left + tableLabelWidth + 12, y - 16, new Color(0x0F, 0x1F, 0x33));
+        y -= headerHeight;
+
+        for (String line : lines) {
+            if (line.startsWith("##")) break;
+            String cleaned = line.replaceAll("^[0-9]+[、.．)]?\\s*", "");
+            String[] kv = cleaned.split("：", 2);
+            String label = kv.length > 0 ? kv[0].trim() : cleaned;
+            String value = kv.length > 1 ? kv[1].trim() : "";
+            float rowHeight = Math.max(measureWrappedHeight(font, 10.5f, label, tableLabelWidth - 18), measureWrappedHeight(font, 10.5f, value, tableValueWidth - 18)) + 6f;
+            cs.setNonStrokingColor(Color.WHITE);
+            cs.addRect(left, y - rowHeight, width, rowHeight);
+            cs.fill();
+            cs.setStrokingColor(new Color(0x55, 0x55, 0x55));
+            cs.addRect(left, y - rowHeight, width, rowHeight);
+            cs.stroke();
+            cs.moveTo(left + tableLabelWidth, y - rowHeight);
+            cs.lineTo(left + tableLabelWidth, y);
+            cs.stroke();
+            drawWrappedParagraph(cs, font, 10.5f, label, left + 12, y - 13, tableLabelWidth - 18, false, new Color(0, 0, 0));
+            drawWrappedParagraph(cs, font, 10.5f, value, left + tableLabelWidth + 12, y - 13, tableValueWidth - 18, false, new Color(0, 0, 0));
+            y -= rowHeight;
+        }
+        return y;
+    }
+
+    private static float drawNotesBlock(PDPageContentStream cs, PDType0Font font, List<String> lines, float left, float y, float width) throws IOException {
+        if (lines.isEmpty()) return y;
+        float currentY = y;
+        for (String raw : lines) {
+            String line = raw.trim();
+            if (line.isEmpty()) continue;
+            if (line.startsWith("##")) {
+                String heading = line.replaceFirst("^#{2,3}\\s*", "");
+                currentY = drawSectionTitle(cs, font, heading, left, currentY, 12.2f, new Color(0x0F, 0x1F, 0x33));
+                continue;
+            }
+            if (line.matches("^[0-9]+[、.．)].*")) {
+                currentY = drawNumberedParagraph(cs, font, 10.5f, line, left, currentY, width, new Color(0, 0, 0));
+                continue;
+            }
+            if (line.startsWith("（")) {
+                currentY = drawWrappedParagraph(cs, font, 10.2f, line, left, currentY, width, false, new Color(0, 0, 0));
+                continue;
+            }
+            currentY = drawWrappedParagraph(cs, font, 10.2f, line, left, currentY, width, false, new Color(0, 0, 0));
+        }
+        return currentY;
+    }
+
+    private static void drawKeyValue(PDPageContentStream cs, PDType0Font font, float fontSize, String line, float x, float y, float labelWidth, float valueWidth) throws IOException {
+        String[] kv = line.split("：", 2);
+        String label = kv[0];
+        String value = kv.length > 1 ? kv[1] : "";
+        drawText(cs, font, fontSize, label + "：", x, y, new Color(0x0F, 0x1F, 0x33));
+        drawWrappedParagraph(cs, font, fontSize, value, x + labelWidth, y, valueWidth, false, new Color(0, 0, 0));
+    }
+
+    private static float drawSectionTitle(PDPageContentStream cs, PDType0Font font, String title, float left, float y, float fontSize, Color color) throws IOException {
+        drawText(cs, font, fontSize, title, left, y, color);
+        return y - (fontSize + 10f);
+    }
+
+    private static float drawWrappedParagraph(PDPageContentStream cs,
+                                              PDType0Font font,
+                                              float fontSize,
+                                              String text,
+                                              float x,
+                                              float y,
+                                              float width,
+                                              boolean numbered,
+                                              Color color) throws IOException {
+        List<String> wrapped = wrapPdfText(font, fontSize, text, width);
+        float lineHeight = fontSize * 1.45f;
+        float currentY = y;
+        for (int i = 0; i < wrapped.size(); i++) {
+            drawText(cs, font, fontSize, wrapped.get(i), x, currentY, color);
+            currentY -= lineHeight;
+        }
+        return currentY - 4f;
+    }
+
+    private static float drawNumberedParagraph(PDPageContentStream cs,
+                                                PDType0Font font,
+                                                float fontSize,
+                                                String text,
+                                                float x,
+                                                float y,
+                                                float width,
+                                                Color color) throws IOException {
+        String trimmed = text == null ? "" : text.trim();
+        int separatorIndex = trimmed.indexOf('、');
+        if (separatorIndex < 0) {
+            separatorIndex = trimmed.indexOf('.');
+        }
+        String prefix = separatorIndex >= 0 ? trimmed.substring(0, separatorIndex + 1) : "1、";
+        String body = separatorIndex >= 0 ? trimmed.substring(separatorIndex + 1).trim() : trimmed;
+        float prefixWidth = measureTextWidth(font, fontSize, prefix) + 6f;
+        drawText(cs, font, fontSize, prefix, x, y, color);
+        return drawWrappedParagraph(cs, font, fontSize, body, x + prefixWidth, y, width - prefixWidth, false, color);
+    }
+
+    private static List<String> wrapPdfText(PDType0Font font, float fontSize, String text, float maxWidth) throws IOException {
+        String value = text == null ? "" : text.trim();
+        if (value.isEmpty()) {
+            return List.of();
+        }
+        List<String> lines = new ArrayList<>();
+        for (String paragraph : value.split("\\r?\\n")) {
+            String p = paragraph.trim();
+            if (p.isEmpty()) continue;
+            StringBuilder current = new StringBuilder();
+            for (int i = 0; i < p.length(); i++) {
+                char ch = p.charAt(i);
+                String candidate = current.toString() + ch;
+                if (measureTextWidth(font, fontSize, candidate) > maxWidth && current.length() > 0) {
+                    lines.add(current.toString());
+                    current.setLength(0);
+                }
+                current.append(ch);
+            }
+            if (current.length() > 0) {
+                lines.add(current.toString());
+            }
+        }
+        return lines;
+    }
+
+    private static float measureWrappedHeight(PDType0Font font, float fontSize, String text, float width) throws IOException {
+        List<String> lines = wrapPdfText(font, fontSize, text, width);
+        return Math.max(fontSize * 1.2f, lines.size() * fontSize * 1.45f);
+    }
+
+    private static float measureTextWidth(PDType0Font font, float fontSize, String text) throws IOException {
+        return font.getStringWidth(text) / 1000f * fontSize;
+    }
+
+    private static float measureGraphicsTextWidth(Graphics2D g, Font font, String text) {
+        FontMetrics metrics = g.getFontMetrics(font);
+        return metrics.stringWidth(text == null ? "" : text);
+    }
+
+    private static void drawText(PDPageContentStream cs, PDType0Font font, float fontSize, String text, float x, float y, Color color) throws IOException {
+        cs.beginText();
+        cs.setNonStrokingColor(color);
+        cs.setFont(font, fontSize);
+        cs.newLineAtOffset(x, y);
+        cs.showText(text);
+        cs.endText();
+    }
+
+    private static void drawCenteredText(PDPageContentStream cs, PDType0Font font, float fontSize, String text, float centerX, float y, Color color) throws IOException {
+        float width = measureTextWidth(font, fontSize, text);
+        drawText(cs, font, fontSize, text, centerX - width / 2f, y, color);
     }
 
     public static BufferedImage renderDetailPage(String title, List<FieldLine> fieldLines, String subtitle) {
@@ -190,9 +500,13 @@ public final class SimplePdfWriter {
         int notesHeight = 0;
         for (int i = 0; i < noteList.size(); i++) {
             String note = normalizeNoteText(noteList.get(i), i + 1);
-            List<String> wrapped = wrapText(note, noteFont, contentWidth - 28);
+            Font activeFont = isHeadingLine(note) ? sectionFont : noteFont;
+            int noteWidth = isHeadingLine(note) ? contentWidth : contentWidth - 28;
+            List<String> wrapped = wrapText(stripHeadingPrefix(note), activeFont, noteWidth);
             wrappedNotes.add(wrapped);
-            notesHeight += Math.max(noteLineHeight, wrapped.size() * noteLineHeight) + 6;
+            notesHeight += isHeadingLine(note)
+                    ? sectionHeight + 8
+                    : Math.max(noteLineHeight, wrapped.size() * noteLineHeight) + 6;
         }
 
         List<String> footerList = footerLines == null ? Collections.emptyList() : footerLines;
@@ -245,38 +559,19 @@ public final class SimplePdfWriter {
         g.fillRect(LEFT_MARGIN, y, contentWidth, 1);
         y += 24;
 
-        g.setFont(sectionFont);
-        g.setColor(new Color(0x0F, 0x1F, 0x33));
-        g.drawString("保单信息", LEFT_MARGIN, y);
-        y += sectionHeight + 12;
+        y += 2;
         y = drawTwoColumnFields(g, summaryList, wrappedSummaryValues, y, columnWidth, halfGap, labelFont, valueFont, labelHeight, valueLineHeight);
 
-        y += 10;
+        y += 8;
         g.setFont(sectionFont);
-        g.drawString("保险责任/份:", LEFT_MARGIN, y);
+        g.setColor(new Color(0x0F, 0x1F, 0x33));
+        g.drawString("保险责任/份：", LEFT_MARGIN, y);
         y += sectionHeight + 8;
         y = drawCoverageTable(g, y, contentWidth, tableLabelWidth, tableValueWidth, coverageList, wrappedCoverageLabels, wrappedCoverageValues, tableHeadFont, tableBodyFont, tableHeadHeight, tableBodyLineHeight);
 
         if (!noteList.isEmpty()) {
-            y += 16;
-            g.setFont(sectionFont);
-            g.drawString("特别约定：", LEFT_MARGIN, y);
-            y += sectionHeight + 8;
-            g.setFont(noteFont);
-            for (int i = 0; i < wrappedNotes.size(); i++) {
-                List<String> noteLines = wrappedNotes.get(i);
-                int blockHeight = Math.max(noteLineHeight, noteLines.size() * noteLineHeight);
-                g.drawString((i + 1) + "、", LEFT_MARGIN, y);
-                int noteX = LEFT_MARGIN + 24;
-                for (String line : noteLines) {
-                    g.drawString(line, noteX, y);
-                    y += noteLineHeight;
-                }
-                y += 6;
-                if (blockHeight > noteLineHeight) {
-                    y += (blockHeight - noteLineHeight);
-                }
-            }
+            y += 28;
+            y = (int) drawNotesBlock(g, sectionFont, noteFont, sectionHeight, noteLineHeight, noteList, LEFT_MARGIN, y, contentWidth);
         }
 
         if (!footerList.isEmpty()) {
@@ -295,6 +590,63 @@ public final class SimplePdfWriter {
 
         g.dispose();
         return image;
+    }
+
+    private static float drawNotesBlock(Graphics2D g,
+                                        Font sectionFont,
+                                        Font noteFont,
+                                        int sectionHeight,
+                                        int noteLineHeight,
+                                        List<String> lines,
+                                        float left,
+                                        float y,
+                                        float width) {
+        if (lines == null || lines.isEmpty()) {
+            return y;
+        }
+
+        float currentY = y;
+        g.setColor(Color.BLACK);
+        for (String raw : lines) {
+            String line = raw == null ? "" : raw.trim();
+            if (line.isEmpty()) {
+                continue;
+            }
+            if (line.startsWith("##")) {
+                String heading = line.replaceFirst("^#{2,3}\\s*", "");
+                g.setFont(sectionFont);
+                g.drawString(heading, (int) left, (int) currentY);
+                currentY += sectionHeight + 6;
+                continue;
+            }
+
+            g.setFont(noteFont);
+            if (line.matches("^[0-9]+[、.．)].*")) {
+                int separatorIndex = line.indexOf('、');
+                if (separatorIndex < 0) {
+                    separatorIndex = line.indexOf('.');
+                }
+                String prefix = separatorIndex >= 0 ? line.substring(0, separatorIndex + 1) : "1、";
+                String body = separatorIndex >= 0 ? line.substring(separatorIndex + 1).trim() : line;
+                g.drawString(prefix, (int) left, (int) currentY);
+                int prefixWidth = (int) Math.ceil(measureGraphicsTextWidth(g, noteFont, prefix)) + 6;
+                List<String> wrapped = wrapText(body, noteFont, Math.max(40, (int) width - prefixWidth));
+                for (String wrappedLine : wrapped) {
+                    g.drawString(wrappedLine, (int) left + prefixWidth, (int) currentY);
+                    currentY += noteLineHeight;
+                }
+                currentY += 4;
+                continue;
+            }
+
+            List<String> wrapped = wrapText(line, noteFont, (int) width);
+            for (String wrappedLine : wrapped) {
+                g.drawString(wrappedLine, (int) left, (int) currentY);
+                currentY += noteLineHeight;
+            }
+            currentY += 4;
+        }
+        return currentY;
     }
 
     private static byte[] buildPdf(List<PdfPage> pages) throws IOException {
@@ -471,7 +823,7 @@ public final class SimplePdfWriter {
         g.setFont(headFont);
         g.setColor(new Color(0x0F, 0x1F, 0x33));
         g.drawString("保障内容", tableX + 14, y + headHeight - 8);
-        g.drawString("保险金额/人（人民币）", rowValueX + 14, y + headHeight - 8);
+        g.drawString("保险金额", rowValueX + 14, y + headHeight - 8);
         y += headerHeight;
 
         g.setFont(bodyFont);
@@ -512,12 +864,20 @@ public final class SimplePdfWriter {
     private static String normalizeNoteText(String text, int index) {
         String value = text == null ? "" : text.trim();
         if (value.isEmpty()) {
-            return index + "、-";
+            return "-";
         }
-        if (value.startsWith(index + "、") || value.startsWith(index + ".") || value.startsWith(index + ")")) {
-            return value;
+        return value;
+    }
+
+    private static boolean isHeadingLine(String text) {
+        return text != null && (text.startsWith("##") || text.startsWith("###"));
+    }
+
+    private static String stripHeadingPrefix(String text) {
+        if (text == null) {
+            return "";
         }
-        return index + "、" + value;
+        return text.replaceFirst("^#{2,3}\\s*", "").trim();
     }
 
     private static void drawInsuranceSeal(Graphics2D g, int centerX, int centerY, int radius) {
@@ -533,7 +893,7 @@ public final class SimplePdfWriter {
 
         Font sealFont = new Font("SansSerif", Font.BOLD, 22);
         g.setFont(sealFont);
-        drawCenteredString(g, "电子专用章", centerX, centerY + 48);
+        drawCenteredString(g, "保单凭证电子专用章", centerX, centerY + 48);
     }
 
     private static Polygon createStar(int centerX, int centerY, int outerRadius, int innerRadius) {
@@ -546,6 +906,24 @@ public final class SimplePdfWriter {
             polygon.addPoint(x, y);
         }
         return polygon;
+    }
+
+    private static PDType0Font loadChineseFont(PDDocument document) throws IOException {
+        String[] candidates = {
+                "C:/Windows/Fonts/simhei.ttf",
+                "C:/Windows/Fonts/msyh.ttc",
+                "C:/Windows/Fonts/simsun.ttc"
+        };
+        for (String candidate : candidates) {
+            File file = new File(candidate);
+            if (file.exists()) {
+                return PDType0Font.load(document, file);
+            }
+        }
+        throw new IOException("未找到可用中文字体文件");
+    }
+
+    public record PolicyPage(BufferedImage image, List<String> hiddenText) {
     }
 
     public record FieldLine(String label, String value) {

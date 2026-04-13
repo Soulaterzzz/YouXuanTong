@@ -1,7 +1,6 @@
 package com.zs.ytbx.dto;
 
 import lombok.Data;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 

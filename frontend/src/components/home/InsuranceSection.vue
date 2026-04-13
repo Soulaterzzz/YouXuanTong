@@ -283,6 +283,6 @@ const getStatusLabel = (status) => {
 
 const canDownloadPolicyPdf = (status) => {
   const normalized = String(status ?? '').trim().toUpperCase()
-  return normalized === 'ACTIVE' || normalized === 'EXPIRED' || normalized === 'INSURED' || status === '已生效' || status === '已过期'
+  return normalized === 'UNDERWRITING' || normalized === 'ACTIVE' || normalized === 'EXPIRED' || normalized === 'INSURED' || status === '承保中' || status === '已生效' || status === '已过期'
 }
 </script>

@@ -249,11 +249,12 @@ export default {
       activeForm: {
         planName: '',
         displayPrice: 0,
+        insuredName: '',
+        insuredId: '',
         beneficiaryName: '',
         beneficiaryId: '',
         beneficiaryJob: '',
         count: 1,
-        address: '',
         agent: ''
       },
       activeFormRules: {
@@ -268,6 +269,8 @@ export default {
           },
           trigger: 'change'
         }],
+        insuredName: [{ required: true, message: '请输入投保人姓名', trigger: 'blur' }],
+        insuredId: [{ required: true, message: '请输入投保人证件号', trigger: 'blur' }],
         beneficiaryName: [{ required: true, message: '请输入被保人姓名', trigger: 'blur' }],
         beneficiaryId: [{ required: true, message: '请输入被保人证件号', trigger: 'blur' }],
         beneficiaryJob: [{ required: true, message: '请选择被保人职业', trigger: 'change' }]
@@ -1581,11 +1584,12 @@ export default {
         productId: product.id,
         planName: String(product.id),
         displayPrice: Number(product.displayPrice != null ? product.displayPrice : (product.price || 0)),
+        insuredName: '',
+        insuredId: '',
         beneficiaryName: '',
         beneficiaryId: '',
         beneficiaryJob: '',
         count: 1,
-        address: '',
         agent: ''
       }
       this.activeDialogVisible = true

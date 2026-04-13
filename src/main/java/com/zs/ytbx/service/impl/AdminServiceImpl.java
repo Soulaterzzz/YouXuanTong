@@ -34,7 +34,6 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -483,20 +482,20 @@ public class AdminServiceImpl implements AdminService {
     @Transactional(rollbackFor = Exception.class)
     public void approveInsurance(Long insuranceId, InsuranceApproveRequest request, Long reviewerId, String reviewerName) {
         InsuranceRecordEntity insurance = requireInsurance(insuranceId);
-        ensureTransition(insurance, InsuranceStatus.PENDING_REVIEW, InsuranceStatus.APPROVED);
+        ensureTransition(insurance, InsuranceStatus.PENDING_REVIEW, InsuranceStatus.UNDERWRITING);
 
-        insurance.setInsuranceStatus(InsuranceStatus.APPROVED.getCode());
+        insurance.setInsuranceStatus(InsuranceStatus.UNDERWRITING.getCode());
         insurance.setReviewComment(request.getReviewComment().trim());
         insurance.setReviewerId(reviewerId);
         insurance.setReviewerName(reviewerName);
         insurance.setReviewTime(LocalDateTime.now());
         insurance.setRejectReason(null);
-        insurance.setUnderwritingTime(null);
+        insurance.setUnderwritingTime(LocalDateTime.now());
         insurance.setActivateTime(null);
         insurance.setUpdateTime(LocalDateTime.now());
         insuranceRecordMapper.updateById(insurance);
 
-        syncExpenseStatus(insurance.getExpenseId(), InsuranceStatus.APPROVED, insurance.getPolicyNo(), insurance.getEffectiveDate(), insurance.getExpiryDate());
+        syncExpenseStatus(insurance.getExpenseId(), InsuranceStatus.UNDERWRITING, insurance.getPolicyNo(), insurance.getEffectiveDate(), insurance.getExpiryDate());
     }
 
     @Override
