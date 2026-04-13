@@ -265,10 +265,7 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
         wrapper.orderByDesc(InsuranceRecordEntity::getCreateTime);
 
         List<BufferedImage> pages = insuranceRecordMapper.selectList(wrapper).stream()
-                .map(record -> SimplePdfWriter.renderDetailPage(
-                        "保险清单",
-                        toInsurancePdfFields(record),
-                        "保单号：" + defaultText(record.getPolicyNo()) + " · 状态：" + defaultText(mapStatus(record.getInsuranceStatus()))))
+                .map(this::renderInsurancePolicyPage)
                 .collect(Collectors.toList());
         if (pages.isEmpty()) {
             pages = List.of(SimplePdfWriter.renderDetailPage(
@@ -282,10 +279,7 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
     @Override
     public byte[] exportInsurancePdf(Long insuranceId) {
         InsuranceRecordEntity insurance = requireInsuranceVisible(insuranceId);
-        BufferedImage page = SimplePdfWriter.renderDetailPage(
-                "保险清单",
-                toInsurancePdfFields(insurance),
-                "保单号：" + defaultText(insurance.getPolicyNo()) + " · 状态：" + defaultText(mapStatus(insurance.getInsuranceStatus())));
+        BufferedImage page = renderInsurancePolicyPage(insurance);
         return SimplePdfWriter.writePages(List.of(page));
     }
 
@@ -860,6 +854,179 @@ public class AnXinXuanServiceImpl implements AnXinXuanService {
                 new SimplePdfWriter.FieldLine("承保时间", entity.getUnderwritingTime() == null ? "" : entity.getUnderwritingTime().toString()),
                 new SimplePdfWriter.FieldLine("生效时间", entity.getActivateTime() == null ? "" : entity.getActivateTime().toString())
         );
+    }
+
+    private BufferedImage renderInsurancePolicyPage(InsuranceRecordEntity insurance) {
+        ExpenseRecordEntity expense = insurance.getExpenseId() == null ? null : expenseRecordMapper.selectById(insurance.getExpenseId());
+        AxxProductEntity product = expense == null || expense.getProductId() == null
+                ? null
+                : axxProductMapper.selectById(expense.getProductId());
+
+        String title = firstNonBlank(
+                product != null ? product.getProductName() : null,
+                insurance.getProductName(),
+                "保险清单");
+        String subtitle = "保单号：" + defaultText(insurance.getPolicyNo()) + " · 状态：" + defaultText(mapStatus(insurance.getInsuranceStatus()));
+
+        List<SimplePdfWriter.FieldLine> summaryFields = List.of(
+                new SimplePdfWriter.FieldLine("保单号码", defaultText(insurance.getPolicyNo())),
+                new SimplePdfWriter.FieldLine("保险期间", formatPolicyPeriod(insurance)),
+                new SimplePdfWriter.FieldLine("被保险人姓名", defaultText(insurance.getBeneficiaryName())),
+                new SimplePdfWriter.FieldLine("被保险人证件号码", defaultText(insurance.getBeneficiaryIdNo())),
+                new SimplePdfWriter.FieldLine("投保人姓名", defaultText(insurance.getInsuredName())),
+                new SimplePdfWriter.FieldLine("投保人证件号码", defaultText(insurance.getInsuredIdNo())),
+                new SimplePdfWriter.FieldLine("受益人", defaultText(insurance.getBeneficiaryName())),
+                new SimplePdfWriter.FieldLine("受益人证件号码", defaultText(insurance.getBeneficiaryIdNo())),
+                new SimplePdfWriter.FieldLine("保费合计", formatMoney(firstNonNull(insurance.getDisplayPrice(), insurance.getPremiumAmount()))),
+                new SimplePdfWriter.FieldLine("份数", insurance.getQuantity() == null ? "1" : String.valueOf(insurance.getQuantity()))
+        );
+
+        List<SimplePdfWriter.FieldLine> coverageRows = buildCoverageRows(product, insurance);
+        List<String> notes = buildPolicyNotes(product, insurance);
+        List<String> footers = List.of(
+                "承保公司：" + firstNonBlank(product != null ? product.getCompanyName() : null, "-"),
+                "服务电话：400-890-9999",
+                "注意：仅需使用保单号报案及理赔即可"
+        );
+
+        String introText = buildPolicyIntroText(product, insurance);
+        return SimplePdfWriter.renderInsurancePolicyPage(
+                title,
+                subtitle,
+                "尊敬的客户：",
+                introText,
+                summaryFields,
+                coverageRows,
+                notes,
+                footers);
+    }
+
+    private List<SimplePdfWriter.FieldLine> buildCoverageRows(AxxProductEntity product, InsuranceRecordEntity insurance) {
+        List<SimplePdfWriter.FieldLine> rows = parseCoverageRows(product == null ? null : product.getDetailText());
+        if (rows.isEmpty() && product != null) {
+            rows = parseCoverageRows(product.getFeatures());
+        }
+        if (rows.isEmpty() && product != null) {
+            rows = parseCoverageRows(product.getDescription());
+        }
+        if (rows.isEmpty()) {
+            rows = new ArrayList<>();
+            rows.add(new SimplePdfWriter.FieldLine("保险金额", formatMoney(firstNonNull(insurance.getDisplayPrice(), insurance.getPremiumAmount()))));
+            rows.add(new SimplePdfWriter.FieldLine("份数", insurance.getQuantity() == null ? "1" : String.valueOf(insurance.getQuantity())));
+            rows.add(new SimplePdfWriter.FieldLine("起保日期", insurance.getEffectiveDate() == null ? "-" : insurance.getEffectiveDate().toString()));
+            rows.add(new SimplePdfWriter.FieldLine("结束日期", insurance.getExpiryDate() == null ? "-" : insurance.getExpiryDate().toString()));
+        }
+        return rows;
+    }
+
+    private List<String> buildPolicyNotes(AxxProductEntity product, InsuranceRecordEntity insurance) {
+        List<String> notes = extractTextLines(product == null ? null : product.getDetailText());
+        if (notes.isEmpty()) {
+            notes = extractTextLines(product == null ? null : product.getFeatures());
+        }
+        if (notes.isEmpty()) {
+            notes = extractTextLines(product == null ? null : product.getDescription());
+        }
+        if (notes.isEmpty()) {
+            notes = new ArrayList<>();
+            notes.add("投保年龄、保障范围、免赔责任及理赔条件以保险条款和保单为准。");
+            notes.add("请核对保单号、保险期间、被保险人信息是否准确无误。");
+            notes.add("发生事故后请及时报案，避免影响理赔时效。");
+        }
+        if (insurance.getReviewComment() != null && !insurance.getReviewComment().isBlank()) {
+            notes.add("审核意见：" + insurance.getReviewComment().trim());
+        }
+        if (insurance.getRejectReason() != null && !insurance.getRejectReason().isBlank()) {
+            notes.add("驳回原因：" + insurance.getRejectReason().trim());
+        }
+        return notes;
+    }
+
+    private String buildPolicyIntroText(AxxProductEntity product, InsuranceRecordEntity insurance) {
+        String productName = firstNonBlank(product != null ? product.getProductName() : null, insurance.getProductName(), "本保险产品");
+        String companyName = firstNonBlank(product != null ? product.getCompanyName() : null, "承保公司");
+        String displayPrice = formatMoney(firstNonNull(insurance.getDisplayPrice(), insurance.getPremiumAmount()));
+        return "感谢您委托我代为办理保险业务。为了保护您的合法权益，请知悉保险条款，重点关注保险责任、投保须知、责任免除、免赔额、健康保险产品等待期等内容，并可要求业务销售人员对上述内容进行详细讲解。\n"
+                + "本保单由" + companyName + "承保，产品名称为“" + productName + "”，当前保费合计为" + displayPrice + "，请妥善保管本保单并以保险公司官网公示内容为准。";
+    }
+
+    private List<SimplePdfWriter.FieldLine> parseCoverageRows(String text) {
+        List<SimplePdfWriter.FieldLine> rows = new ArrayList<>();
+        for (String line : extractTextLines(text)) {
+            String normalized = line.replaceAll("^[0-9]+[、.．)]?\\s*", "").trim();
+            if (normalized.isBlank()) {
+                continue;
+            }
+            String[] tokens = normalized.split("[:：]", 2);
+            if (tokens.length == 2) {
+                rows.add(new SimplePdfWriter.FieldLine(tokens[0].trim(), tokens[1].trim()));
+                continue;
+            }
+            int amountIndex = findAmountIndex(normalized);
+            if (amountIndex > 0) {
+                String label = normalized.substring(0, amountIndex).trim();
+                String value = normalized.substring(amountIndex).trim();
+                rows.add(new SimplePdfWriter.FieldLine(label.isBlank() ? normalized : label, value));
+            } else {
+                rows.add(new SimplePdfWriter.FieldLine(normalized, "-"));
+            }
+        }
+        return rows;
+    }
+
+    private List<String> extractTextLines(String text) {
+        List<String> lines = new ArrayList<>();
+        if (text == null || text.isBlank()) {
+            return lines;
+        }
+        for (String raw : text.split("\\r?\\n")) {
+            String line = raw.trim();
+            if (!line.isBlank()) {
+                lines.add(line);
+            }
+        }
+        return lines;
+    }
+
+    private int findAmountIndex(String value) {
+        if (value == null || value.isBlank()) {
+            return -1;
+        }
+        for (int i = 0; i < value.length(); i++) {
+            if (Character.isDigit(value.charAt(i))) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private String formatPolicyPeriod(InsuranceRecordEntity insurance) {
+        String start = insurance.getEffectiveDate() == null ? "-" : insurance.getEffectiveDate().toString();
+        String end = insurance.getExpiryDate() == null ? "-" : insurance.getExpiryDate().toString();
+        return "自 " + start + " 起至 " + end;
+    }
+
+    private String formatMoney(BigDecimal value) {
+        if (value == null) {
+            return "-";
+        }
+        return value.setScale(2, RoundingMode.HALF_UP).toPlainString() + "元";
+    }
+
+    private BigDecimal firstNonNull(BigDecimal first, BigDecimal second) {
+        return first != null ? first : second;
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return "";
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return "";
     }
 
     private List<String> productInsuranceTemplateHeaders() {
