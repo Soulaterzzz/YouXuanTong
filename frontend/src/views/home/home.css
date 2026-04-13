@@ -2369,6 +2369,12 @@ body {
   color: #909399;
 }
 
+.profession-upload-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .template-file-info {
   display: flex;
   align-items: center;

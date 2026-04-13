@@ -352,6 +352,39 @@ public class ImageServiceImpl implements ImageService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public String uploadProfessionTable(String companyCode, MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "职业表文件不能为空");
+        }
+
+        validateProfessionFile(file);
+        String safeCompanyCode = normalizeCompanyCode(companyCode);
+        String originalFilename = file.getOriginalFilename();
+        String extension = getFileExtension(originalFilename);
+        String normalizedExtension = extension == null ? "" : extension.toLowerCase();
+        Path uploadPath = Paths.get(fileStorageConfig.getProfessionFilePath());
+
+        try {
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath);
+            }
+
+            deleteIfExists(uploadPath.resolve(safeCompanyCode + ".xls"));
+            deleteIfExists(uploadPath.resolve(safeCompanyCode + ".xlsx"));
+
+            String fileName = safeCompanyCode + "." + normalizedExtension;
+            Path filePath = uploadPath.resolve(fileName);
+            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+            log.info("职业表上传成功: companyCode={}, path={}", safeCompanyCode, filePath);
+            return fileName;
+        } catch (IOException e) {
+            log.error("上传职业表失败: companyCode={}", safeCompanyCode, e);
+            throw new BusinessException(ResultCode.SYSTEM_ERROR, "上传职业表失败: " + e.getMessage());
+        }
+    }
+
+    @Override
     public void deleteProductTemplate(Long productId) {
         AxxProductEntity product = productMapper.selectById(productId);
         if (product == null) {
@@ -391,5 +424,41 @@ public class ImageServiceImpl implements ImageService {
             throw new BusinessException(ResultCode.INVALID_PARAM,
                 "文件大小超过限制，最大允许: " + (fileStorageConfig.getMaxFileSize() / 1024 / 1024) + "MB");
         }
+    }
+
+    private void validateProfessionFile(MultipartFile file) {
+        String filename = file.getOriginalFilename();
+        if (filename == null || filename.isEmpty()) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "职业表文件名不能为空");
+        }
+
+        String extension = getFileExtension(filename);
+        if (extension == null || !Arrays.asList(fileStorageConfig.getAllowedProfessionExtensions())
+                .contains(extension.toLowerCase())) {
+            throw new BusinessException(ResultCode.INVALID_PARAM,
+                "职业表仅支持上传 .xls 或 .xlsx 文件");
+        }
+
+        if (file.getSize() > fileStorageConfig.getMaxFileSize()) {
+            throw new BusinessException(ResultCode.INVALID_PARAM,
+                "文件大小超过限制，最大允许: " + (fileStorageConfig.getMaxFileSize() / 1024 / 1024) + "MB");
+        }
+    }
+
+    private void deleteIfExists(Path path) throws IOException {
+        Files.deleteIfExists(path);
+    }
+
+    private String normalizeCompanyCode(String companyCode) {
+        if (companyCode == null || companyCode.isBlank()) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "公司编码不能为空");
+        }
+
+        String normalized = companyCode.trim().toLowerCase();
+        if (normalized.contains("..") || normalized.contains("/") || normalized.contains("\\")) {
+            throw new BusinessException(ResultCode.INVALID_PARAM, "公司编码不合法");
+        }
+
+        return normalized;
     }
 }

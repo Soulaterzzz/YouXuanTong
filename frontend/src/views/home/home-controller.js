@@ -15,6 +15,76 @@ const RechargeSection = defineAsyncComponent(() => import('@/components/home/Rec
 const UserAdminSection = defineAsyncComponent(() => import('@/components/home/UserAdminSection.vue'))
 const HomeDialogs = defineAsyncComponent(() => import('@/components/home/dialogs/HomeDialogs.vue'))
 
+const COMPANY_CODE_ALIASES = [
+  {
+    code: 'renbao',
+    names: ['中国人民财产保险股份有限公司', '中国人保财险', '中国人民财险', '人保财险', '人保']
+  },
+  {
+    code: 'guoshou',
+    names: ['中国人寿财产保险股份有限公司', '中国人寿财险', '国寿财险', '国寿财', '国寿财产']
+  },
+  {
+    code: 'pingan',
+    names: ['中国平安财产保险股份有限公司', '中国平安财险', '平安产险', '平安财险', '平安财', '平安保险']
+  },
+  {
+    code: 'taiping',
+    names: ['中国太平洋财产保险股份有限公司', '中国太平洋保险', '太平洋财险', '太平洋财产保险', '太保', '太平财险', '太平保险']
+  },
+  {
+    code: 'zhongan',
+    names: ['众安在线财产保险股份有限公司', '众安在线', '众安在线财险', '众安在线保险', '众安保险', '众安']
+  },
+  {
+    code: 'zhonghua',
+    names: ['中华联合保险', '中华联合财险', '中华联合财产保险', '中华联合']
+  },
+  {
+    code: 'pingan-life',
+    names: ['中国平安人寿保险股份有限公司', '平安人寿', '平安寿险']
+  }
+]
+
+function resolveCompanyCodeByName(companyName, companyList = []) {
+  const normalizedName = String(companyName || '').trim()
+  if (!normalizedName) {
+    return ''
+  }
+
+  const exactMatch = companyList.find((company) => company?.name === normalizedName)
+  if (exactMatch?.code) {
+    return exactMatch.code
+  }
+
+  const aliasMatch = COMPANY_CODE_ALIASES.find((item) => item.names.some((alias) => normalizedName.includes(alias)))
+  return aliasMatch?.code || ''
+}
+
+function resolveCompanyCodeFromProduct(product, companyList = []) {
+  const directCode = resolveCompanyCodeByName(product?.companyName, companyList)
+  if (directCode) {
+    return directCode
+  }
+
+  const sourceText = [
+    product?.alias,
+    product?.name,
+    product?.description,
+    product?.features
+  ]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .join(' ')
+
+  if (!sourceText) {
+    return ''
+  }
+
+  const aliasMatch = COMPANY_CODE_ALIASES.find((item) => item.names.some((alias) => sourceText.includes(alias)))
+  return aliasMatch?.code || ''
+}
+
 export default {
   name: 'Home',
   components: {
@@ -937,10 +1007,57 @@ export default {
           this.companyList = [
             { code: 'guoshou', name: '国寿财险' },
             { code: 'pingan', name: '平安财险' },
+            { code: 'zhongan', name: '众安保险' },
             { code: 'zhonghua', name: '中华联合' },
             { code: 'taiping', name: '太平财险' },
             { code: 'renbao', name: '人保财险' }
           ]
+          localStorage.setItem('insuranceCompanies', JSON.stringify(this.companyList))
+        }
+
+        const defaultCompanyList = [
+          { code: 'guoshou', name: '国寿财险' },
+          { code: 'pingan', name: '平安财险' },
+          { code: 'zhongan', name: '众安保险' },
+          { code: 'zhonghua', name: '中华联合' },
+          { code: 'taiping', name: '太平财险' },
+          { code: 'renbao', name: '人保财险' },
+          { code: 'pingan-life', name: '平安人寿' }
+        ]
+        const existingCodes = new Set(this.companyList.map((company) => company.code))
+        let companyListChanged = false
+        defaultCompanyList.forEach((company) => {
+          if (!existingCodes.has(company.code)) {
+            this.companyList.push(company)
+            companyListChanged = true
+          }
+        })
+        if (companyListChanged) {
+          localStorage.setItem('insuranceCompanies', JSON.stringify(this.companyList))
+        }
+
+        const canonicalCompanyNames = {
+          guoshou: '国寿财险',
+          pingan: '平安财险',
+          zhongan: '众安保险',
+          zhonghua: '中华联合',
+          taiping: '太平洋保险',
+          renbao: '人保财险',
+          'pingan-life': '平安人寿'
+        }
+        let normalizedCompanyChanged = false
+        this.companyList = this.companyList.map((company) => {
+          const canonicalName = canonicalCompanyNames[company.code]
+          if (canonicalName && company.name !== canonicalName) {
+            normalizedCompanyChanged = true
+            return {
+              ...company,
+              name: canonicalName
+            }
+          }
+          return company
+        })
+        if (normalizedCompanyChanged) {
           localStorage.setItem('insuranceCompanies', JSON.stringify(this.companyList))
         }
       } catch (error) {
@@ -1004,6 +1121,14 @@ export default {
       return company ? company.name : ''
     },
 
+    getCompanyCode(companyName) {
+      return resolveCompanyCodeByName(companyName, this.companyList)
+    },
+
+    getProductCompanyCode(product) {
+      return resolveCompanyCodeFromProduct(product, this.companyList)
+    },
+
     getCategoryName(categoryCode) {
       if (!categoryCode) return ''
       const category = this.categoryList.find(cat => cat.code === categoryCode)
@@ -1061,6 +1186,7 @@ export default {
           productCode: product.productCode || '',
           productName: product.name || '',
           categoryCode: product.categoryCode || '1-3',
+          companyCode: this.getProductCompanyCode(product),
           companyName: product.companyName || '',
           description: product.description || '',
           features: product.features || '',
@@ -1386,6 +1512,62 @@ export default {
       } catch (error) {
         console.error('下载产品模板失败:', error)
         this.$message.error(error.response?.data?.message || '模板文件下载失败')
+      }
+    },
+
+    beforeProfessionUpload(file) {
+      if (!this.productForm.companyCode) {
+        this.$message.warning('请先选择承保公司')
+        return false
+      }
+
+      const isExcel = /\.(xls|xlsx)$/i.test(file.name || '')
+      const isLt10M = file.size / 1024 / 1024 < 10
+      if (!isExcel) {
+        this.$message.error('职业表仅支持 .xls 或 .xlsx 文件')
+        return false
+      }
+      if (!isLt10M) {
+        this.$message.error('职业表文件大小不能超过 10MB')
+        return false
+      }
+      return true
+    },
+
+    handleProfessionUploadSuccess(response) {
+      if (response.code === '00000') {
+        this.$message.success(response.data?.message || '职业表上传成功')
+      } else {
+        this.$message.error(response.message || '职业表上传失败')
+      }
+    },
+
+    handleProfessionUploadError(error) {
+      console.error('职业表上传失败:', error)
+      this.$message.error(error.response?.data?.message || '职业表上传失败，请重试')
+    },
+
+    async downloadOccupationTable(product) {
+      if (!product?.id) {
+        this.$message.warning('请选择需要下载职业表的产品')
+        return
+      }
+
+      const companyCode = this.getProductCompanyCode(product)
+      if (!companyCode) {
+        this.$message.warning('该产品暂未配置承保公司职业表')
+        return
+      }
+
+      try {
+        const professionUrl = import.meta.env.DEV
+          ? `http://127.0.0.1:8080/files/uploads/profession/${companyCode}`
+          : `/files/uploads/profession/${companyCode}`
+        await this.downloadFile(professionUrl, `${companyCode}.xlsx`)
+        this.$message.success('职业表下载已开始')
+      } catch (error) {
+        console.error('下载职业表失败:', error)
+        this.$message.error(error.response?.status === 404 ? '该承保公司暂无职业表，请先上传' : (error.response?.data?.message || '职业表下载失败'))
       }
     },
 

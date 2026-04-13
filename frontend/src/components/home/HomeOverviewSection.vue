@@ -6,7 +6,7 @@
           <div class="panel-head">
             <div class="panel-copy">
               <span class="panel-kicker">{{ isAdmin ? '运营重点' : '销售重点' }}</span>
-              <h2>{{ isAdmin ? '今天优先处理这三类任务' : '今天先处理这三类事项' }}</h2>
+              <h2>{{ isAdmin ? '业务数据' : '控制台' }}</h2>
             </div>
           </div>
 

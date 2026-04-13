@@ -97,6 +97,19 @@ public class ImageController {
         return ApiResponse.success(Map.of("url", templateUrl, "message", "模板上传成功"));
     }
 
+    @PostMapping("/profession/{companyCode}")
+    public ApiResponse<Map<String, String>> uploadProfessionTable(
+            @PathVariable String companyCode,
+            @RequestParam("file") MultipartFile file) {
+        requireAdmin();
+        String fileName = imageService.uploadProfessionTable(companyCode, file);
+        return ApiResponse.success(Map.of(
+                "fileName", fileName,
+                "url", "/files/uploads/profession/" + fileName,
+                "message", "职业表上传成功"
+        ));
+    }
+
     @DeleteMapping("/product/{productId}/template")
     public ApiResponse<Map<String, String>> deleteProductTemplate(@PathVariable Long productId) {
         requireAdmin();

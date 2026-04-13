@@ -9,9 +9,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -27,8 +27,11 @@ public class FileController {
 
     private final FileStorageConfig fileStorageConfig;
 
-    @GetMapping("/files/{*filePath}")
-    public ResponseEntity<byte[]> download(@PathVariable String filePath) {
+    @GetMapping("/files/**")
+    public ResponseEntity<byte[]> download(HttpServletRequest request) {
+        String requestUri = request.getRequestURI();
+        String contextPath = request.getContextPath() == null ? "" : request.getContextPath();
+        String filePath = requestUri.substring(contextPath.length() + "/files/".length());
         if (!StringUtils.hasText(filePath)) {
             return ResponseEntity.notFound().build();
         }
@@ -116,12 +119,49 @@ public class FileController {
         Path candidate = Paths.get(filePath).toAbsolutePath().normalize();
         Path uploadRoot = Paths.get(fileStorageConfig.getUploadPath()).toAbsolutePath().normalize();
         Path templateRoot = Paths.get(fileStorageConfig.getTemplateFilePath()).toAbsolutePath().normalize();
+        Path professionRoot = Paths.get(fileStorageConfig.getProfessionFilePath()).toAbsolutePath().normalize();
 
-        if (candidate.startsWith(uploadRoot) || candidate.startsWith(templateRoot)) {
+        if (candidate.startsWith(uploadRoot) || candidate.startsWith(templateRoot) || candidate.startsWith(professionRoot)) {
+            if (candidate.startsWith(professionRoot)) {
+                Path professionCandidate = resolveProfessionPath(candidate, professionRoot);
+                if (professionCandidate != null) {
+                    return professionCandidate;
+                }
+            }
             return candidate;
         }
 
         return null;
+    }
+
+    private Path resolveProfessionPath(Path candidate, Path professionRoot) {
+        if (Files.exists(candidate) && Files.isRegularFile(candidate)) {
+            return candidate;
+        }
+
+        Path parent = candidate.getParent();
+        if (parent == null || !parent.startsWith(professionRoot)) {
+            return null;
+        }
+
+        String fileName = candidate.getFileName().toString();
+        String baseName = stripFileExtension(fileName);
+        for (String extension : fileStorageConfig.getAllowedProfessionExtensions()) {
+            Path alternative = parent.resolve(baseName + "." + extension);
+            if (Files.exists(alternative) && Files.isRegularFile(alternative)) {
+                return alternative;
+            }
+        }
+
+        return null;
+    }
+
+    private String stripFileExtension(String fileName) {
+        int lastDotIndex = fileName.lastIndexOf('.');
+        if (lastDotIndex > 0) {
+            return fileName.substring(0, lastDotIndex);
+        }
+        return fileName;
     }
 
     private MediaType resolveMediaType(Path path) {

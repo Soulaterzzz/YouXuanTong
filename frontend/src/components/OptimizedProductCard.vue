@@ -50,6 +50,10 @@
           <el-icon><Document /></el-icon>
           详情
         </el-button>
+        <el-button type="success" plain size="small" @click="$emit('download-occupation-table', product)">
+          <el-icon><Download /></el-icon>
+          职业表
+        </el-button>
         <el-button v-if="isAdmin" type="primary" size="small" @click="$emit('open-product-dialog', product)">
           <el-icon><Edit /></el-icon>
           编辑
@@ -218,6 +222,7 @@ defineProps({
 defineEmits([
   'preview-image',
   'open-product-detail',
+  'download-occupation-table',
   'open-product-dialog',
   'toggle-product-status',
   'delete-product',

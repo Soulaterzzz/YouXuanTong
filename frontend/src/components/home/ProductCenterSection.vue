@@ -98,6 +98,7 @@
           :is-admin="isAdmin"
           @preview-image="$emit('preview-image', $event)"
           @open-product-detail="$emit('open-product-detail', $event)"
+          @download-occupation-table="$emit('download-occupation-table', $event)"
           @open-product-dialog="$emit('open-product-dialog', $event)"
           @toggle-product-status="$emit('toggle-product-status', $event)"
           @delete-product="$emit('delete-product', $event)"
@@ -156,6 +157,7 @@ defineEmits([
   'clear-product-search',
   'preview-image',
   'open-product-detail',
+  'download-occupation-table',
   'open-product-dialog',
   'toggle-product-status',
   'delete-product',

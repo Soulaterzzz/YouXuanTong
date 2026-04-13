@@ -13,6 +13,52 @@ const COMPANY_HOTLINES = {
   '中国人寿财险': '95519'
 }
 
+const COMPANY_PROFILES = [
+  {
+    displayName: '人保财险',
+    officialName: '中国人民财产保险股份有限公司',
+    aliases: ['中国人民财产保险股份有限公司', '中国人保财险', '中国人民财险', '人保财险', '人保'],
+    hotline: '95518'
+  },
+  {
+    displayName: '国寿财险',
+    officialName: '中国人寿财产保险股份有限公司',
+    aliases: ['中国人寿财产保险股份有限公司', '中国人寿财险', '国寿财', '国寿财产'],
+    hotline: '95519'
+  },
+  {
+    displayName: '平安财险',
+    officialName: '中国平安财产保险股份有限公司',
+    aliases: ['中国平安财产保险股份有限公司', '中国平安财险', '平安产险', '平安财', '平安保险'],
+    hotline: '95511'
+  },
+  {
+    displayName: '太平洋保险',
+    officialName: '中国太平洋财产保险股份有限公司',
+    aliases: ['中国太平洋财产保险股份有限公司', '中国太平洋保险', '太保', '太平洋财险', '太平洋财产保险'],
+    hotline: '95500'
+  },
+  {
+    displayName: '众安保险',
+    officialName: '众安在线财产保险股份有限公司',
+    aliases: ['众安在线财产保险股份有限公司', '众安在线', '众安在线财险', '众安在线保险', '众安'],
+    hotline: '1010-9955'
+  },
+  {
+    displayName: '平安人寿',
+    officialName: '中国平安人寿保险股份有限公司',
+    aliases: ['中国平安人寿保险股份有限公司', '平安寿险', '平安人寿'],
+    hotline: '95511'
+  }
+]
+
+const DEFAULT_COMPANY_PROFILE = {
+  displayName: '承保公司待配置',
+  officialName: '承保公司待配置',
+  aliases: [],
+  hotline: '请以承保公司官方客服为准'
+}
+
 const DETAIL_SPLIT_RE = /[；;。！？!?\n]+/
 
 function normalizeText(value) {
@@ -54,13 +100,54 @@ export function getCompanyHotline(companyName) {
   return COMPANY_HOTLINES[normalizedName] || '请以承保公司官方客服为准'
 }
 
+function resolveCompanyProfile(product) {
+  const candidates = [
+    product?.companyName,
+    product?.alias,
+    product?.name,
+    product?.description,
+    product?.features
+  ]
+    .map(normalizeText)
+    .filter(Boolean)
+
+  const sourceText = candidates.join(' ')
+
+  const directCompanyName = normalizeText(product?.companyName)
+  if (directCompanyName) {
+    const directMatch = COMPANY_PROFILES.find((profile) => {
+      const aliases = [profile.displayName, profile.officialName, ...(profile.aliases || [])].filter(Boolean)
+      return aliases.some((alias) => sourceText.includes(alias) || directCompanyName.includes(alias))
+    })
+
+    if (directMatch) {
+      return directMatch
+    }
+
+    return {
+      displayName: directCompanyName,
+      officialName: directCompanyName,
+      aliases: [directCompanyName],
+      hotline: getCompanyHotline(directCompanyName)
+    }
+  }
+
+  const matchedProfile = COMPANY_PROFILES.find((profile) => {
+    const aliases = [profile.displayName, profile.officialName, ...(profile.aliases || [])].filter(Boolean)
+    return aliases.some((alias) => sourceText.includes(alias))
+  })
+
+  return matchedProfile || DEFAULT_COMPANY_PROFILE
+}
+
 export function buildProductDetailCopy(product) {
   const descriptionClauses = splitDetailClauses(product?.description)
   const featureClauses = splitDetailClauses(product?.features)
-  const companyName = normalizeText(product?.companyName) || '承保公司待配置'
+  const companyProfile = resolveCompanyProfile(product)
+  const companyName = companyProfile.displayName || normalizeText(product?.companyName) || '承保公司待配置'
   const categoryLabel = getCategoryLabel(product?.categoryCode)
   const saleStatusLabel = getSaleStatusLabel(product?.saleStatus)
-  const hotline = getCompanyHotline(product?.companyName)
+  const hotline = companyProfile.hotline || getCompanyHotline(product?.companyName)
   const basePrice = formatMoney(product?.price)
   const displayPrice = formatMoney(product?.displayPrice ?? product?.price)
   const detailText = normalizeMultilineText(product?.detailText) || [

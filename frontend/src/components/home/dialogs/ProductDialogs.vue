@@ -44,6 +44,36 @@
           </el-col>
         </el-row>
         <el-row :gutter="16">
+          <el-col :span="24">
+            <el-form-item label="职业表">
+              <div class="profession-upload-block">
+                <el-upload
+                  class="profession-table-uploader"
+                  :action="`/api/images/profession/${productForm.companyCode}`"
+                  :disabled="!productForm.companyCode"
+                  :show-file-list="false"
+                  :before-upload="beforeProfessionUpload"
+                  :on-success="handleProfessionUploadSuccess"
+                  :on-error="handleProfessionUploadError"
+                  accept=".xls,.xlsx"
+                  :headers="uploadHeaders"
+                  method="post"
+                >
+                  <el-button type="success" plain :disabled="!productForm.companyCode">
+                    <el-icon><Upload /></el-icon>
+                    上传职业表
+                  </el-button>
+                </el-upload>
+                <div class="upload-tip">
+                  {{ productForm.companyCode
+                    ? `将保存到 /uploads/profession/${productForm.companyCode}.xls 或 .xlsx`
+                    : '请先选择承保公司后再上传职业表' }}
+                </div>
+              </div>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
           <el-col :span="8">
             <el-form-item label="价格" required>
               <el-input-number v-model="productForm.price" :min="0.01" :precision="2" style="width: 100%" />

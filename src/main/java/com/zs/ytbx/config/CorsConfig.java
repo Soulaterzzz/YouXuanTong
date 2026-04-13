@@ -3,6 +3,7 @@ package com.zs.ytbx.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
@@ -24,6 +25,9 @@ public class CorsConfig {
         }
         config.addAllowedHeader("*");
         config.addAllowedMethod("*");
+        config.addExposedHeader(HttpHeaders.CONTENT_DISPOSITION);
+        config.addExposedHeader(HttpHeaders.CONTENT_LENGTH);
+        config.addExposedHeader(HttpHeaders.CONTENT_TYPE);
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);
 

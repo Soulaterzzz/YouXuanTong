@@ -37,6 +37,7 @@
         @clear-product-search="clearProductSearch"
         @preview-image="previewImage"
         @open-product-detail="openProductDetail"
+        @download-occupation-table="downloadOccupationTable"
         @open-product-dialog="openProductDialog"
         @toggle-product-status="toggleProductStatus"
         @delete-product="deleteProduct"

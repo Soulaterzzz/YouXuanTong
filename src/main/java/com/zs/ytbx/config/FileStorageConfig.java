@@ -11,7 +11,9 @@ public class FileStorageConfig {
     private String uploadPath = "./uploads";
     private String productImagePath = "products";
     private String templateFilePath = "./uploads/templates";
+    private String professionFilePath = "./uploads/profession";
     private long maxFileSize = 10 * 1024 * 1024;
     private String[] allowedExtensions = {"jpg", "jpeg", "png", "gif", "webp"};
     private String[] allowedTemplateExtensions = {"pdf", "doc", "docx", "xls", "xlsx", "txt"};
+    private String[] allowedProfessionExtensions = {"xls", "xlsx"};
 }

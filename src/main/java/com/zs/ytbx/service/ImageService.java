@@ -13,4 +13,6 @@ public interface ImageService {
     TemplateFileVO getProductTemplate(Long productId);
     String uploadProductTemplate(Long productId, MultipartFile file);
     void deleteProductTemplate(Long productId);
+
+    String uploadProfessionTable(String companyCode, MultipartFile file);
 }
